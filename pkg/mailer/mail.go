@@ -1,0 +1,264 @@
+package mailer
+
+import (
+	"bytes"
+	"compress/zlib"
+	"context"
+	"crypto/cipher"
+	"crypto/rand"
+	"database/sql"
+	"encoding/json"
+	"github.com/afk11/airtrack/pkg/db"
+	"github.com/jmoiron/sqlx"
+	"github.com/pkg/errors"
+	log "github.com/sirupsen/logrus"
+	"gopkg.in/mail.v2"
+	"io"
+	"io/ioutil"
+	"strings"
+	"sync"
+	"time"
+)
+
+func zlibEncode(in []byte) ([]byte, error) {
+	var compressed bytes.Buffer
+	w := zlib.NewWriter(&compressed)
+	_, err := w.Write(in)
+	if err != nil {
+		return nil, err
+	}
+	err = w.Close()
+	if err != nil {
+		return nil, err
+	}
+	c := compressed.Bytes()
+	return c, nil
+}
+func zlibDecode(in []byte) ([]byte, error) {
+	r, err := zlib.NewReader(bytes.NewBuffer(in))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		_ = r.Close()
+	}()
+	raw, err := ioutil.ReadAll(r)
+	if err != nil {
+		return nil, errors.Wrap(err, "reading compressed data")
+	}
+	return raw, nil
+}
+
+type MailSender interface {
+	Queue(msg db.EmailJob) error
+}
+
+type Mailer struct {
+	dbConn    *sqlx.DB
+	from      string
+	key       []byte
+	dialer    *mail.Dialer
+	queued    []db.EmailJob
+	aesgcm    cipher.AEAD
+	canceller func()
+	mu        sync.RWMutex
+	wg        sync.WaitGroup
+}
+
+func (m *Mailer) Queue(msg db.EmailJob) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.queued = append(m.queued, msg)
+	return nil
+}
+func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
+	return db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
+		for _, job := range queued {
+			// make json
+			raw, err := json.Marshal(job)
+			if err != nil {
+				return err
+			}
+			// compress
+			compressed, err := zlibEncode(raw)
+			if err != nil {
+				return errors.Wrap(err, "zlib decode email")
+			}
+			// encrypt
+			// Never use more than 2^32 random nonces with a given key because of the risk of a repeat.
+			nonce := make([]byte, m.aesgcm.NonceSize())
+			if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+				return err
+			}
+			ciphertext := m.aesgcm.Seal(nil, nonce, compressed, nil)
+			ciphertext = append(ciphertext, nonce...)
+			// encrypt
+			_, err = db.CreateEmailJobTx(tx, now, ciphertext)
+			if err != nil {
+				return err
+			}
+		}
+		return nil
+	}).Exec()
+}
+func (m *Mailer) processMails() error {
+	m.mu.Lock()
+	queued := m.queued
+	m.queued = nil
+	m.mu.Unlock()
+
+	if len(queued) > 0 {
+		err := m.addMailsToDb(time.Now(), queued)
+		if err != nil {
+			return errors.Wrapf(err, "add queued emails to database")
+		}
+	}
+
+	records, err := db.GetPendingEmailJobs(m.dbConn, time.Now())
+	if err == sql.ErrNoRows {
+		return nil
+	} else if err != nil {
+		return err
+	}
+
+	if len(records) == 0 {
+		return nil
+	}
+	log.Debugf("mailer: processing %d jobs", len(records))
+
+	jobs := make([]db.EmailJob, 0, len(records))
+	for _, record := range records {
+		ctLen := len(record.Job)
+		if ctLen < m.aesgcm.NonceSize() {
+			return errors.New("ciphertext too small")
+		}
+		// decrypt
+		nonce := record.Job[ctLen-m.aesgcm.NonceSize():]
+		ct := record.Job[0 : ctLen-m.aesgcm.NonceSize()]
+		compressed, err := m.aesgcm.Open(nil, nonce, ct, nil)
+		if err != nil {
+			return err
+		}
+		// decompress
+		raw, err := zlibDecode(compressed)
+		if err != nil {
+			return errors.Wrap(err, "zlib decode email")
+		}
+		// parse json
+		job := db.EmailJob{}
+		err = json.Unmarshal(raw, &job)
+		if err != nil {
+			panic(err)
+		}
+		jobs = append(jobs, job)
+	}
+
+	if len(jobs) > 0 {
+		sendCloser, err := m.dialer.Dial()
+		if err != nil {
+			log.Warnf("failed to connect to SMTP server: %s", err.Error())
+			return err
+		}
+
+		failed := make([]db.Email, 0)
+		finished := make([]db.Email, 0)
+		for i, job := range jobs {
+			msg := mail.NewMessage()
+			msg.SetHeader("Sender", m.from)
+			msg.SetHeader("To", job.To, job.To)
+			msg.SetHeader("Subject", job.Subject)
+			msg.SetBody("text/html", job.Body)
+			for _, attach := range job.Attachments {
+				msg.AttachReader(attach.ContentType, strings.NewReader(attach.Contents), mail.Rename(attach.FileName))
+			}
+			err := mail.Send(sendCloser, msg)
+			if err != nil {
+				log.Warnf("failed to send email: %s", err.Error())
+				failed = append(failed, records[i])
+			} else {
+				finished = append(finished, records[i])
+			}
+		}
+
+		sendCloser.Close()
+
+		if len(finished) > 0 {
+			err = db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
+				for _, email := range finished {
+					_, err = db.DeleteCompletedEmail(tx, email)
+					if err != nil {
+						return errors.Wrapf(err, "deleting completed email %d", email.Id)
+					}
+				}
+				return nil
+			}).Exec()
+			if err != nil {
+				return err
+			}
+		}
+
+		if len(failed) > 0 {
+			err = db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
+				for _, email := range failed {
+					if email.Retries == 4 {
+						_, err = db.MarkEmailFailedTx(tx, email)
+						if err != nil {
+							return errors.Wrapf(err, "marking email failed %d", email.Id)
+						}
+					} else {
+						_, err = db.RetryEmailAfter(tx, email, time.Now().Add(time.Minute*2))
+						if err != nil {
+							return errors.Wrapf(err, "updating email retry information %d", email.Id)
+						}
+					}
+				}
+				return nil
+			}).Exec()
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+func (m *Mailer) Start() {
+	ctx, canceller := context.WithCancel(context.Background())
+	m.canceller = canceller
+	m.wg.Add(1)
+	go func() {
+		defer m.wg.Done()
+		normalDelay := time.Second * 5
+		delay := normalDelay
+		for {
+			select {
+			case <-time.After(delay):
+				err := m.processMails()
+				if err != nil {
+					delay = time.Minute
+				} else {
+					delay = normalDelay
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+}
+
+func (m *Mailer) Stop() {
+	m.canceller()
+	m.wg.Wait()
+	err := m.processMails()
+	if err != nil {
+		panic(err)
+	}
+}
+func NewMailer(dbConn *sqlx.DB, from string, dialer *mail.Dialer, aesgcm cipher.AEAD) *Mailer {
+	return &Mailer{
+		dbConn: dbConn,
+		dialer: dialer,
+		from:   from,
+		aesgcm: aesgcm,
+		queued: make([]db.EmailJob, 0),
+	}
+}

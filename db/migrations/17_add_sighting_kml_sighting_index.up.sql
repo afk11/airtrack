@@ -1,0 +1,1 @@
+alter table `sighting_kml` add index `sighting_kml_sighting_id_index`(`sighting_id`);

@@ -1,0 +1,70 @@
+timezone: UTC
+encryption:
+  # Application encryption key: base64(random_bytes(32))
+  # dd if=/dev/random bs=32 count=1 2>/dev/null | base64
+  key: G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=
+airports:
+  # Directories containing OpenAIP files for airport geocoding.
+  # Register an account on openaip.net to download the files you need.
+  directories:
+    - ./openaip-gb/
+    - ./openaip-de/
+email:
+  # Notifications driver. Currently only smtp is supported
+  driver: "smtp"
+  smtp:
+    # sender email address
+    sender: sender@domain.local
+    # smtp username
+    username: sender@domain.local
+    # smtp password
+    password: YOUR PASSWORD
+    # smtp host
+    host: SMTP HOST
+    # smtp port
+    port: SMTP PORT
+    # activate and require STARTTLS
+    mandatory_starttls: true
+sighting:
+  # close sightings if no messages have been received in this long
+  # unit: seconds
+  timeout: 60
+database:
+  # golang Mysql driver
+  driver: mysql
+  # DB Host
+  host: server.local
+  # DB Port
+  port: 3306
+  # DB Username
+  username: airtrack
+  # DB Password
+  password: password
+  # Selected Database
+  database: airtrack
+projects:
+  # Sample project configuration
+  - name: German aircraft
+    # Set a filter for this project. Can be omitted if not required.
+    filter: state.CountryCode == "DE"
+    # Whether to reopen a sighting if it was closed recently, due
+    # to bad coverage, etc
+    reopen_sightings: true
+    # Notification configuration
+    notifications:
+      # Address to send notifications to
+      email: mymail@domain.local
+      # List of enabled email notifications
+      events:
+        - map_produced
+        - spotted_in_flight
+        - takeoff_start
+        - takeoff_complete
+    # List of enabled project features
+    features:
+      - track_tx_types
+      - track_callsigns
+      - track_squawks
+      - track_kml
+      - track_takeoff
+      - geocode_endpoints

@@ -1,0 +1,1 @@
+alter table `sighting` add `squawk` varchar(4) null;

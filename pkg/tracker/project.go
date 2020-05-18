@@ -1,0 +1,166 @@
+package tracker
+
+import (
+	"github.com/afk11/airtrack/pkg/config"
+	"github.com/afk11/airtrack/pkg/db"
+	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/google/cel-go/cel"
+	"github.com/google/cel-go/checker/decls"
+	"github.com/pkg/errors"
+	"time"
+)
+
+type (
+	Feature           string
+	EmailNotification string
+)
+
+const (
+	TrackTxTypes     Feature = "track_tx_types"
+	TrackCallSigns   Feature = "track_callsigns"
+	TrackSquawks     Feature = "track_squawks"
+	TrackKmlLocation Feature = "track_kml"
+	TrackTakeoff     Feature = "track_takeoff"
+	GeocodeEndpoints Feature = "geocode_endpoints"
+
+	MapProduced     EmailNotification = "map_produced"
+	SpottedInFlight EmailNotification = "spotted_in_flight"
+	TakeoffStart    EmailNotification = "takeoff_start"
+	TakeoffComplete EmailNotification = "takeoff_complete"
+
+	DefaultSightingReopenInterval = time.Minute * 5
+)
+
+func FeatureFromString(f string) (Feature, error) {
+	switch f {
+	case string(TrackTxTypes):
+		return TrackTxTypes, nil
+	case string(TrackCallSigns):
+		return TrackCallSigns, nil
+	case string(TrackSquawks):
+		return TrackSquawks, nil
+	case string(TrackKmlLocation):
+		return TrackKmlLocation, nil
+	case string(TrackTakeoff):
+		return TrackTakeoff, nil
+	case string(GeocodeEndpoints):
+		return GeocodeEndpoints, nil
+	}
+	return "", errors.New("unknown feature")
+}
+
+func EmailNotificationFromString(n string) (EmailNotification, error) {
+	switch n {
+	case string(MapProduced):
+		return MapProduced, nil
+	case string(SpottedInFlight):
+		return SpottedInFlight, nil
+	case string(TakeoffStart):
+		return TakeoffStart, nil
+	case string(TakeoffComplete):
+		return TakeoffComplete, nil
+	}
+	return "", errors.New("unknown notification")
+}
+
+type Project struct {
+	Name     string
+	Site     *db.CollectionSite
+	Session  *db.CollectionSession
+	Filter   string
+	Program  cel.Program
+	Features []Feature
+
+	NotifyEmail        string
+	EmailNotifications []EmailNotification
+
+	ReopenSightings         bool
+	ReopenSightingsInterval time.Duration
+}
+
+func (p *Project) IsFeatureEnabled(f Feature) bool {
+	for _, pf := range p.Features {
+		if pf == f {
+			return true
+		}
+	}
+	return false
+}
+
+func (p *Project) IsEmailNotificationEnabled(n EmailNotification) bool {
+	for _, ni := range p.EmailNotifications {
+		if ni == n {
+			return true
+		}
+	}
+	return false
+}
+
+func InitProject(cfg config.Project) (*Project, error) {
+	if cfg.Disabled {
+		return nil, errors.New("cannot init disabled project")
+	}
+	p := Project{}
+	p.Name = cfg.Name
+	p.Filter = cfg.Filter
+	p.Features = make([]Feature, 0, len(cfg.Features))
+	p.ReopenSightingsInterval = DefaultSightingReopenInterval
+	if cfg.ReopenSightings {
+		p.ReopenSightings = cfg.ReopenSightings
+	}
+	if cfg.ReopenSightingsInterval != 0 {
+		p.ReopenSightingsInterval = time.Duration(cfg.ReopenSightingsInterval) * time.Second
+	}
+
+	for _, f := range cfg.Features {
+		feature, err := FeatureFromString(f)
+		if err != nil {
+			return nil, errors.Wrapf(err, "unknown feature: %s", f)
+		}
+		p.Features = append(p.Features, feature)
+	}
+
+	if cfg.Notifications != nil {
+		if cfg.Notifications.Email == "" {
+			return nil, errors.Errorf("notifications missing value for email")
+		}
+		p.NotifyEmail = cfg.Notifications.Email
+		for _, n := range cfg.Notifications.Enabled {
+			notification, err := EmailNotificationFromString(n)
+			if err != nil {
+				return nil, errors.Wrapf(err, "unknown email notification: %s", n)
+			}
+			p.EmailNotifications = append(p.EmailNotifications, notification)
+		}
+	}
+
+	if p.Filter != "" {
+		env, err := cel.NewEnv(
+			cel.Types(&pb.Source{}, &pb.Message{}, &pb.State{}),
+			cel.Declarations(
+				decls.NewIdent("msg",
+					decls.NewObjectType("airtrack.Message"),
+					nil),
+				decls.NewIdent("state",
+					decls.NewObjectType("airtrack.State"),
+					nil)))
+
+		if err != nil {
+			return nil, err
+		}
+		parsed, issues := env.Parse(cfg.Filter)
+		if issues != nil && issues.Err() != nil {
+			return nil, errors.Wrap(issues.Err(), "failed to parse filter expression")
+		}
+		checked, issues := env.Check(parsed)
+		if issues != nil && issues.Err() != nil {
+			return nil, errors.Wrap(issues.Err(), "type errors in filter expression")
+		}
+		prg, err := env.Program(checked)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to initialize filter")
+		}
+		p.Program = prg
+	}
+	return &p, nil
+}

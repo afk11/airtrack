@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package airtrack;
+option go_package = "github.com/afk11/airtrack/pkg/pb";
+
+message Source {
+  string Id = 1;
+  string Type = 2;
+  string Url = 3;
+};
+message Message {
+  Source Source = 1;
+
+  string Icao = 10;
+  string Squawk = 11;
+  string CallSign = 12;
+  string Altitude = 13;
+
+  string Latitude = 20;
+  string Longitude = 21;
+
+  bool IsOnGround = 30;
+
+  string VerticalRate = 40;
+}
+message State {
+  string Icao = 1;
+
+  bool HaveAltitude = 10;
+  int64 Altitude = 11;
+
+  bool HaveLocation = 20;
+  double Latitude = 21;
+  double Longitude = 22;
+
+  bool HaveCallsign = 30;
+  string CallSign = 31;
+
+  bool HaveSquawk = 40;
+  string Squawk = 41;
+
+  bool HaveCountry = 50;
+  string CountryCode = 51;
+  string Country = 52;
+
+  bool IsOnGround = 60;
+
+  bool HaveVerticalRate = 70;
+  int64 VerticalRate = 71;
+}

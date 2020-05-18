@@ -1,0 +1,2 @@
+create table `aircraft` (`id` int unsigned not null auto_increment primary key, `icao` varchar(6) not null, `created_at` timestamp null, `updated_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
+alter table `aircraft` add unique `aircraft_icao_unique`(`icao`);
