@@ -141,7 +141,7 @@ func NewSighting(icao string) *Sighting {
 }
 
 func New(dbConn *sqlx.DB, opt Options) (*Tracker, error) {
-	if opt.SightingTimeout < 0 || opt.SightingTimeout < time.Second*30 {
+	if opt.SightingTimeout < time.Second*30 {
 		return nil, errors.New("invalid sighting timeout - must be at least 30 seconds")
 	} else if opt.OnGroundUpdateThreshold < 1 {
 		return nil, errors.New("invalid onground confirmation threshold - must be at least 1")
@@ -160,7 +160,7 @@ func New(dbConn *sqlx.DB, opt Options) (*Tracker, error) {
 	}, nil
 }
 
-func (t *Tracker) Start(msgs chan *pb.Message) error {
+func (t *Tracker) Start(msgs chan *pb.Message) {
 	consumerCtx, consumerCanceller := context.WithCancel(context.Background())
 	t.consumerCanceller = consumerCanceller
 	t.consumerWG.Add(t.opt.Workers)
@@ -171,7 +171,6 @@ func (t *Tracker) Start(msgs chan *pb.Message) error {
 	lostAcCtx, lostAcCanceller := context.WithCancel(context.Background())
 	t.lostAcCanceller = lostAcCanceller
 	go t.checkForLostAircraft(lostAcCtx)
-	return nil
 }
 
 func (t *Tracker) Stop() error {

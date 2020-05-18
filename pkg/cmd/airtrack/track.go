@@ -196,10 +196,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		log.Debugf("skipping %d disabled projects", ignored)
 	}
 
-	err = t.Start(msgs)
-	if err != nil {
-		return err
-	}
+	t.Start(msgs)
 
 	if cfg.Metrics != nil && cfg.Metrics.Enabled {
 		var prometheusPort = 9206

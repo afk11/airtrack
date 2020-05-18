@@ -104,10 +104,8 @@ func InitProject(cfg config.Project) (*Project, error) {
 	p.Name = cfg.Name
 	p.Filter = cfg.Filter
 	p.Features = make([]Feature, 0, len(cfg.Features))
+	p.ReopenSightings = cfg.ReopenSightings
 	p.ReopenSightingsInterval = DefaultSightingReopenInterval
-	if cfg.ReopenSightings {
-		p.ReopenSightings = cfg.ReopenSightings
-	}
 	if cfg.ReopenSightingsInterval != 0 {
 		p.ReopenSightingsInterval = time.Duration(cfg.ReopenSightingsInterval) * time.Second
 	}

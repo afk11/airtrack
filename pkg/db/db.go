@@ -3,13 +3,13 @@ package db
 import (
 	"database/sql"
 	"fmt"
+	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/url"
 	"strings"
 	"time"
-
-	"github.com/jmoiron/sqlx"
 )
 
 const (
