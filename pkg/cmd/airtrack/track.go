@@ -146,7 +146,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	}
 	opt.AirportGeocoder = nearestAirports
 
-	countryCodesData, err := asset.Asset("assets/iso3166_alpha2_country_codes.txt")
+	countryCodesData, err := asset.Asset("assets/iso3166_country_codes.txt")
 	if err != nil {
 		panic(err)
 	}

@@ -12,7 +12,7 @@ func TestStore_GetCountryCode(t *testing.T) {
 		name: "Portugal",
 	}
 	store := emptyStore()
-	store.alpha2[codePT] = country
+	store.alpha2[codePT] = &country
 	_, found := store.GetCountryCode(codeSD)
 	assert.False(t, found)
 	foundCountry, found := store.GetCountryCode(codePT)
@@ -22,28 +22,28 @@ func TestStore_GetCountryCode(t *testing.T) {
 }
 func TestNew_Errors(t *testing.T) {
 	t.Run("invalid country code", func(t *testing.T) {
-		rows := [][2]string{
-			{"GBallalala", "United Kingdom"},
+		rows := [][3]string{
+			{"GBallalala", "GBR", "United Kingdom"},
 		}
 		s, err := New(rows)
-		assert.EqualError(t, err, "country code should be two characters")
+		assert.EqualError(t, err, "alpha2 country code should be two characters")
 		assert.Nil(t, s)
 	})
 	t.Run("duplicate country code", func(t *testing.T) {
-		rows := [][2]string{
-			{"GB", "United Kingdom"},
-			{"GB", "United Kingdom"},
+		rows := [][3]string{
+			{"GB", "GBR", "United Kingdom"},
+			{"GB", "GBR", "United Kingdom"},
 		}
 		s, err := New(rows)
-		assert.EqualError(t, err, "cannot use duplicate country codes (GB)")
+		assert.EqualError(t, err, "cannot use duplicate alpha2 country codes (GB)")
 		assert.Nil(t, s)
 	})
 }
 func TestNew(t *testing.T) {
-	rows := [][2]string{
-		{"GB", "United Kingdom"},
-		{"KZ", "Kazakhstan"},
-		{"KI", "Kiribati"},
+	rows := [][3]string{
+		{"GB", "GBR", "United Kingdom"},
+		{"KZ", "KAZ", "Kazakhstan"},
+		{"KI", "KIR", "Kiribati"},
 	}
 	store, err := New(rows)
 	assert.NoError(t, err)

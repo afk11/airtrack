@@ -128,7 +128,7 @@ BT BTN Bhutan
 NR NRU Nauru
 RW RWA Rwanda
 FR FRA France
-FM ALA Micronesia
+FM FSM Micronesia
 LC LCA Saint Lucia
 SN SEN Senegal
 DE DEU Germany

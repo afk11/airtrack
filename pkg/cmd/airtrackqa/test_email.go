@@ -48,7 +48,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 
 	loc, err := time.LoadLocation(cfg.TimeZone)
 	if err != nil {
-		return errors.Wrapf(err, "Invalid timezone", ctx.Config.TimeZone)
+		return errors.Wrapf(err, "invalid timezone %s", ctx.Config.TimeZone)
 	}
 
 	dbConn, err := db.NewConn(cfg.Database.Driver, cfg.Database.Username, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Database, loc)

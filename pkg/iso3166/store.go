@@ -1,8 +1,8 @@
 package iso3166
 
 import (
-	"errors"
 	"fmt"
+	"github.com/pkg/errors"
 )
 
 type Store struct {
@@ -29,9 +29,8 @@ func New(list [][3]string) (*Store, error) {
 		if len(v[0]) != 2 {
 			return nil, errors.New("alpha2 country code should be two characters")
 		} else if len(v[1]) != 3 {
-			return nil, errors.New("alpha3 country code should be three characters")
+			return nil, errors.Errorf("alpha3 country code should be three characters (%s)", v[1])
 		}
-
 		country := Country{
 			name: v[2],
 		}
@@ -40,9 +39,9 @@ func New(list [][3]string) (*Store, error) {
 		_, a2Known := s.alpha2[a2]
 		_, a3Known := s.alpha3[a3]
 		if a2Known {
-			return nil, fmt.Errorf("cannot use duplicate alpha2 country codes (%s)", v[0])
+			return nil, fmt.Errorf("cannot use duplicate alpha2 country codes (%s)", a2)
 		} else if a3Known {
-			return nil, fmt.Errorf("cannot use duplicate alpha3 country codes (%s)", v[1])
+			return nil, fmt.Errorf("cannot use duplicate alpha3 country codes (%s)", a3)
 		}
 		s.alpha2[a2] = &country
 		s.alpha3[a3] = &country

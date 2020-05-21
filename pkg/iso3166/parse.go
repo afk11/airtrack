@@ -7,12 +7,10 @@ import (
 
 func ParseColumnFormat(r io.Reader) (*Store, error) {
 	scanner := bufio.NewScanner(r)
-	var list [][2]string
+	var list [][3]string
 	for scanner.Scan() {
 		line := scanner.Text()
-		code := line[0:2]
-		country := line[3:]
-		list = append(list, [2]string{code, country})
+		list = append(list, [3]string{line[0:2], line[3:6], line[7:]})
 	}
 	if err := scanner.Err(); err != nil {
 		return nil, err

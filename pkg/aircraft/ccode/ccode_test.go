@@ -32,12 +32,12 @@ func TestLoadCountryAllocations(t *testing.T) {
 730000 	737FFF 	IR
 004000 	0043FF 	ZW
 09A000 	09AFFF 	GM`
-	store, err := iso3166.New([][2]string{
-		{"DJ", "Djibouti"},
-		{"SE", "Sweden"},
-		{"IR", "Iran, Islamic Republic"},
-		{"ZW", "Zimbabwe"},
-		{"GM", "Gambia"},
+	store, err := iso3166.New([][3]string{
+		{"DJ", "DJI", "Djibouti"},
+		{"SE", "SWE", "Sweden"},
+		{"IR", "IRN", "Iran, Islamic Republic"},
+		{"ZW", "ZWE", "Zimbabwe"},
+		{"GM", "GMB", "Gambia"},
 	})
 	if err != nil {
 		t.Errorf("error building country store for test: %s", err.Error())

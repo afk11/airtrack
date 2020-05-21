@@ -8,7 +8,7 @@ import (
 )
 
 func TestParseColumnFormat(t *testing.T) {
-	data, err := asset.Asset("assets/iso3166_alpha2_country_codes.txt")
+	data, err := asset.Asset("assets/iso3166_country_codes.txt")
 	assert.NoError(t, err)
 	assert.NotNil(t, data)
 	buf := bytes.NewBuffer(data)
