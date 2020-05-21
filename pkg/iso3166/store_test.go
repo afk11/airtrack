@@ -6,13 +6,13 @@ import (
 )
 
 func TestStore_GetCountryCode(t *testing.T) {
-	codePT := CountryCode("PT")
-	codeSD := CountryCode("SD")
+	codePT := AlphaTwoCountryCode("PT")
+	codeSD := AlphaTwoCountryCode("SD")
 	country := Country{
 		name: "Portugal",
 	}
 	store := emptyStore()
-	store.countries[codePT] = country
+	store.alpha2[codePT] = country
 	_, found := store.GetCountryCode(codeSD)
 	assert.False(t, found)
 	foundCountry, found := store.GetCountryCode(codePT)
@@ -47,17 +47,17 @@ func TestNew(t *testing.T) {
 	}
 	store, err := New(rows)
 	assert.NoError(t, err)
-	assert.Equal(t, 3, len(store.countries))
+	assert.Equal(t, 3, len(store.alpha2))
 
-	c, ok := store.countries["GB"]
+	c, ok := store.alpha2["GB"]
 	assert.True(t, ok)
 	assert.Equal(t, "United Kingdom", c.name)
 
-	c, ok = store.countries["KZ"]
+	c, ok = store.alpha2["KZ"]
 	assert.True(t, ok)
 	assert.Equal(t, "Kazakhstan", c.name)
 
-	c, ok = store.countries["KI"]
+	c, ok = store.alpha2["KI"]
 	assert.True(t, ok)
 	assert.Equal(t, "Kiribati", c.name)
 }

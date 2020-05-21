@@ -16,19 +16,19 @@ func TestParseColumnFormat(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, store)
 
-	bd, found := store.GetCountryCode(CountryCode("BD"))
+	bd, found := store.GetCountryCode(AlphaTwoCountryCode("BD"))
 	assert.True(t, found)
 	assert.Equal(t, "Bangladesh", bd.Name())
 
-	ar, found := store.GetCountryCode(CountryCode("AR"))
+	ar, found := store.GetCountryCode(AlphaTwoCountryCode("AR"))
 	assert.True(t, found)
 	assert.Equal(t, "Argentina", ar.Name())
 
-	sd, found := store.GetCountryCode(CountryCode("SD"))
+	sd, found := store.GetCountryCode(AlphaTwoCountryCode("SD"))
 	assert.True(t, found)
 	assert.Equal(t, "Sudan", sd.Name())
 
-	c, found := store.GetCountryCode(CountryCode("ZZ"))
+	c, found := store.GetCountryCode(AlphaTwoCountryCode("ZZ"))
 	assert.False(t, found)
 	assert.Nil(t, c)
 }

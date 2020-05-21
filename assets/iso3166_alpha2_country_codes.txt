@@ -159,7 +159,7 @@ KW Kuwait
 CL Chile
 TD Chad
 GR Greece
-LA Lao People's Democratic
+LA Lao People's Democratic Republic
 EC Ecuador
 TG Togo
 HU Hungary
@@ -185,3 +185,31 @@ CZ Czech Republic
 KP Democratic People's Republic of Korea
 RO Romania
 IQ Iraq
+AW Aruba
+AX Åland Islands
+AD Andorra
+AS American Samoa
+AQ Antarctica
+AI Anguilla
+TF French Southern Territories
+BQ Bonaire
+BL Saint Barthélemy
+BV Bouvet Island
+CC Cocos (Keeling) Islands
+CW Curaçao
+CX Christmas Island
+KY Cayman Islands
+DM Dominica
+GG Guernsey
+GI Gibraltar
+GP Guadeloupe
+GL Greenland
+GF French Guiana
+GU Guam
+HM Heard Island and McDonald Islands
+KN Saint Kitts and Nevis
+FK Falkland Islands (Malvinas)
+FO Faroe Islands
+IO British Indian Ocean Territory
+PN Pitcairn
+PS Palestine

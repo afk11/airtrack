@@ -12,7 +12,7 @@ import (
 type allocationRange struct {
 	low   uint32
 	high  uint32
-	owner iso3166.CountryCode
+	owner iso3166.AlphaTwoCountryCode
 }
 
 func icaoToInt(icao string) (uint32, error) {
@@ -38,7 +38,7 @@ func LoadCountryAllocations(r io.Reader, store *iso3166.Store) (CountryAllocatio
 		if len(allocation) != 2 {
 			continue
 		}
-		cc := iso3166.CountryCode(allocation)
+		cc := iso3166.AlphaTwoCountryCode(allocation)
 		_, found := store.GetCountryCode(cc)
 		if !found {
 			return nil, errors.Errorf("unknown country code in allocations file (%s)", cc)
@@ -79,19 +79,19 @@ func LoadCountryAllocations(r io.Reader, store *iso3166.Store) (CountryAllocatio
 }
 
 type CountryAllocationSearcher interface {
-	DetermineCountryCode(icao string) (*iso3166.CountryCode, error)
+	DetermineCountryCode(icao string) (*iso3166.AlphaTwoCountryCode, error)
 }
 
 type RadixCountryAllocationSearcher struct {
 	tree *iradix.Tree
 }
 
-func (cc *RadixCountryAllocationSearcher) DetermineCountryCode(k string) (*iso3166.CountryCode, error) {
+func (cc *RadixCountryAllocationSearcher) DetermineCountryCode(k string) (*iso3166.AlphaTwoCountryCode, error) {
 	icao, err := icaoToInt(k)
 	if err != nil {
 		panic(err)
 	}
-	var country *iso3166.CountryCode
+	var country *iso3166.AlphaTwoCountryCode
 	kb := []byte(k)
 	cc.tree.Root().WalkPath(kb, func(k []byte, v interface{}) bool {
 		r := v.(allocationRange)

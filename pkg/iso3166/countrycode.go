@@ -1,7 +1,14 @@
 package iso3166
 
-type CountryCode string
+type (
+	AlphaTwoCountryCode   string
+	AlphaThreeCountryCode string
+)
 
-func (cc CountryCode) String() string {
+func (cc AlphaTwoCountryCode) String() string {
+	return string(cc)
+}
+
+func (cc AlphaThreeCountryCode) String() string {
 	return string(cc)
 }

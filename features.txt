@@ -9,3 +9,4 @@ squawks       | squawk_changed
 takeoff       | takeoff_begin
               | takeoff_end
 ----------------------------------------------
+https://datahub.io/core/geo-countries#data

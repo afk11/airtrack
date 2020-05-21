@@ -1,0 +1,223 @@
+DJ DJI Djibouti
+SE SWE Sweden
+IR IRN Iran, Islamic Republic
+ZW ZWE Zimbabwe
+GM GMB Gambia
+CH CHE Switzerland
+IL ISR Israel
+MZ MOZ Mozambique
+BF BFA Burkina Faso
+TR TUR Turkey
+JO JOR Jordan
+ZA ZAF South Africa
+ST STP Sao Tome
+YU YUG Yugoslavia
+LB LBN Lebanon
+EG EGY Egypt
+DZ DZA Algeria
+CY CYP Cyprus
+MY MYS Malaysia
+LY LBY Libya
+BS BHS Bahamas
+IE IRL Ireland
+PH PHL Philippines
+MA MAR Morocco
+BB BRB Barbados
+IS ISL Iceland
+PK PAK Pakistan
+TN TUN Tunisia
+BZ BLZ Belize
+LU LUX Luxembourg
+SG SGP Singapore
+BW BWA Botswana
+CO COL Colombia
+MT MLT Malta
+LK LKA Sri Lanka
+BI BDI Burundi **
+CR CRI Costa Rica
+MC MCO Monaco
+SY SYR Syrian Arab Republic
+CM CMR Cameroon
+CU CUB Cuba
+SM SMR San Marino
+CN CHN China
+KM COM Comoros
+SV SLV El Salvador
+AU AUS Australia
+CG COG Congo **
+GT GTM Guatemala
+AL ALB Albania
+IN IND India
+CI CIV Côte d Ivoire
+GY GUY Guyana
+HR HRV Croatia
+JP JPN Japan
+GA GAB Gabon
+HT HTI Haiti
+LV LVA Latvia
+TH THA Thailand
+ET ETH Ethiopia
+HN HND Honduras
+LT LTU Lithuania
+VN VNM Viet Nam
+GQ GNQ Equatorial Guinea
+VC VCT Saint Vincent and the Grenadines
+MD MDA Republic of Moldova
+YE YEM Yemen
+GH GHA Ghana
+JM JAM Jamaica
+SK SVK Slovakia
+BH BHR Bahrain
+GN GIN Guinea
+NI NIC Nicaragua
+SI SVN Slovenia
+BN BRN Brunei Darussalam
+GW GNB Guinea-Bissau
+PA PAN Panama
+UZ UZB Uzbekistan
+AE ARE United Arab Emirates
+LS LSO Lesotho
+DO DOM Dominican Republic
+UA UKR Ukraine
+SB SLB Solomon Islands
+KE KEN Kenya
+TT TTO Trinidad and Tobago
+BY BLR Belarus
+PG PNG Papua New Guinea
+LR LBR Liberia
+SR SUR Suriname
+EE EST Estonia
+TW TWN Taiwan
+MG MDG Madagascar
+AG ATG Antigua and Barbuda
+MK MKD North Macedonia
+ID IDN Indonesia
+MW MWI Malawi
+GD GRD Grenada
+BA BIH Bosnia and Herzegovina
+MV MDF Maldives
+MX MEX Mexico
+GE GEO Georgia
+MH MHL Marshall Islands
+ML MLI Mali
+VE VEN Venezuela
+TJ TJK Tajikistan
+CK COK Cook Islands
+MR MRT Mauritania
+RU RUS Russian Federation
+AM ARM Armenia
+WS WSM Samoa
+MU MUS Mauritius
+US USA United States
+NE NER Niger
+NA NAM Namibia
+AZ AZE Azerbaijan
+NG NGA Nigeria
+ER ERI Eritrea
+KG KGZ Kyrgyzstan
+CA CAN Canada
+UG UGA Uganda
+TM TKM Turkmenistan
+NZ NZL New Zealand
+QA QAT Qatar
+IT ITA Italy
+FJ FJI Fiji
+CF CAF Central African Republic
+ES ESP Spain
+BT BTN Bhutan
+NR NRU Nauru
+RW RWA Rwanda
+FR FRA France
+FM ALA Micronesia
+LC LCA Saint Lucia
+SN SEN Senegal
+DE DEU Germany
+MN MNG Mongolia
+TO TON Tonga
+SC SYC Seychelles
+GB GBR United Kingdom
+KZ KAZ Kazakhstan
+KI KIR Kiribati
+SL SLE Sierra Leone
+AT AUT Austria
+PW PLW Palau
+VU VUT Vanuatu
+SO SOM Somalia
+BE BEL Belgium
+AF AFG Afghanistan
+SZ SWZ Eswatini
+BG BGR Bulgaria
+BD BGD Bangladesh
+AR ARG Argentina
+SD SDN Sudan
+DK DNK Denmark
+MM MMR Myanmar
+BR BRA Brazil
+TZ TZA United Republic of Tanzania
+FI FIN Finland
+KW KWT Kuwait
+CL CHL Chile
+TD TCD Chad
+GR GRC Greece
+LA LAO Lao People's Democratic Republic
+EC ECU Ecuador
+TG TGO Togo
+HU HUN Hungary
+NP NPL Nepal
+PY PRY Paraguay
+ZM ZMB Zambia
+NO NOR Norway
+OM OMN Oman
+PE PER Peru
+CD COD Democratic Republic of the Congo
+NL NLD Netherlands, Kingdom of
+KH KHM Cambodia
+UY URY Uruguay
+AO AGO Angola
+PL POL Poland
+SA SAU Saudi Arabia
+BO BOL Bolivia
+BJ BEN Benin
+PT PRT Portugal
+KR KOR Republic of Korea
+CV CPV Cape Verde
+CZ CZE Czech Republic
+KP PRK Democratic People's Republic of Korea
+RO ROU Romania
+IQ IRQ Iraq
+AW ABW Aruba
+AX ALA Åland Islands
+AD AND Andorra
+AS ASM American Samoa
+AQ ATA Antarctica
+AI AIA Anguilla
+TF ATF French Southern Territories
+BQ BES Bonaire
+BL BLM Saint Barthélemy
+BV BVT Bouvet Island
+CC CCK Cocos (Keeling) Islands
+CW CUW Curaçao
+CX CXR Christmas Island
+KY CYM Cayman Islands
+DM DMA Dominica
+GG GGY Guernsey
+GI GIB Gibraltar
+GP GLP Guadeloupe
+GL GRL Greenland
+GF GUF French Guiana
+GU GUM Guam
+HM HMD Heard Island and McDonald Islands
+KN KNA Saint Kitts and Nevis
+FK FLK Falkland Islands (Malvinas)
+FO FRO Faroe Islands
+IO IOT British Indian Ocean Territory
+PN PCN Pitcairn
+PS PSE Palestine, State of
+PF PYF French Polynesia
+SJ SJM Svalbard and Jan Mayen
+TK TKL Tokelau
+TL TLS Timor-Leste
+TV TUV Tuvalu
+VG VGB Virgin Islands (British)
+VI VIR Virgin Islands (U.S)
+WF WLF Wallis and Futuna

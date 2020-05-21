@@ -6,6 +6,6 @@ import (
 )
 
 func TestCountryCode(t *testing.T) {
-	c := CountryCode("PL")
+	c := AlphaTwoCountryCode("PL")
 	assert.Equal(t, "PL", c.String())
 }
