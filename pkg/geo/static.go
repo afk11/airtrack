@@ -5,6 +5,11 @@ import (
 )
 
 type Geocoder interface {
+	// ReverseGeocode takes a lat/lon and tries to return a location
+	// name, and the distance to the location from the input point.
+	// The final error value is set upon failure. If no error is returned,
+	// the address + distance fields may be zero values if no results
+	// are found
 	ReverseGeocode(lat float64, lon float64) (string, float64, error)
 }
 
