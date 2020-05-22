@@ -101,20 +101,19 @@ func InitProject(cfg config.Project) (*Project, error) {
 		return nil, errors.New("cannot init disabled project")
 	}
 	p := Project{
+		Name: cfg.Name,
+		Filter: cfg.Filter,
+		Features: make([]Feature, 0, len(cfg.Features)),
+		ReopenSightings: cfg.ReopenSightings,
 		ReopenSightingsInterval: DefaultSightingReopenInterval,
 		OnGroundUpdateThreshold: DefaultOnGroundUpdateThreshold,
 	}
-	p.Name = cfg.Name
-	p.Filter = cfg.Filter
-	p.Features = make([]Feature, 0, len(cfg.Features))
-	p.ReopenSightings = cfg.ReopenSightings
 	if p.ReopenSightings {
 		p.ReopenSightingsInterval = time.Duration(cfg.ReopenSightingsInterval) * time.Second
 	}
 	if cfg.OnGroundUpdateThreshold != nil {
 		p.OnGroundUpdateThreshold = *cfg.OnGroundUpdateThreshold
 	}
-
 	for _, f := range cfg.Features {
 		feature, err := FeatureFromString(f)
 		if err != nil {
