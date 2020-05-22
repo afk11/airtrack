@@ -66,9 +66,6 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	if cfg.Sighting.Timeout != nil {
 		opt.SightingTimeout = time.Second * time.Duration(*cfg.Sighting.Timeout)
 	}
-	if cfg.Sighting.OnGroundUpdateThreshold != nil {
-		opt.OnGroundUpdateThreshold = *cfg.Sighting.OnGroundUpdateThreshold
-	}
 
 	if cfg.Encryption.Key == "" {
 		return errors.New("encryption.key not set or empty")

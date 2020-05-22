@@ -103,8 +103,6 @@ encryption:
   key: G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=
 sighting:
   timeout: 60
-  reopen_timeframe: 600
-  onground_update_threshold: 6
 `)
 		cfg, err := ReadConfig(buf)
 		assert.NoError(t, err)
@@ -113,7 +111,6 @@ sighting:
 		assert.Equal(t, "G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=", cfg.Encryption.Key, "parsed encryption key should match")
 		assert.NotNil(t, cfg.Sighting)
 		assert.Equal(t, int64(60), *cfg.Sighting.Timeout)
-		assert.Equal(t, int64(6), *cfg.Sighting.OnGroundUpdateThreshold)
 	})
 
 	t.Run("database", func(t *testing.T) {
@@ -186,6 +183,7 @@ projects:
     filter: state.CountryCode == "GB"
     reopen_sightings: true
     reopen_sightings_interval: 10
+    onground_update_threshold: 7
     notifications:
       email: email@domain.local
       events:
@@ -214,6 +212,7 @@ projects:
 		assert.Equal(t, `state.CountryCode == "GB"`, cfg.Projects[1].Filter)
 		assert.True(t, cfg.Projects[1].ReopenSightings)
 		assert.Equal(t, 10, cfg.Projects[1].ReopenSightingsInterval)
+		assert.Equal(t, int64(7), *cfg.Projects[1].OnGroundUpdateThreshold)
 		assert.False(t, cfg.Projects[1].Disabled)
 		assert.Equal(t, "email@domain.local", cfg.Projects[1].Notifications.Email)
 		assert.Equal(t, 2, len(cfg.Projects[1].Notifications.Enabled))

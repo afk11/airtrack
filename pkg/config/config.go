@@ -40,8 +40,9 @@ type (
 		Filter                  string
 		Notifications           *Notifications `yaml:"notifications"`
 		Features                []string
-		ReopenSightings         bool `yaml:"reopen_sightings"`
-		ReopenSightingsInterval int  `yaml:"reopen_sightings_interval"`
+		ReopenSightings         bool   `yaml:"reopen_sightings"`
+		ReopenSightingsInterval int    `yaml:"reopen_sightings_interval"`
+		OnGroundUpdateThreshold *int64 `yaml:"onground_update_threshold"`
 	}
 
 	Database struct {
@@ -75,8 +76,7 @@ type (
 		Airports   Airports   `yaml:"airports"`
 		Metrics    *Metrics   `yaml:"metrics"`
 		Sighting   struct {
-			Timeout                 *int64 `yaml:"timeout"`
-			OnGroundUpdateThreshold *int64 `yaml:"onground_update_threshold"`
+			Timeout *int64 `yaml:"timeout"`
 		} `yaml:"sighting"`
 		Database      Database       `yaml:"database"`
 		EmailSettings *EmailSettings `yaml:"email"`
