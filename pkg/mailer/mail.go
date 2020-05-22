@@ -71,28 +71,59 @@ func (m *Mailer) Queue(msg db.EmailJob) error {
 	m.queued = append(m.queued, msg)
 	return nil
 }
+func encodeJob(aes cipher.AEAD, job *db.EmailJob) ([]byte, error) {
+	// make json
+	raw, err := json.Marshal(job)
+	if err != nil {
+		return nil, err
+	}
+	// compress
+	compressed, err := zlibEncode(raw)
+	if err != nil {
+		return nil, errors.Wrap(err, "zlib decode email")
+	}
+	// encrypt
+	// Never use more than 2^32 random nonces with a given key because of the risk of a repeat.
+	nonce := make([]byte, aes.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	ciphertext := aes.Seal(nil, nonce, compressed, nil)
+	ciphertext = append(ciphertext, nonce...)
+	return ciphertext, nil
+}
+func decodeJob(aes cipher.AEAD, jobBytes []byte) (db.EmailJob, error) {
+	ctLen := len(jobBytes)
+	if ctLen < aes.NonceSize() {
+		return db.EmailJob{}, errors.New("ciphertext too small")
+	}
+	// decrypt
+	nonce := jobBytes[ctLen-aes.NonceSize():]
+	ct := jobBytes[0 : ctLen-aes.NonceSize()]
+	compressed, err := aes.Open(nil, nonce, ct, nil)
+	if err != nil {
+		return db.EmailJob{}, err
+	}
+	// decompress
+	raw, err := zlibDecode(compressed)
+	if err != nil {
+		return db.EmailJob{}, errors.Wrap(err, "zlib decode email")
+	}
+	// parse json
+	job := db.EmailJob{}
+	err = json.Unmarshal(raw, &job)
+	if err != nil {
+		return db.EmailJob{}, err
+	}
+	return job, nil
+}
 func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
 	return db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
 		for _, job := range queued {
-			// make json
-			raw, err := json.Marshal(job)
+			ciphertext, err := encodeJob(m.aesgcm, &job)
 			if err != nil {
 				return err
 			}
-			// compress
-			compressed, err := zlibEncode(raw)
-			if err != nil {
-				return errors.Wrap(err, "zlib decode email")
-			}
-			// encrypt
-			// Never use more than 2^32 random nonces with a given key because of the risk of a repeat.
-			nonce := make([]byte, m.aesgcm.NonceSize())
-			if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-				return err
-			}
-			ciphertext := m.aesgcm.Seal(nil, nonce, compressed, nil)
-			ciphertext = append(ciphertext, nonce...)
-			// encrypt
 			_, err = db.CreateEmailJobTx(tx, now, ciphertext)
 			if err != nil {
 				return err
@@ -128,27 +159,9 @@ func (m *Mailer) processMails() error {
 
 	jobs := make([]db.EmailJob, 0, len(records))
 	for _, record := range records {
-		ctLen := len(record.Job)
-		if ctLen < m.aesgcm.NonceSize() {
-			return errors.New("ciphertext too small")
-		}
-		// decrypt
-		nonce := record.Job[ctLen-m.aesgcm.NonceSize():]
-		ct := record.Job[0 : ctLen-m.aesgcm.NonceSize()]
-		compressed, err := m.aesgcm.Open(nil, nonce, ct, nil)
+		job, err := decodeJob(m.aesgcm, record.Job)
 		if err != nil {
-			return err
-		}
-		// decompress
-		raw, err := zlibDecode(compressed)
-		if err != nil {
-			return errors.Wrap(err, "zlib decode email")
-		}
-		// parse json
-		job := db.EmailJob{}
-		err = json.Unmarshal(raw, &job)
-		if err != nil {
-			panic(err)
+			return errors.Wrapf(err, "decoding job")
 		}
 		jobs = append(jobs, job)
 	}
@@ -180,7 +193,10 @@ func (m *Mailer) processMails() error {
 			}
 		}
 
-		sendCloser.Close()
+		err = sendCloser.Close()
+		if err != nil {
+			log.Warnf("failed to close SMTP dialer")
+		}
 
 		if len(finished) > 0 {
 			err = db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
