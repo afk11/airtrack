@@ -99,14 +99,22 @@ func (e *TestEmail) Run(ctx *Context) error {
 		})
 
 		var numPoints int
+		var firstLocation, lastLocation *db.SightingLocation
 		err := db.GetLocationHistoryWalkBatch(dbConn, sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
-			w.Add(location)
+			w.Write(location)
+			if firstLocation == nil {
+				firstLocation = &location[0]
+			}
+			lastLocation = &location[len(location)-1]
 			numPoints += len(location)
 		})
 		if err != nil {
 			return err
 		}
-		firstLocation, lastLocation, kmlStr := w.Final()
+		kmlStr, err := w.Final()
+		if err != nil {
+			return err
+		}
 		firstSeen := sighting.CreatedAt
 		lastSeen := time.Now()
 		if sighting.ClosedAt != nil {

@@ -459,14 +459,22 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		})
 
 		var numPoints int
+		var firstPos, lastPos *db.SightingLocation
 		err := db.GetLocationHistoryWalkBatch(t.dbConn, observation.sighting, LocationFetchBatchSize, func(location []db.SightingLocation) {
-			w.Add(location)
+			if firstPos == nil {
+				firstPos = &location[0]
+			}
+			lastPos = &location[len(location)-1]
+			w.Write(location)
 			numPoints += len(location)
 		})
 		if err != nil {
 			return err
 		}
-		firstPos, lastPos, kmlStr := w.Final()
+		kmlStr, err := w.Final()
+		if err != nil {
+			return err
+		}
 		log.Debugf("[session %d] location history for %s had %d points",
 			project.Session.Id, sighting.a.Icao, numPoints)
 
