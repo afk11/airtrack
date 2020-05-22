@@ -66,7 +66,7 @@ type (
 	}
 
 	Encryption struct {
-		Key string
+		Key string `yaml:"key"`
 	}
 
 	Config struct {
@@ -76,7 +76,6 @@ type (
 		Metrics    *Metrics   `yaml:"metrics"`
 		Sighting   struct {
 			Timeout                 *int64 `yaml:"timeout"`
-			ReopenTimeframe         *int64 `yaml:"reopen_timeframe"`
 			OnGroundUpdateThreshold *int64 `yaml:"onground_update_threshold"`
 		} `yaml:"sighting"`
 		Database      Database       `yaml:"database"`

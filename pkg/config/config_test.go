@@ -113,7 +113,6 @@ sighting:
 		assert.Equal(t, "G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=", cfg.Encryption.Key, "parsed encryption key should match")
 		assert.NotNil(t, cfg.Sighting)
 		assert.Equal(t, int64(60), *cfg.Sighting.Timeout)
-		assert.Equal(t, int64(600), *cfg.Sighting.ReopenTimeframe)
 		assert.Equal(t, int64(6), *cfg.Sighting.OnGroundUpdateThreshold)
 	})
 

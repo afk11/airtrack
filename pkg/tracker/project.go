@@ -13,6 +13,20 @@ import (
 type (
 	Feature           string
 	EmailNotification string
+	Project           struct {
+		Name     string
+		Site     *db.CollectionSite
+		Session  *db.CollectionSession
+		Filter   string
+		Program  cel.Program
+		Features []Feature
+
+		NotifyEmail        string
+		EmailNotifications []EmailNotification
+
+		ReopenSightings         bool
+		ReopenSightingsInterval time.Duration
+	}
 )
 
 const (
@@ -61,21 +75,6 @@ func EmailNotificationFromString(n string) (EmailNotification, error) {
 		return TakeoffComplete, nil
 	}
 	return "", errors.New("unknown notification")
-}
-
-type Project struct {
-	Name     string
-	Site     *db.CollectionSite
-	Session  *db.CollectionSession
-	Filter   string
-	Program  cel.Program
-	Features []Feature
-
-	NotifyEmail        string
-	EmailNotifications []EmailNotification
-
-	ReopenSightings         bool
-	ReopenSightingsInterval time.Duration
 }
 
 func (p *Project) IsFeatureEnabled(f Feature) bool {

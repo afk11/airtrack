@@ -29,6 +29,8 @@ sighting:
   # close sightings if no messages have been received in this long
   # unit: seconds
   timeout: 60
+  # The number of messages with the same value required to change on_ground status
+  onground_update_threshold: 6
 database:
   # golang Mysql driver
   driver: mysql
