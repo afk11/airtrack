@@ -131,16 +131,20 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		}
 		var totalAirports int
 		for _, file := range files {
-			airports, err := openaip.ReadAirportsFromFile(file)
+			openaipFile, err := openaip.ParseFile(file)
 			if err != nil {
 				return errors.Wrapf(err, "error reading openaip file: %s", file)
 			}
-			err = nearestAirports.Register(airports)
+			acRecords, err := openaip.ExtractAirports(openaipFile)
+			if err != nil {
+				return errors.Wrapf(err, "converting openaip record: %s", file)
+			}
+			err = nearestAirports.Register(acRecords)
 			if err != nil {
 				return errors.Wrapf(err, "error reading openaip file: %s", file)
 			}
-			log.Debugf("found %d airports in file %s", len(airports), file)
-			totalAirports += len(airports)
+			log.Debugf("found %d openaipFile in file %s", len(acRecords), file)
+			totalAirports += len(acRecords)
 		}
 		log.Infof("found %d airports in %d files", totalAirports, len(files))
 	}

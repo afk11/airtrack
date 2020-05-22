@@ -25,15 +25,19 @@ func (na *NearestAirport) Run(ctx *Context) error {
 	nearestAirports := geo.NewNearestAirportGeocoder(tracker.DefaultGeoHashLength)
 	files, err := fs.ScanDirectoriesForFiles("aip", cfg.Airports.Directories)
 	for _, file := range files {
-		airports, err := openaip.ReadAirportsFromFile(file)
+		openaipFile, err := openaip.ParseFile(file)
 		if err != nil {
 			return errors.Wrapf(err, "error reading openaip file: %s", file)
 		}
-		err = nearestAirports.Register(airports)
+		acRecords, err := openaip.ExtractAirports(openaipFile)
+		if err != nil {
+			return errors.Wrapf(err, "converting openaip record: %s", file)
+		}
+		err = nearestAirports.Register(acRecords)
 		if err != nil {
 			return errors.Wrapf(err, "error reading openaip file: %s", file)
 		}
-		fmt.Printf("found %d airports in file %s\n", len(airports), file)
+		fmt.Printf("found %d openaipFile in file %s\n", len(acRecords), file)
 	}
 
 	place, distance, err := nearestAirports.ReverseGeocode(na.Lat, na.Lon)

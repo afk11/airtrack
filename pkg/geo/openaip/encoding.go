@@ -41,7 +41,31 @@ type (
 	}
 )
 
-func (a *Airport) ToAirportRecord() (geo.AirportRecord, error) {
+func ParseFile(file string) (*File, error) {
+	contents, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading openaip file")
+	}
+	f, err := Parse(contents)
+	if err != nil {
+		return nil, errors.Wrapf(err, "parsing openaip file")
+	}
+	return f, nil
+}
+
+func Parse(contents []byte) (*File, error) {
+	// we initialize our Users array
+	var aip File
+	// we unmarshal our byteArray which contains our
+	// xmlFiles content into 'aip' which we defined above
+	err := xml.Unmarshal(contents, &aip)
+	if err != nil {
+		return nil, err
+	}
+	return &aip, nil
+}
+
+func convertAirportToAirportRecord(a *Airport) (geo.AirportRecord, error) {
 	lat, err := strconv.ParseFloat(a.Geolocation.Latitude, 64)
 	if err != nil {
 		return geo.AirportRecord{}, err
@@ -60,34 +84,12 @@ func (a *Airport) ToAirportRecord() (geo.AirportRecord, error) {
 	}, nil
 }
 
-func ReadAirportsFromFile(file string) ([]geo.AirportRecord, error) {
-	contents, err := ioutil.ReadFile(file)
-	if err != nil {
-		return nil, errors.Wrapf(err, "reading openaip file")
-	}
-	f, err := Parse(contents)
-	if err != nil {
-		return nil, errors.Wrapf(err, "parsing openaip file")
-	}
-	return ExtractAirports(f)
-}
-func Parse(contents []byte) (*File, error) {
-	// we initialize our Users array
-	var aip File
-	// we unmarshal our byteArray which contains our
-	// xmlFiles content into 'aip' which we defined above
-	err := xml.Unmarshal(contents, &aip)
-	if err != nil {
-		return nil, err
-	}
-	return &aip, nil
-}
 func ExtractAirports(aip *File) ([]geo.AirportRecord, error) {
 	var airports []geo.AirportRecord
 	// we unmarshal our byteArray which contains our
 	// xmlFiles content into 'aip' which we defined above
 	for _, airport := range aip.Waypoints.Airports {
-		acRecord, err := airport.ToAirportRecord()
+		acRecord, err := convertAirportToAirportRecord(&airport)
 		if err != nil {
 			return nil, err
 		}

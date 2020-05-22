@@ -6,9 +6,9 @@ import (
 )
 
 type AirportRecord struct {
-	// FilePath of airport, eg, Dublin
+	// Name of airport, eg, Dublin
 	Name string
-	// ICAO airport code, eg, EIDW
+	// Code is the ICAO issued airport code, eg, EIDW
 	Code string
 	// CountryCode is two letter country code, eg, IE
 	CountryCode string
