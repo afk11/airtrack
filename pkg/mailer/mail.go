@@ -1,53 +1,22 @@
 package mailer
 
 import (
-	"bytes"
-	"compress/zlib"
 	"context"
 	"crypto/cipher"
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"github.com/afk11/airtrack/pkg/db"
+	"github.com/afk11/airtrack/pkg/zlib"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gopkg.in/mail.v2"
 	"io"
-	"io/ioutil"
 	"strings"
 	"sync"
 	"time"
 )
-
-func zlibEncode(in []byte) ([]byte, error) {
-	var compressed bytes.Buffer
-	w := zlib.NewWriter(&compressed)
-	_, err := w.Write(in)
-	if err != nil {
-		return nil, err
-	}
-	err = w.Close()
-	if err != nil {
-		return nil, err
-	}
-	c := compressed.Bytes()
-	return c, nil
-}
-func zlibDecode(in []byte) ([]byte, error) {
-	r, err := zlib.NewReader(bytes.NewBuffer(in))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = r.Close()
-	}()
-	raw, err := ioutil.ReadAll(r)
-	if err != nil {
-		return nil, errors.Wrap(err, "reading compressed data")
-	}
-	return raw, nil
-}
 
 type MailSender interface {
 	Queue(msg db.EmailJob) error
@@ -78,7 +47,7 @@ func encodeJob(aes cipher.AEAD, job *db.EmailJob) ([]byte, error) {
 		return nil, err
 	}
 	// compress
-	compressed, err := zlibEncode(raw)
+	compressed, err := zlib.Encode(raw)
 	if err != nil {
 		return nil, errors.Wrap(err, "zlib decode email")
 	}
@@ -105,7 +74,7 @@ func decodeJob(aes cipher.AEAD, jobBytes []byte) (db.EmailJob, error) {
 		return db.EmailJob{}, err
 	}
 	// decompress
-	raw, err := zlibDecode(compressed)
+	raw, err := zlib.Decode(compressed)
 	if err != nil {
 		return db.EmailJob{}, errors.Wrap(err, "zlib decode email")
 	}
