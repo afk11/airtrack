@@ -341,10 +341,10 @@ func GetLocationHistoryWalkBatch(db *sqlx.DB, sighting *Sighting, batchSize int6
 			batch = append(batch, location)
 		}
 		res.Close()
-		f(batch)
 
 		more = len(batch) > 0
 		if more {
+			f(batch)
 			lastId = int64(batch[len(batch)-1].Id)
 			batch = make([]SightingLocation, 0, batchSize)
 		}
