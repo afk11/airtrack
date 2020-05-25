@@ -6,6 +6,7 @@ import (
 	"github.com/afk11/airtrack/pkg/pb"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
+	"net"
 	"net/http"
 	"sync"
 	"time"
@@ -64,8 +65,8 @@ func (e *jsonDecodeError) Error() string {
 var counter int
 var firstTime time.Time
 
-func GetAdsbx(msgs chan *pb.Message, source *pb.Source) error {
-	resp, err := http.Get(source.Url)
+func GetAdsbx(client *http.Client, msgs chan *pb.Message, source *pb.Source) error {
+	resp, err := client.Get(source.Url)
 	if err != nil {
 		return err
 	}
@@ -131,13 +132,24 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 		Type: "adsbx",
 		Url:  "http://sky.oxolan:8080/api/aircraft/json/",
 	}
+	client := &http.Client{
+		Transport: &http.Transport{
+			DialContext: (&net.Dialer{
+				Timeout:   30 * time.Second,
+				KeepAlive: 30 * time.Second,
+			}).DialContext,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ResponseHeaderTimeout: 10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+		},
+	}
 	var degradedService bool
 	var retryCount int
 
 	for {
 		select {
 		case <-time.After(wait):
-			err := GetAdsbx(p.messages, src)
+			err := GetAdsbx(client, p.messages, src)
 			if err != nil {
 				jsonErr, ok := (err).(*jsonDecodeError)
 				if ok {
