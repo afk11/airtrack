@@ -2,29 +2,11 @@ package cup
 
 import (
 	"fmt"
+	"github.com/afk11/airtrack/pkg/coord"
 	"github.com/afk11/airtrack/pkg/geo"
 	"github.com/pkg/errors"
 	"strconv"
 )
-
-func parseCupCsvLocationParameter(param string, posSuffix byte, negSuffix byte) (byte, float64, error) {
-	suffix := param[len(param)-1]
-	if suffix != posSuffix && suffix != negSuffix {
-		return 0, 0.0, fmt.Errorf("invalid suffix")
-	}
-
-	value, err := strconv.ParseFloat(param[:len(param)-1], 64)
-	if err != nil {
-		return 0, 0.0, errors.Wrap(err, "failed to parse location paramer")
-	}
-	// convert from milli-degrees to degrees
-	value = value / 100
-	// negative if necessary
-	if suffix == negSuffix {
-		value = -value
-	}
-	return suffix, value, nil
-}
 
 func FromCupCsvRecord(c []string) (*geo.AirportRecord, error) {
 	if len(c) != 11 {
@@ -32,14 +14,9 @@ func FromCupCsvRecord(c []string) (*geo.AirportRecord, error) {
 		return nil, errors.Errorf("expected 7 fields in CUP format record (found %d)", len(c))
 	}
 
-	_, lat, err := parseCupCsvLocationParameter(c[3], 'N', 'S')
+	lat, lon, err := coord.DMSToDecimalLocation(c[3], c[4])
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid latitude")
-	}
-
-	_, lon, err := parseCupCsvLocationParameter(c[4], 'E', 'W')
-	if err != nil {
-		return nil, errors.Wrap(err, "invalid longitude")
+		return nil, errors.Wrap(err, "invalid location")
 	}
 
 	elevLen := len(c[5])

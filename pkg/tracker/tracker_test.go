@@ -84,6 +84,7 @@ func TestTracker(t *testing.T) {
 				return errors.Wrap(err, "process message")
 			}
 
+			// has global Sighting
 			s, ok := tr.sighting["444444"]
 			assert.True(t, ok, "should find aircraft sighting after processing message")
 			assert.NotNil(t, s)
@@ -91,15 +92,23 @@ func TestTracker(t *testing.T) {
 			assert.NotNil(t, s.a)
 			assert.Equal(t, p.Icao, s.a.Icao)
 
+			// aircraft in DB matches expected values
 			ac, err := db.LoadAircraftByIcao(tr.dbConn, p.Icao)
 			assert.NoError(t, err, "expecting aircraft to exist")
 			assert.NotNil(t, ac, "expecting aircraft to be returned")
 			assert.Equal(t, p.Icao, ac.Icao)
 			assert.Equal(t, s.a.Id, ac.Id)
 
-			lastSighting, err := db.LoadLastSighting(tr.dbConn, proj.Session, ac)
+			// can load sighting for our project
+			ourSighting, err := db.LoadLastSighting(tr.dbConn, proj.Session, ac)
 			assert.NoError(t, err, "expected last sighting, not error")
-			assert.NotNil(t, lastSighting)
+			assert.NotNil(t, ourSighting)
+
+			ob, ok := s.observedBy[proj.Session.Id]
+			assert.True(t, ok, "should find observation by our project on Sighting")
+			assert.Equal(t, *proj, *ob.project, "observation project should match our project")
+			assert.NotNil(t, ob.sighting)
+			assert.Equal(t, ourSighting.Id, ob.sighting.Id)
 
 			return nil
 		})
