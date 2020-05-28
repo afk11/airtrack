@@ -397,8 +397,7 @@ func (t *Tracker) reverseGeocode(lat float64, lon float64) (*GeocodeLocation, fl
 
 // needs to be called with t.sightingMu locked
 func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error {
-	sid := project.Session.Id
-	observation, ok := sighting.observedBy[sid]
+	observation, ok := sighting.observedBy[project.Session.Id]
 	if !ok {
 		panic(errors.New("failed to find project record in sighting!"))
 	}
@@ -604,11 +603,11 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 		var lat, long float64
 		lat, err = strconv.ParseFloat(msg.Latitude, 64)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "parse msg latitude")
 		}
 		long, err = strconv.ParseFloat(msg.Longitude, 64)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "parse msg longitude")
 		}
 		s.State.HaveLocation = true
 		s.State.Latitude = lat
@@ -656,7 +655,7 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 		}
 	}
 
-	if !s.searchedCountry {
+	if !s.searchedCountry && t.opt.Allocations != nil {
 		s.searchedCountry = true
 		code, err := t.opt.Allocations.DetermineCountryCode(s.State.Icao)
 		if err != nil {
@@ -702,7 +701,7 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 		sighting, isReopened, err := t.initProjectSighting(project, s.a)
 		if err != nil {
 			// Cleanup reserved sighting
-			return err
+			return errors.Wrapf(err, "failed to init project sighting")
 		}
 		observation = NewProjectObservation(project, sighting, now)
 		s.observedBy[project.Session.Id] = observation
@@ -930,15 +929,15 @@ func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting
 	// A new sighting is needed
 	res, err := db.CreateSighting(t.dbConn, p.Session, ac)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Wrapf(err, "creating sighting record failed")
 	}
 	sightingId, err := res.LastInsertId()
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Wrapf(err, "fetching sighting id failed")
 	}
 	s, err = db.LoadSightingById(t.dbConn, sightingId)
 	if err != nil {
-		return nil, false, err
+		return nil, false, errors.Wrapf(err, "load sighting by id failed")
 	}
 
 	if s != nil && s.ClosedAt != nil {

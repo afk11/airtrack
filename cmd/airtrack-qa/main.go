@@ -12,6 +12,7 @@ var cli struct {
 	NearestAirport   airtrackqa.NearestAirport      `cmd help:"find nearest airport"`
 	AirportFileStats airtrackqa.OpenAipAirportStats `cmd help:"print stats for openaip airport file"`
 	EmptyKml         airtrackqa.EmptyKml            `cmd help:"compare kml files"`
+	DumpMigration    airtrackqa.DumpMigration       `cmd help:"dump a migration file"`
 }
 
 func main() {

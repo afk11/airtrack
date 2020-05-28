@@ -124,6 +124,10 @@ func NewConn(driver string, user string, pass string, host string, port int, db 
 	return sqlx.Connect(driver, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
 		user, pass, host, port, db, url.PathEscape(location.String())))
 }
+func NewMultiStmtConn(driver string, user string, pass string, host string, port int, db string, location *time.Location) (*sqlx.DB, error) {
+	return sqlx.Connect(driver, fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&multiStatements=true&loc=%s",
+		user, pass, host, port, db, url.PathEscape(location.String())))
+}
 func CheckRowsUpdated(res sql.Result, expectAffected int64) error {
 	affected, err := res.RowsAffected()
 	if err != nil {
@@ -205,7 +209,8 @@ func CreateAircraft(db *sqlx.DB, icao string) (sql.Result, error) {
 
 func CreateSighting(db *sqlx.DB, session *CollectionSession, ac *Aircraft) (sql.Result, error) {
 	now := time.Now()
-	return db.Exec("INSERT INTO sighting (collection_session_id, aircraft_id, created_at, updated_at) VALUES (?, ?, ?, ?)", session.Id, ac.Id, &now, &now)
+	return db.Exec("INSERT INTO sighting (collection_site_id, collection_session_id, aircraft_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+		session.CollectionSiteId, session.Id, ac.Id, &now, &now)
 }
 func ReopenSighting(db *sqlx.DB, sighting *Sighting) (sql.Result, error) {
 	res, err := db.Exec(

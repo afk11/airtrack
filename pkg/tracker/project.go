@@ -101,10 +101,10 @@ func InitProject(cfg config.Project) (*Project, error) {
 		return nil, errors.New("cannot init disabled project")
 	}
 	p := Project{
-		Name: cfg.Name,
-		Filter: cfg.Filter,
-		Features: make([]Feature, 0, len(cfg.Features)),
-		ReopenSightings: cfg.ReopenSightings,
+		Name:                    cfg.Name,
+		Filter:                  cfg.Filter,
+		Features:                make([]Feature, 0, len(cfg.Features)),
+		ReopenSightings:         cfg.ReopenSightings,
 		ReopenSightingsInterval: DefaultSightingReopenInterval,
 		OnGroundUpdateThreshold: DefaultOnGroundUpdateThreshold,
 	}

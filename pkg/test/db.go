@@ -1,6 +1,11 @@
 package test
 
 import (
+	"database/sql"
+	"github.com/afk11/airtrack/pkg/db/migrations"
+	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database/mysql"
+	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 	"os"
 	"strconv"
 	"time"
@@ -83,4 +88,29 @@ func LoadTestDbConfig() (*TestDbConfig, error) {
 		cfg.NumDbs = n
 	}
 	return cfg, nil
+}
+
+func InitMigration(database string, db *sql.DB) (*migrate.Migrate, error) {
+	s := bindata.Resource(migrations.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations.Asset(name)
+		})
+	d, err := bindata.WithInstance(s)
+	if err != nil {
+		return nil, err
+	}
+	driver, err := mysql.WithInstance(db, &mysql.Config{})
+	if err != nil {
+		return nil, err
+	}
+	m, err := migrate.NewWithInstance(
+		"go-bindata",
+		d,
+		database,
+		driver,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
 }

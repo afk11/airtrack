@@ -103,7 +103,6 @@ func initMigrations(dbConf *config.Database) (*migrate.Migrate, error) {
 		dbConf.Host, dbConf.Port, dbConf.Database)
 	s := bindata.Resource(migrations.AssetNames(),
 		func(name string) ([]byte, error) {
-			fmt.Println(name)
 			return migrations.Asset(name)
 		})
 	d, err := bindata.WithInstance(s)

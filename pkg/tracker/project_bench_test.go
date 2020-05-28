@@ -22,9 +22,11 @@ func nmap(set []Feature) map[Feature]struct{} {
 	}
 	return m
 }
+
 type IsFeatureEnabledLoop struct {
 	f []Feature
 }
+
 func (t IsFeatureEnabledLoop) IsFeatureEnabled(f Feature) bool {
 	for _, tf := range t.f {
 		if tf == f {
@@ -33,14 +35,18 @@ func (t IsFeatureEnabledLoop) IsFeatureEnabled(f Feature) bool {
 	}
 	return false
 }
+
 type IsFeatureEnabledMap struct {
 	f map[Feature]struct{}
 }
+
 func (t IsFeatureEnabledMap) IsFeatureEnabled(f Feature) bool {
 	_, ok := t.f[f]
 	return ok
 }
+
 type IsFeatureEnabledFn func(f Feature) bool
+
 func benchmarkIsFeatureEnabled(fn IsFeatureEnabledFn, b *testing.B) {
 	for n := 0; n < b.N; n++ {
 		fn("A")
