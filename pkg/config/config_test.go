@@ -62,7 +62,7 @@ timezone: UTC
 encryption:
   key: G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=
 airports:
-  directories:
+  openaip:
     - ./dir1/
     - ./dir2/
 `)
@@ -71,9 +71,9 @@ airports:
 		assert.NotNil(t, cfg)
 		assert.Equal(t, "UTC", cfg.TimeZone, "parsed timezone should match")
 		assert.Equal(t, "G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=", cfg.Encryption.Key, "parsed encryption key should match")
-		assert.Equal(t, 2, len(cfg.Airports.Directories))
-		assert.Equal(t, "./dir1/", cfg.Airports.Directories[0])
-		assert.Equal(t, "./dir2/", cfg.Airports.Directories[1])
+		assert.Equal(t, 2, len(cfg.Airports.OpenAIPDirectories))
+		assert.Equal(t, "./dir1/", cfg.Airports.OpenAIPDirectories[0])
+		assert.Equal(t, "./dir2/", cfg.Airports.OpenAIPDirectories[1])
 		assert.Nil(t, cfg.EmailSettings)
 	})
 

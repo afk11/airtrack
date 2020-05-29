@@ -38,10 +38,11 @@ const (
 	TrackTakeoff     Feature = "track_takeoff"
 	GeocodeEndpoints Feature = "geocode_endpoints"
 
-	MapProduced     EmailNotification = "map_produced"
-	SpottedInFlight EmailNotification = "spotted_in_flight"
-	TakeoffStart    EmailNotification = "takeoff_start"
-	TakeoffComplete EmailNotification = "takeoff_complete"
+	MapProduced           EmailNotification = "map_produced"
+	SpottedInFlight       EmailNotification = "spotted_in_flight"
+	TakeoffStart          EmailNotification = "takeoff_start"
+	TakeoffComplete       EmailNotification = "takeoff_complete"
+	TakeoffUnknownAirport EmailNotification = "takeoff_unknown_airport"
 
 	DefaultSightingReopenInterval = time.Minute * 5
 )

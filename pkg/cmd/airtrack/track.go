@@ -12,6 +12,7 @@ import (
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/airtrack/pkg/fs"
 	"github.com/afk11/airtrack/pkg/geo"
+	"github.com/afk11/airtrack/pkg/geo/cup"
 	"github.com/afk11/airtrack/pkg/geo/openaip"
 	"github.com/afk11/airtrack/pkg/iso3166"
 	"github.com/afk11/airtrack/pkg/mailer"
@@ -121,30 +122,58 @@ func (c *TrackCmd) Run(ctx *Context) error {
 
 	nearestAirports := geo.NewNearestAirportGeocoder(tracker.DefaultGeoHashLength)
 
-	if len(cfg.Airports.Directories) > 0 {
-		files, err := fs.ScanDirectoriesForFiles("aip", cfg.Airports.Directories)
+	var airportFiles int
+	var airportsFound int
+	if len(cfg.Airports.OpenAIPDirectories) > 0 {
+		files, err := fs.ScanDirectoriesForFiles("aip", cfg.Airports.OpenAIPDirectories)
 		if err != nil {
-			log.Fatalf("error scanning airport location directories: %s", err.Error())
+			log.Fatalf("error scanning openaip directories: %s", err.Error())
 		}
-		var totalAirports int
 		for _, file := range files {
 			openaipFile, err := openaip.ParseFile(file)
 			if err != nil {
 				return errors.Wrapf(err, "error reading openaip file: %s", file)
 			}
-			acRecords, err := openaip.ExtractAirports(openaipFile)
+			acRecords, err := openaip.ExtractOpenAIPRecords(openaipFile)
 			if err != nil {
 				return errors.Wrapf(err, "converting openaip record: %s", file)
 			}
 			err = nearestAirports.Register(acRecords)
 			if err != nil {
+				return errors.Wrapf(err, "registering airports from openaip file: %s", file)
+			}
+			log.Debugf("found %d airports in openaip file %s", len(acRecords), file)
+			airportsFound += len(acRecords)
+		}
+		airportFiles += len(files)
+	}
+	if len(cfg.Airports.CupDirectories) > 0 {
+		files, err := fs.ScanDirectoriesForFiles("cup", cfg.Airports.CupDirectories)
+		if err != nil {
+			log.Fatalf("error scanning cup directories: %s", err.Error())
+		}
+		for _, file := range files {
+			cupRecords, err := cup.ParseFile(file)
+			if err != nil {
 				return errors.Wrapf(err, "error reading openaip file: %s", file)
 			}
-			log.Debugf("found %d openaipFile in file %s", len(acRecords), file)
-			totalAirports += len(acRecords)
+			acRecords, err := openaip.ExtractCupRecords(cupRecords)
+			if err != nil {
+				return errors.Wrapf(err, "extracting cup records: %s", file)
+			}
+			err = nearestAirports.Register(acRecords)
+			if err != nil {
+				return errors.Wrapf(err, "registering airports from cup file: %s", file)
+			}
+			log.Debugf("found %d airports in openaip file %s", len(acRecords), file)
+			airportsFound += len(acRecords)
 		}
-		log.Infof("found %d airports in %d files", totalAirports, len(files))
+		airportFiles += len(files)
 	}
+	if airportFiles > 0 {
+		log.Infof("found %d airports in %d files", airportsFound, airportFiles)
+	}
+
 	opt.AirportGeocoder = nearestAirports
 
 	countryCodesData, err := asset.Asset("assets/iso3166_country_codes.txt")

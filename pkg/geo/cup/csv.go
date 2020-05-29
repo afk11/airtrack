@@ -1,11 +1,16 @@
 package cup
 
 import (
+	"bytes"
+	"encoding/csv"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/coord"
 	"github.com/afk11/airtrack/pkg/geo"
 	"github.com/pkg/errors"
+	"io"
+	"io/ioutil"
 	"strconv"
+	"strings"
 )
 
 func FromCupCsvRecord(c []string) (*geo.AirportRecord, error) {
@@ -38,4 +43,30 @@ func FromCupCsvRecord(c []string) (*geo.AirportRecord, error) {
 	r.Elevation = elevation
 	r.Style = c[6]
 	return r, nil
+}
+
+func ParseFile(file string) ([][]string, error) {
+	contents, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading openaip file")
+	}
+	f, err := Parse(bytes.NewBuffer(contents))
+	if err != nil {
+		return nil, errors.Wrapf(err, "parsing openaip file")
+	}
+	return f, nil
+}
+func Parse(contents io.Reader) ([][]string, error) {
+	r := csv.NewReader(contents)
+	r.Comment = '*'
+
+	records, err := r.ReadAll()
+	if err != nil {
+		return nil, err
+	}
+	if strings.Join(records[0], ",") != "name,code,country,lat,lon,elev,style,rwdir,rwlen,freq,desc" {
+		return nil, errors.New("missing first row with column titles, or invalid titles found.")
+	}
+
+	return records[1:], nil
 }

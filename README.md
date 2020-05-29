@@ -76,3 +76,12 @@ Install go-bindata, and proto-gen-go
 
 ## Contribute
 
+## Resources
+
+CUP File Format
+
+http://download.naviter.com/docs/CUP-file-format-description.pdf
+
+OpenAIP Airport File Format
+
+http://www.openaip.net/system/files/openAIP_aip_format_1_1_airport.pdf

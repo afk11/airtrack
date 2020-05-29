@@ -13,7 +13,8 @@ const (
 
 type (
 	Airports struct {
-		Directories []string `yaml:"directories"`
+		OpenAIPDirectories []string `yaml:"openaip"`
+		CupDirectories     []string `yaml:"cup"`
 	}
 
 	SmtpSettings struct {

@@ -6,9 +6,12 @@ encryption:
 airports:
   # Directories containing OpenAIP files for airport geocoding.
   # Register an account on openaip.net to download the files you need.
-  directories:
+  openaip:
     - ./openaip-gb/
     - ./openaip-de/
+  cup:
+    - ./cup-us/
+    - ./cup-ru/
 email:
   # Notifications driver. Currently only smtp is supported
   driver: "smtp"

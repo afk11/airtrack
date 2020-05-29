@@ -17,8 +17,9 @@ func (e Email) String() string {
 }
 
 const (
-	MapProducedEmail Email = "assets/email/map_produced.tpl"
-	SpottedInFlight  Email = "assets/email/spotted_in_flight.tpl"
+	MapProducedEmail      Email = "assets/email/map_produced.tpl"
+	SpottedInFlight       Email = "assets/email/spotted_in_flight.tpl"
+	TakeoffUnknownAirport Email = "assets/email/takeoff_unknown_airport.tpl"
 )
 
 var (
@@ -147,6 +148,40 @@ func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile string
 				ContentType: "application/vnd.google-earth.kml+xml",
 			},
 		},
+	}
+	return job, nil
+}
+
+type TakeoffUnknownAirportParams struct {
+	Project       string
+	Icao          string
+	CallSign      string
+	StartTimeFmt  string
+	StartLocation Location
+}
+
+func PrepareTakeoffUnknownAirport(templates *MailTemplates, to string, params TakeoffUnknownAirportParams) (*db.EmailJob, error) {
+	var callsign string
+	if params.CallSign != "" {
+		callsign = " (" + params.CallSign + ")"
+	}
+
+	subject := fmt.Sprintf("[%s] %s%s: takeoff from unknown airport", params.Project, params.Icao, callsign)
+
+	tpl, err := templates.Get(TakeoffUnknownAirport)
+	if err != nil {
+		return nil, err
+	}
+
+	var buf bytes.Buffer
+	err = tpl.Execute(&buf, params)
+	if err != nil {
+		return nil, err
+	}
+	job := &db.EmailJob{
+		To:      to,
+		Subject: subject,
+		Body:    buf.String(),
 	}
 	return job, nil
 }

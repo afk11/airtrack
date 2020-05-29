@@ -2,7 +2,9 @@ package openaip
 
 import (
 	"encoding/xml"
+	"github.com/afk11/airtrack/pkg/coord"
 	"github.com/afk11/airtrack/pkg/geo"
+	"github.com/afk11/airtrack/pkg/geo/cup"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"strconv"
@@ -84,7 +86,29 @@ func convertAirportToAirportRecord(a *Airport) (geo.AirportRecord, error) {
 	}, nil
 }
 
-func ExtractAirports(aip *File) ([]geo.AirportRecord, error) {
+func convertCupRecordToAirportRecord(rec []string) (geo.AirportRecord, error) {
+	lat, lon, err := coord.DMSToDecimalLocation(rec[3], rec[4])
+	if err != nil {
+		return geo.AirportRecord{}, err
+	}
+	if rec[5][len(rec[5])-1] != 'm' {
+		return geo.AirportRecord{}, errors.New("expected elevation unit to be meters")
+	}
+	elev, err := strconv.ParseFloat(rec[5][0:len(rec[5])-2], 64)
+	if err != nil {
+		return geo.AirportRecord{}, err
+	}
+	return geo.AirportRecord{
+		Name:        rec[0],
+		Code:        rec[1],
+		CountryCode: rec[2],
+		Latitude:    lat,
+		Longitude:   lon,
+		Elevation:   elev,
+	}, nil
+}
+
+func ExtractOpenAIPRecords(aip *File) ([]geo.AirportRecord, error) {
 	var airports []geo.AirportRecord
 	// we unmarshal our byteArray which contains our
 	// xmlFiles content into 'aip' which we defined above
@@ -94,6 +118,19 @@ func ExtractAirports(aip *File) ([]geo.AirportRecord, error) {
 			return nil, err
 		}
 		airports = append(airports, acRecord)
+	}
+	return airports, nil
+}
+func ExtractCupRecords(records [][]string) ([]geo.AirportRecord, error) {
+	var airports []geo.AirportRecord
+	// we unmarshal our byteArray which contains our
+	// xmlFiles content into 'aip' which we defined above
+	for _, airport := range records {
+		acRecord, err := cup.FromCupCsvRecord(airport)
+		if err != nil {
+			return nil, err
+		}
+		airports = append(airports, *acRecord)
 	}
 	return airports, nil
 }

@@ -644,6 +644,7 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 				if !s.State.IsOnGround && s.State.VerticalRate > 0 {
 					log.Tracef("%s: IsInTakeoff (Alt: %d, VerticalRate: %d)", s.State.Icao, s.State.Altitude, s.State.VerticalRate)
 					s.Tags.IsInTakeoff = true
+					// takeoff_begin
 				}
 			} else {
 				log.Tracef("%s: IsOnGround confirmation %t %d", s.State.Icao, s.onGroundCandidate, s.onGroundCounter)
@@ -739,10 +740,33 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 		if project.IsFeatureEnabled(TrackTakeoff) {
 			if observation.tags.IsInTakeoff {
 				if project.IsEmailNotificationEnabled(TakeoffStart) {
-
+					// takeoff begin
 				}
 				log.Infof("[session %d] %s: has begun takeoff",
 					project.Session.Id, s.State.Icao)
+				if observation.origin != nil {
+					if !observation.origin.ok && project.IsEmailNotificationEnabled(TakeoffUnknownAirport) {
+						// didn't geocode origin airport
+						log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, TakeoffUnknownAirport)
+						msg, err := email.PrepareTakeoffUnknownAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffUnknownAirportParams{
+							Project:      project.Name,
+							Icao:         s.State.Icao,
+							CallSign:     s.State.CallSign,
+							StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+							StartLocation: email.Location{
+								Latitude:  s.State.Latitude,
+								Longitude: s.State.Longitude,
+							},
+						})
+						if err != nil {
+							return err
+						}
+						err = t.opt.Mailer.Queue(*msg)
+						if err != nil {
+							return nil
+						}
+					}
+				}
 			} else {
 				if project.IsEmailNotificationEnabled(TakeoffComplete) {
 

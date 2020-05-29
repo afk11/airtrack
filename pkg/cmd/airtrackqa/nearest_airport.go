@@ -18,18 +18,18 @@ func (na *NearestAirport) Run(ctx *Context) error {
 	fmt.Printf("%f %f\n", na.Lat, na.Lon)
 
 	cfg := ctx.Config
-	if len(cfg.Airports.Directories) == 0 {
+	if len(cfg.Airports.OpenAIPDirectories) == 0 {
 		return errors.New("no airport directories configured")
 	}
 
 	nearestAirports := geo.NewNearestAirportGeocoder(tracker.DefaultGeoHashLength)
-	files, err := fs.ScanDirectoriesForFiles("aip", cfg.Airports.Directories)
+	files, err := fs.ScanDirectoriesForFiles("aip", cfg.Airports.OpenAIPDirectories)
 	for _, file := range files {
 		openaipFile, err := openaip.ParseFile(file)
 		if err != nil {
 			return errors.Wrapf(err, "error reading openaip file: %s", file)
 		}
-		acRecords, err := openaip.ExtractAirports(openaipFile)
+		acRecords, err := openaip.ExtractOpenAIPRecords(openaipFile)
 		if err != nil {
 			return errors.Wrapf(err, "converting openaip record: %s", file)
 		}
