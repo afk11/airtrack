@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/airtrack/pkg/zlib"
 	"github.com/jmoiron/sqlx"
@@ -102,6 +103,21 @@ func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
 	}).Exec()
 }
 func (m *Mailer) processMails() error {
+	start := time.Now()
+	cancelled := make(chan bool)
+	defer func() {
+		cancelled <- true
+	}()
+
+	go func() {
+		select {
+		case <-time.After(time.Minute):
+			panic(fmt.Errorf("mailer running after 1 minute"))
+		case <-cancelled:
+			log.Debugf("mailer terminated normally after %s", time.Since(start))
+			break
+		}
+	}()
 	m.mu.Lock()
 	queued := m.queued
 	m.queued = nil

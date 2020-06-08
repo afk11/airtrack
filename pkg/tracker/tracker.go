@@ -646,8 +646,6 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 					s.Tags.IsInTakeoff = true
 					// takeoff_begin
 				}
-			} else {
-				log.Tracef("%s: IsOnGround confirmation %t %d", s.State.Icao, s.onGroundCandidate, s.onGroundCounter)
 			}
 		} else {
 			log.Tracef("%s: new candidate IsOnGround %t", s.State.Icao, msg.IsOnGround)

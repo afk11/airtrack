@@ -71,12 +71,18 @@ type (
 		Key string `yaml:"key"`
 	}
 
+	AdsbxConfig struct {
+		ApiUrl string `yaml:"url"`
+		ApiKey string `yaml:"apikey"`
+	}
+
 	Config struct {
-		TimeZone   string     `yaml:"timezone"`
-		Encryption Encryption `yaml:"encryption"`
-		Airports   Airports   `yaml:"airports"`
-		Metrics    *Metrics   `yaml:"metrics"`
-		Sighting   struct {
+		TimeZone    string      `yaml:"timezone"`
+		Encryption  Encryption  `yaml:"encryption"`
+		Airports    Airports    `yaml:"airports"`
+		Metrics     *Metrics    `yaml:"metrics"`
+		AdsbxConfig AdsbxConfig `yaml:"adsbx"`
+		Sighting    struct {
 			Timeout *int64 `yaml:"timeout"`
 		} `yaml:"sighting"`
 		Database      Database       `yaml:"database"`

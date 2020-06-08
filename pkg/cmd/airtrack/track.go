@@ -40,6 +40,11 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		return errors.Wrapf(err, "invalid log verbosity level")
 	}
 	log.SetLevel(level)
+	log.SetFormatter(&log.TextFormatter{
+		DisableColors:   true,
+		TimestampFormat: "2006-01-02 15:04:05",
+		FullTimestamp:   true,
+	})
 
 	var gracefulStop = make(chan os.Signal)
 	signal.Notify(gracefulStop, syscall.SIGTERM)
@@ -193,14 +198,22 @@ func (c *TrackCmd) Run(ctx *Context) error {
 
 	icaoAllocations, err := ccode.LoadCountryAllocations(bytes.NewBuffer(icaoAllocationsData), countryCodeStore)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
 	opt.CountryCodes = countryCodeStore
 	opt.Allocations = icaoAllocations
 
 	msgs := make(chan *pb.Message)
-	p := tracker.NewAdsbxProducer(msgs)
+	adsbxEndpoint := tracker.DefaultAdsbxEndpoint
+	var adsbxApiKey string
+	if cfg.AdsbxConfig.ApiUrl != "" {
+		adsbxEndpoint = cfg.AdsbxConfig.ApiUrl
+	}
+	if cfg.AdsbxConfig.ApiKey != "" {
+		adsbxApiKey = cfg.AdsbxConfig.ApiKey
+	}
+	p := tracker.NewAdsbxProducer(msgs, adsbxEndpoint, adsbxApiKey)
 
 	t, err := tracker.New(dbConn, opt)
 	if err != nil {

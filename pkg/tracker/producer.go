@@ -3,13 +3,19 @@ package tracker
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
 	"net"
 	"net/http"
 	"sync"
 	"time"
+)
+
+const (
+	DefaultAdsbxEndpoint = "https://adsbexchange.com/api/aircraft/json/"
 )
 
 type AdsbxAircraftResponse struct {
@@ -64,13 +70,62 @@ func (e *jsonDecodeError) Error() string {
 
 var counter int
 var firstTime time.Time
+var numReqs int
 
-func GetAdsbx(client *http.Client, msgs chan *pb.Message, source *pb.Source) error {
-	resp, err := client.Get(source.Url)
+type AdsbxProducer struct {
+	url                 string
+	apikey              string
+	messages            chan *pb.Message
+	wg                  sync.WaitGroup
+	jsonPayloadDumpFile string
+	canceller           func()
+}
+
+func NewAdsbxProducer(msgs chan *pb.Message, url string, apikey string) *AdsbxProducer {
+	return &AdsbxProducer{
+		messages:            msgs,
+		jsonPayloadDumpFile: "/tmp/airtrack-adsbx-json-payload",
+		url:                 url,
+		apikey:              apikey,
+	}
+}
+
+func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs chan *pb.Message, source *pb.Source) error {
+	start := time.Now()
+	cancelled := make(chan bool)
+	defer func() {
+		cancelled <- true
+		numReqs++
+	}()
+
+	go func() {
+		select {
+		case <-time.After(time.Minute):
+			panic(fmt.Errorf("running after 1 minute, on request %d", numReqs))
+		case <-cancelled:
+			log.Debugf("terminated normally after %s", time.Since(start))
+			break
+		}
+	}()
+
+	req, err := http.NewRequest("GET", p.url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Add("api-auth", p.apikey)
+	req.WithContext(ctx)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return errors.Errorf("received not-ok code %d from adsbx", resp.StatusCode)
+	}
+
+	// check status
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
@@ -109,20 +164,6 @@ func GetAdsbx(client *http.Client, msgs chan *pb.Message, source *pb.Source) err
 	return nil
 }
 
-type AdsbxProducer struct {
-	messages            chan *pb.Message
-	wg                  sync.WaitGroup
-	jsonPayloadDumpFile string
-	canceller           func()
-}
-
-func NewAdsbxProducer(msgs chan *pb.Message) *AdsbxProducer {
-	return &AdsbxProducer{
-		messages:            msgs,
-		jsonPayloadDumpFile: "/tmp/airtrack-adsbx-json-payload",
-	}
-}
-
 func (p *AdsbxProducer) producer(ctx context.Context) {
 	defer p.wg.Done()
 
@@ -130,18 +171,19 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 	src := &pb.Source{
 		Id:   "1",
 		Type: "adsbx",
-		Url:  "http://sky.oxolan:8080/api/aircraft/json/",
+		Url:  p.url,
 	}
 	client := &http.Client{
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
-				Timeout:   30 * time.Second,
-				KeepAlive: 30 * time.Second,
+				Timeout:   10 * time.Second,
+				KeepAlive: 10 * time.Second,
 			}).DialContext,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ResponseHeaderTimeout: 10 * time.Second,
+			TLSHandshakeTimeout:   5 * time.Second,
+			ResponseHeaderTimeout: 5 * time.Second,
 			ExpectContinueTimeout: 1 * time.Second,
 		},
+		Timeout: 10 * time.Second,
 	}
 	var degradedService bool
 	var retryCount int
@@ -149,7 +191,7 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 	for {
 		select {
 		case <-time.After(wait):
-			err := GetAdsbx(client, p.messages, src)
+			err := p.GetAdsbx(client, ctx, p.messages, src)
 			if err != nil {
 				jsonErr, ok := (err).(*jsonDecodeError)
 				if ok {
