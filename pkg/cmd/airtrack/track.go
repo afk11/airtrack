@@ -110,6 +110,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 			if settings.MandatoryStartTLS {
 				dialer.StartTLSPolicy = mail.MandatoryStartTLS
 			}
+			dialer.Timeout = time.Second * 30
 			m := mailer.NewMailer(dbConn, settings.Sender, dialer, aesgcm)
 			m.Start()
 			opt.Mailer = m

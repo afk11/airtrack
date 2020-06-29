@@ -11,10 +11,11 @@ build-bindata-migrations:
 		go-bindata -pkg migrations -debug -o ./pkg/db/migrations/migrations.go -prefix db/migrations db/migrations
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
-build-airtrack: build-bindata-assets build-bindata-migrations build-protobuf
-		GO111MODULE=on go build -o airtrack cmd/airtrack/main.go
-build-airtrack-qa: build-bindata-assets build-bindata-migrations build-protobuf
-		GO111MODULE=on go build -o airtrackqa cmd/airtrack-qa/main.go
+build-linux-amd64: build-airtrack-linux-amd64 build-airtrack-qa-linux-amd64
+build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-protobuf
+		GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
+build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-protobuf
+		GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
 test: test-cleanup
 	go test -coverprofile=./coverage/tests.out ./... \
