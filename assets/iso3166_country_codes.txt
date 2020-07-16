@@ -33,9 +33,10 @@ BW BWA Botswana
 CO COL Colombia
 MT MLT Malta
 LK LKA Sri Lanka
-BI BDI Burundi **
+BI BDI Burundi
 CR CRI Costa Rica
 MC MCO Monaco
+ME MNE Montenegro
 SY SYR Syrian Arab Republic
 CM CMR Cameroon
 CU CUB Cuba
@@ -44,7 +45,7 @@ CN CHN China
 KM COM Comoros
 SV SLV El Salvador
 AU AUS Australia
-CG COG Congo **
+CG COG Congo
 GT GTM Guatemala
 AL ALB Albania
 IN IND India
@@ -52,6 +53,7 @@ CI CIV Côte d Ivoire
 GY GUY Guyana
 HR HRV Croatia
 JP JPN Japan
+JE JEY Jersey
 GA GAB Gabon
 HT HTI Haiti
 LV LVA Latvia
@@ -131,6 +133,7 @@ FR FRA France
 FM FSM Micronesia
 LC LCA Saint Lucia
 SN SEN Senegal
+RS SRB Serbia
 DE DEU Germany
 MN MNG Mongolia
 TO TON Tonga

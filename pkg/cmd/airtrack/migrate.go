@@ -98,7 +98,7 @@ func (c *MigrateStepsCmd) Run(ctx *Context) error {
 }
 
 func initMigrations(dbConf *config.Database) (*migrate.Migrate, error) {
-	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s",
+	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?multiStatements=true",
 		dbConf.Username, dbConf.Password,
 		dbConf.Host, dbConf.Port, dbConf.Database)
 	s := bindata.Resource(migrations.AssetNames(),
