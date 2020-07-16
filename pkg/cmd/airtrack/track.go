@@ -186,8 +186,11 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	if err != nil {
 		panic(err)
 	}
-
-	countryCodeStore, err := iso3166.ParseColumnFormat(bytes.NewBuffer(countryCodesData))
+	countryCodeRows, err := iso3166.ParseColumnFormat(bytes.NewBuffer(countryCodesData))
+	if err != nil {
+		panic(err)
+	}
+	countryCodeStore, err := iso3166.New(countryCodeRows)
 	if err != nil {
 		panic(err)
 	}
@@ -196,7 +199,6 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	if err != nil {
 		panic(err)
 	}
-
 	icaoAllocations, err := ccode.LoadCountryAllocations(bytes.NewBuffer(icaoAllocationsData), countryCodeStore)
 	if err != nil {
 		return err

@@ -21,21 +21,21 @@ func TestStore_GetCountryCode(t *testing.T) {
 	assert.Equal(t, country.name, foundCountry.Name())
 }
 func TestNew_Errors(t *testing.T) {
-	t.Run("invalid country code", func(t *testing.T) {
+	t.Run("invalid countryCodes code", func(t *testing.T) {
 		rows := [][3]string{
 			{"GBallalala", "GBR", "United Kingdom"},
 		}
 		s, err := New(rows)
-		assert.EqualError(t, err, "alpha2 country code should be two characters")
+		assert.EqualError(t, err, "alpha2 countryCodes code should be two characters")
 		assert.Nil(t, s)
 	})
-	t.Run("duplicate country code", func(t *testing.T) {
+	t.Run("duplicate countryCodes code", func(t *testing.T) {
 		rows := [][3]string{
 			{"GB", "GBR", "United Kingdom"},
 			{"GB", "GBR", "United Kingdom"},
 		}
 		s, err := New(rows)
-		assert.EqualError(t, err, "cannot use duplicate alpha2 country codes (GB)")
+		assert.EqualError(t, err, "cannot use duplicate alpha2 countryCodes codes (GB)")
 		assert.Nil(t, s)
 	})
 }

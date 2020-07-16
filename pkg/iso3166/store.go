@@ -5,7 +5,12 @@ import (
 	"github.com/pkg/errors"
 )
 
+type countryCodes struct{
+	alpha2 AlphaTwoCountryCode
+	alpha3 AlphaThreeCountryCode
+}
 type Store struct {
+	countries map[string]countryCodes
 	alpha2 map[AlphaTwoCountryCode]*Country
 	alpha3 map[AlphaThreeCountryCode]*Country
 }
@@ -19,6 +24,7 @@ func (s *Store) GetCountryCode(cc AlphaTwoCountryCode) (*Country, bool) {
 }
 func emptyStore() *Store {
 	return &Store{
+		countries: make(map[string]countryCodes),
 		alpha2: make(map[AlphaTwoCountryCode]*Country),
 		alpha3: make(map[AlphaThreeCountryCode]*Country),
 	}
@@ -27,9 +33,9 @@ func New(list [][3]string) (*Store, error) {
 	s := emptyStore()
 	for _, v := range list {
 		if len(v[0]) != 2 {
-			return nil, errors.New("alpha2 country code should be two characters")
+			return nil, errors.New("alpha2 countryCodes code should be two characters")
 		} else if len(v[1]) != 3 {
-			return nil, errors.Errorf("alpha3 country code should be three characters (%s)", v[1])
+			return nil, errors.Errorf("alpha3 countryCodes code should be three characters (%s)", v[1])
 		}
 		country := Country{
 			name: v[2],
@@ -39,12 +45,13 @@ func New(list [][3]string) (*Store, error) {
 		_, a2Known := s.alpha2[a2]
 		_, a3Known := s.alpha3[a3]
 		if a2Known {
-			return nil, fmt.Errorf("cannot use duplicate alpha2 country codes (%s)", a2)
+			return nil, fmt.Errorf("cannot use duplicate alpha2 countryCodes codes (%s)", a2)
 		} else if a3Known {
-			return nil, fmt.Errorf("cannot use duplicate alpha3 country codes (%s)", a3)
+			return nil, fmt.Errorf("cannot use duplicate alpha3 countryCodes codes (%s)", a3)
 		}
 		s.alpha2[a2] = &country
 		s.alpha3[a3] = &country
+		s.countries[v[2]] = countryCodes{alpha2: a2, alpha3: a3}
 	}
 	return s, nil
 }

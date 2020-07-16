@@ -5,7 +5,7 @@ import (
 	"io"
 )
 
-func ParseColumnFormat(r io.Reader) (*Store, error) {
+func ParseColumnFormat(r io.Reader) ([][3]string, error) {
 	scanner := bufio.NewScanner(r)
 	var list [][3]string
 	for scanner.Scan() {
@@ -15,6 +15,5 @@ func ParseColumnFormat(r io.Reader) (*Store, error) {
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-
-	return New(list)
+	return list, nil
 }
