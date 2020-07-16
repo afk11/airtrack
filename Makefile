@@ -6,9 +6,9 @@ COVERAGEARGS=$(COVERAGEOPTIONS)
 install-go-bindata:
 		go get -u github.com/jteeuwen/go-bindata/...
 build-bindata-assets:
-		go-bindata -pkg asset -debug -o ./pkg/assets/asset.go assets/...
+		go-bindata -pkg asset -o ./pkg/assets/asset.go assets/...
 build-bindata-migrations:
-		go-bindata -pkg migrations -debug -o ./pkg/db/migrations/migrations.go -prefix db/migrations db/migrations
+		go-bindata -pkg migrations -o ./pkg/db/migrations/migrations.go -prefix db/migrations db/migrations
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
 build-linux-amd64: build-airtrack-linux-amd64 build-airtrack-qa-linux-amd64
