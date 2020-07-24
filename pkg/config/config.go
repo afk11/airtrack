@@ -25,6 +25,14 @@ type (
 		Port              int    `yaml:"port"`
 		MandatoryStartTLS bool   `yaml:"mandatory_starttls"`
 	}
+
+	MapSettings struct {
+		Enabled bool `yaml:"enabled"`
+		Address string `yaml:"address"`
+		Port    uint16 `yaml:"port"`
+		BaseUrl string `yaml:""`
+	}
+
 	EmailSettings struct {
 		Driver string        `yaml:"driver"`
 		Smtp   *SmtpSettings `yaml:"smtp"`
@@ -35,10 +43,16 @@ type (
 		Enabled []string `yaml:"events"`
 	}
 
+	ProjectMap struct {
+		Enabled bool `yaml:"enabled"`
+	}
+
 	Project struct {
 		Name                    string
+		//
 		Disabled                bool `yaml:"disabled"`
 		Filter                  string
+		Map                     ProjectMap `yaml:"map"`
 		Notifications           *Notifications `yaml:"notifications"`
 		Features                []string
 		ReopenSightings         bool   `yaml:"reopen_sightings"`
@@ -82,6 +96,7 @@ type (
 		Airports    Airports    `yaml:"airports"`
 		Metrics     *Metrics    `yaml:"metrics"`
 		AdsbxConfig AdsbxConfig `yaml:"adsbx"`
+		MapSettings MapSettings `yaml:"map"`
 		Sighting    struct {
 			Timeout *int64 `yaml:"timeout"`
 		} `yaml:"sighting"`

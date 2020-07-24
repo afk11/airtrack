@@ -95,6 +95,8 @@ type (
 		projectMu         sync.RWMutex
 		sightingMu        sync.Mutex
 		sighting          map[string]*Sighting
+		projectStatusListeners []ProjectStatusListener
+		projectAcUpdateListeners []ProjectAircraftUpdateListener
 		consumerCanceller context.CancelFunc
 		lostAcCanceller   context.CancelFunc
 		consumerWG        sync.WaitGroup
@@ -156,10 +158,23 @@ func New(dbConn *sqlx.DB, opt Options) (*Tracker, error) {
 		sighting:      make(map[string]*Sighting),
 		dbConn:        dbConn,
 		opt:           opt,
+		projectStatusListeners: make([]ProjectStatusListener, 0),
+		projectAcUpdateListeners: make([]ProjectAircraftUpdateListener, 0),
 		mailTemplates: tpls,
 	}, nil
 }
-
+func (t *Tracker) RegisterProjectStatusListener(l ProjectStatusListener) error {
+	t.projectMu.Lock()
+	defer t.projectMu.Unlock()
+	t.projectStatusListeners = append(t.projectStatusListeners, l)
+	return nil
+}
+func (t *Tracker) RegisterProjectAircraftUpdateListener(l ProjectAircraftUpdateListener) error {
+	t.projectMu.Lock()
+	defer t.projectMu.Unlock()
+	t.projectAcUpdateListeners = append(t.projectAcUpdateListeners, l)
+	return nil
+}
 func (t *Tracker) Start(msgs chan *pb.Message) {
 	consumerCtx, consumerCanceller := context.WithCancel(context.Background())
 	t.consumerCanceller = consumerCanceller
@@ -270,6 +285,11 @@ func (t *Tracker) AddProject(p *Project) error {
 	p.Site = site
 	p.Session = session
 	t.projects = append(t.projects, p)
+
+	numListeners := len(t.projectStatusListeners)
+	for i := 0; i < numListeners; i++ {
+		t.projectStatusListeners[i].Activated(p)
+	}
 	return nil
 }
 
@@ -534,6 +554,10 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		}
 	}
 
+	numListeners := len(t.projectAcUpdateListeners)
+	for i := 0; i < numListeners; i++ {
+		t.projectAcUpdateListeners[i].LostAircraft(project, sighting)
+	}
 	return nil
 }
 
@@ -895,6 +919,14 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 		}
 	}
 
+	numListeners := len(t.projectAcUpdateListeners)
+	for i := 0; i < numListeners; i++ {
+		if firstSighting {
+			t.projectAcUpdateListeners[i].NewAircraft(project, s)
+		} else {
+			t.projectAcUpdateListeners[i].UpdatedAircraft(project, s)
+		}
+	}
 	return nil
 }
 

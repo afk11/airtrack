@@ -20,7 +20,6 @@ type (
 		Filter   string
 		Program  cel.Program
 		Features []Feature
-
 		NotifyEmail        string
 		EmailNotifications []EmailNotification
 

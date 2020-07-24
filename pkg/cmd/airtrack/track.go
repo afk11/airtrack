@@ -222,6 +222,20 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
+
+	if cfg.MapSettings.Enabled {
+		m := tracker.NewAircraftMap(cfg.MapSettings)
+		err = t.RegisterProjectStatusListener(tracker.NewMapProjectStatusListener(m))
+		if err != nil {
+			return err
+		}
+		err = t.RegisterProjectAircraftUpdateListener(tracker.NewMapProjectAircraftUpdateListener(m))
+		if err != nil {
+			return err
+		}
+		go m.Serve()
+	}
+
 	var ignored int32
 	for _, proj := range cfg.Projects {
 		if proj.Disabled {
