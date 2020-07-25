@@ -148,7 +148,7 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 	}
 
 	for _, ac := range msg.Aircraft {
-		msgs <- &pb.Message{
+		msg := &pb.Message{
 			Source:       source,
 			Icao:         ac.Icao,
 			Squawk:       ac.Sqk,
@@ -158,7 +158,10 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 			Longitude:    ac.Lon,
 			IsOnGround:   ac.Ground == "1",
 			VerticalRate: ac.Vsi,
+			Track: ac.Trak,
+			GroundSpeed: ac.Spd,
 		}
+		msgs <- msg
 	}
 
 	return nil

@@ -22,6 +22,9 @@ message Message {
   bool IsOnGround = 30;
 
   string VerticalRate = 40;
+
+  string Track = 50;
+  string GroundSpeed = 90;
 }
 message State {
   string Icao = 1;
@@ -47,4 +50,10 @@ message State {
 
   bool HaveVerticalRate = 70;
   int64 VerticalRate = 71;
+
+  bool HaveTrack = 80;
+  double Track = 81;
+
+  bool HaveGroundSpeed = 90;
+  double GroundSpeed = 91;
 }

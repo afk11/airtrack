@@ -66,11 +66,18 @@ type (
 		haveAlt  bool
 		altitude int64
 
+		haveGS bool
+		gs float64
+
+		haveTrack bool
+		track float64
+
 		tags SightingTags
 
 		haveLocation  bool
 		latitude      float64
 		longitude     float64
+		lastLocationUpdate *time.Time
 		locationCount int64
 	}
 	Sighting struct {
@@ -659,6 +666,22 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 				s.State.Icao, s.State.Altitude, vr)
 		}
 	}
+	if msg.Track != "" {
+		track, err := strconv.ParseFloat(msg.Track, 64)
+		if err != nil {
+			return errors.Wrapf(err, "parse msg latitude")
+		}
+		s.State.Track = track
+		s.State.HaveTrack = true
+	}
+	if msg.GroundSpeed != "" {
+		gs, err := strconv.ParseFloat(msg.GroundSpeed,  64)
+		if err != nil {
+			return errors.Wrapf(err, "parse msg latitude")
+		}
+		s.State.GroundSpeed = gs
+		s.State.HaveGroundSpeed = true
+	}
 	if s.State.IsOnGround != msg.IsOnGround {
 		if s.onGroundCandidate == msg.IsOnGround {
 			s.onGroundCounter++
@@ -734,12 +757,26 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 	// Update Projects information in DB
 	observation.lastSeen = now
 
-	var updatedAlt, updatedLocation, updatedCallSign, updatedSquawk bool
+	var updatedAlt, updatedLocation, updatedCallSign, updatedSquawk, updatedGS, updatedTrack bool
 	if s.State.HaveAltitude {
 		updatedAlt = !observation.haveAlt || (s.State.Altitude != observation.altitude)
 		if updatedAlt {
 			observation.altitude = s.State.Altitude
 			observation.haveAlt = true
+		}
+	}
+	if s.State.HaveTrack {
+		updatedTrack = !observation.haveTrack || (s.State.Track != observation.track)
+		if updatedTrack {
+			observation.track = s.State.Track
+			observation.haveTrack = true
+		}
+	}
+	if s.State.HaveGroundSpeed {
+		updatedGS = !observation.haveGS || (s.State.GroundSpeed != observation.gs)
+		if updatedGS {
+			observation.gs = s.State.GroundSpeed
+			observation.haveGS = true
 		}
 	}
 	if s.State.HaveLocation {

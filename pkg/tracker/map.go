@@ -53,6 +53,7 @@ type jsonAircraft struct {
 }
 type jsonAircraftField struct {
 	referenceCount int64
+	lastPosTime time.Time
 	lastMsgTime time.Time
 	// hex: the 24-bit ICAO identifier of the aircraft, as 6 hex digits. The identifier may start with '~', this means that the address is a non-ICAO address (e.g. from TIS-B).
 	Hex string `json:"hex"`
@@ -69,7 +70,7 @@ type jsonAircraftField struct {
 	// flight: callsign, the flight name or aircraft registration as 8 chars (2.2.8.2.6)
 	Flight string `json:"flight,omitempty"`
 	// alt_baro: the aircraft barometric altitude in feet
-	BarometricAltitude string `json:"alt_baro,omitempty"`
+	BarometricAltitude int64 `json:"alt_baro,omitempty"`
 	// alt_geom: geometric (GNSS / INS) altitude in feet referenced to the WGS84 ellipsoid
 	GeometricAltitude string `json:"alt_geom,omitempty"`
 	// gs: ground speed in knots
@@ -118,7 +119,7 @@ type jsonAircraftField struct {
 	// rc: Radius of Containment, meters; a measure of position integrity derived from NIC & supplementary bits. (2.2.3.2.7.2.6, Table 2-69)
 	RadiusOfContainment int64 `json:"rc,omitempty"`
 	// seen_pos: how long ago (in seconds before "now") the position was last updated
-	SeenPos string `json:"seen_pos,omitempty"`
+	SeenPos float64 `json:"seen_pos,omitempty"`
 	// version: ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
 	Version int64 `json:"version,omitempty"`
 	// nic_baro: Navigation Integrity Category for Barometric Altitude (2.2.5.1.35)
@@ -152,7 +153,7 @@ type AircraftMap struct {
 	ac map[string]*jsonAircraftField
 	mu sync.RWMutex
 	projects map[string]*projectState
-	messages int
+	messages int64
 }
 
 func NewAircraftMap(cfg config.MapSettings) *AircraftMap {
@@ -196,6 +197,9 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 			Latitude: s.State.Latitude,
 			Longitude: s.State.Longitude,
 			Squawk: s.State.Squawk,
+			MagneticHeading: s.State.Track,
+			Track: s.State.Track,
+			GroundSpeed: s.State.GroundSpeed,
 			Messages: 1,
 		}
 	}
@@ -209,20 +213,33 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 	} else {
 		state.aircraft = append(state.aircraft, s.State.Icao)
 	}
-
+	m.messages++
 	return nil
 }
 func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+
 	//fmt.Printf("project %s - updated aircraft on map (%s)\n", p.Name, s.State.Icao)
 	acRecord := m.ac[s.State.Icao]
+
+	locationUpdated := s.State.Latitude != acRecord.Latitude || s.State.Longitude != acRecord.Longitude
+
 	acRecord.Messages++
 	acRecord.lastMsgTime = time.Now()
+	if locationUpdated {
+		acRecord.lastPosTime = time.Now()
+	}
 	acRecord.Flight = s.State.CallSign
+	acRecord.BarometricAltitude = s.State.Altitude
 	acRecord.Latitude = s.State.Latitude
 	acRecord.Longitude = s.State.Longitude
 	acRecord.Squawk = s.State.Squawk
+	acRecord.MagneticHeading = s.State.Track
+	acRecord.Track = s.State.Track
+	acRecord.GroundSpeed = s.State.GroundSpeed
+	m.messages++
 	return nil
 }
 func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
@@ -248,15 +265,20 @@ func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 func (m *AircraftMap) aircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+
+	vars := mux.Vars(r)
+	project := vars["project"]
+
 	numAc := len(m.ac)
 	l := make([]*jsonAircraftField, 0, numAc)
 	for _, v := range m.ac {
 		v.Seen = int64(time.Since(v.lastMsgTime).Seconds())
+		v.SeenPos = time.Since(v.lastMsgTime).Seconds()
 		l = append(l, v)
 	}
 	ac := jsonAircraft{
 		Now: float64(time.Now().Unix()),
-		Messages: 0,
+		Messages: m.messages,
 		Aircraft: l,
 	}
 	data, err := json.Marshal(ac)
