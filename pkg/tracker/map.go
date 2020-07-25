@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -43,6 +44,7 @@ func (l *MapProjectAircraftUpdateListener) LostAircraft(p *Project, s *Sighting)
 }
 
 type projectState struct {
+	sync.RWMutex
 	name string
 	aircraft []string
 }
@@ -53,6 +55,7 @@ type jsonAircraft struct {
 	Aircraft []*jsonAircraftField `json:"aircraft"`
 }
 type jsonAircraftField struct {
+	sync.RWMutex
 	referenceCount int64
 	lastPosTime time.Time
 	lastMsgTime time.Time
@@ -93,9 +96,9 @@ type jsonAircraftField struct {
 	// true_heading: Heading, degrees clockwise from true north
 	TrueHeading float64 `json:"true_heading,omitempty"`
 	// baro_rate: Rate of change of barometric altitude, feet/minute
-	BarometricRate float64 `json:"baro_rate,omitempty"`
+	BarometricRate int64 `json:"baro_rate,omitempty"`
 	// geom_rate: Rate of change of geometric (GNSS / INS) altitude, feet/minute
-	GeometricRate float64 `json:"geom_rate,omitempty"`
+	GeometricRate int64 `json:"geom_rate,omitempty"`
 	// squawk: Mode A code (Squawk), encoded as 4 octal digits
 	Squawk string `json:"squawk,omitempty"`
 	// emergency: ADS-B emergency/priority status, a superset of the 7x00 squawks (2.2.3.2.7.8.1.1)
@@ -153,6 +156,8 @@ type AircraftMap struct {
 	s *http.Server
 	ac map[string]*jsonAircraftField
 	mu sync.RWMutex
+	acMu sync.RWMutex
+	projMu sync.RWMutex
 	projects map[string]*projectState
 	messages int64
 }
@@ -178,9 +183,8 @@ func NewAircraftMap(cfg config.MapSettings) *AircraftMap {
 	return m
 }
 func (m *AircraftMap) registerProject(p *Project) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	fmt.Println("registering map project: "+p.Name)
+	m.projMu.Lock()
+	defer m.projMu.Unlock()
 	if _, ok := m.projects[p.Name]; ok {
 		return errors.New("duplicate project")
 	}
@@ -191,10 +195,11 @@ func (m *AircraftMap) registerProject(p *Project) error {
 	return nil
 }
 func (m *AircraftMap) deregisterProject(p *Project) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.projMu.Lock()
+	defer m.projMu.Unlock()
+	m.acMu.Lock()
+	defer m.acMu.Unlock()
 
-	fmt.Println("deregistering map project: "+p.Name)
 	proj, ok := m.projects[p.Name]
 	if !ok {
 		return errors.New("unknown project")
@@ -205,6 +210,7 @@ func (m *AircraftMap) deregisterProject(p *Project) error {
 		m.dereferenceAircraft(icao)
 	}
 	proj.aircraft = nil
+	delete(m.projects, p.Name)
 	return nil
 }
 func (m *AircraftMap) dereferenceAircraft(icao string) bool {
@@ -217,9 +223,10 @@ func (m *AircraftMap) dereferenceAircraft(icao string) bool {
 	return false
 }
 func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	// m.ac write
+	m.projMu.RLock()
+	defer m.projMu.RUnlock()
+
+	m.acMu.Lock()
 	if _, ok := m.ac[s.State.Icao]; !ok {
 		m.ac[s.State.Icao] = &jsonAircraftField{
 			lastMsgTime:     time.Now(),
@@ -230,31 +237,35 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 			Squawk:          s.State.Squawk,
 			MagneticHeading: s.State.Track,
 			Track:           s.State.Track,
+			BarometricRate:           s.State.VerticalRate,
 			GroundSpeed:     s.State.GroundSpeed,
 			Messages:        1,
 		}
 	}
-
 	m.ac[s.State.Icao].referenceCount++
-	fmt.Printf("project %s - new aircraft on map (%s) [ref count: %d]\n", p.Name, s.State.Icao, m.ac[s.State.Icao].referenceCount)
+	refCount := m.ac[s.State.Icao].referenceCount
+	m.acMu.Unlock()
+
+	fmt.Printf("project %s - new aircraft on map (%s) [ref count: %d]\n", p.Name, s.State.Icao, refCount)
 
 	// Associate record with project (init project if necessary)
 	// m.projects read
 	// projectrecord write
 	state := m.projects[p.Name]
+	state.Lock()
 	state.aircraft = append(state.aircraft, s.State.Icao)
+	state.Unlock()
 
-	m.messages++
+	atomic.AddInt64(&m.messages, 1)
 	return nil
 }
 func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.acMu.RLock()
+	defer m.acMu.RUnlock()
 
-	//fmt.Printf("project %s - updated aircraft on map (%s)\n", p.Name, s.State.Icao)
-	// m.ac read
 	acRecord := m.ac[s.State.Icao]
-
+	acRecord.Lock()
+	defer acRecord.Unlock()
 	locationUpdated := s.State.Latitude != acRecord.Latitude || s.State.Longitude != acRecord.Longitude
 
 	acRecord.Messages++
@@ -271,16 +282,16 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	acRecord.Track = s.State.Track
 	acRecord.GroundSpeed = s.State.GroundSpeed
 	m.messages++
+	atomic.AddInt64(&m.messages, 1)
 	return nil
 }
 
 func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.projMu.RLock()
+	defer m.projMu.RUnlock()
 
-	// m.projects read
-	// projectrecord write
 	projRecord := m.projects[p.Name]
+	projRecord.Lock()
 	numAc := int64(len(projRecord.aircraft))
 	var toDelete int64 = -1
 	for i := int64(0); i < numAc && toDelete == -1; i++ {
@@ -289,16 +300,20 @@ func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 		}
 	}
 	projRecord.aircraft = append(projRecord.aircraft[:toDelete], projRecord.aircraft[toDelete+1:]...)
+	projRecord.Unlock()
+
 	// m.ac write
+	m.acMu.Lock()
 	m.dereferenceAircraft(s.State.Icao)
+	m.acMu.Unlock()
 	return nil
 }
 func (m *AircraftMap) aircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.projMu.RLock()
+	defer m.projMu.RUnlock()
+	m.acMu.RLock()
+	defer m.acMu.RUnlock()
 
-	// m.project read
-	// m.ac read
 	vars := mux.Vars(r)
 	projectName := vars["project"]
 	proj, ok := m.projects[projectName]
@@ -311,7 +326,14 @@ func (m *AircraftMap) aircraftJsonHandler(w http.ResponseWriter, r *http.Request
 	l := make([]*jsonAircraftField, numAC)
 	for i := 0; i < numAC; i++ {
 		l[i] = m.ac[proj.aircraft[i]]
+		l[i].RLock()
 	}
+	defer func() {
+		for i := 0; i < numAC; i++ {
+			l[i].RUnlock()
+		}
+	}()
+
 	ac := jsonAircraft{
 		Now: float64(time.Now().Unix()),
 		Messages: m.messages,
@@ -330,12 +352,14 @@ func (m *AircraftMap) Serve() {
 	go func() {
 		for {
 			<-time.After(time.Second)
-			m.mu.Lock()
+			m.acMu.RLock()
 			for _, ac := range m.ac {
+				ac.Lock()
 				ac.Seen = int64(time.Since(ac.lastMsgTime).Seconds())
 				ac.SeenPos = time.Since(ac.lastMsgTime).Seconds()
+				ac.Unlock()
 			}
-			m.mu.Unlock()
+			m.acMu.RUnlock()
 		}
 	}()
 	go func() {
