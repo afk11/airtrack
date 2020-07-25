@@ -214,7 +214,6 @@ func (m *AircraftMap) deregisterProject(p *Project) error {
 	return nil
 }
 func (m *AircraftMap) dereferenceAircraft(icao string) bool {
-	// m.ac write
 	m.ac[icao].referenceCount--
 	if m.ac[icao].referenceCount == 0 {
 		delete(m.ac, icao)
@@ -243,14 +242,9 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 		}
 	}
 	m.ac[s.State.Icao].referenceCount++
-	refCount := m.ac[s.State.Icao].referenceCount
 	m.acMu.Unlock()
 
-	fmt.Printf("project %s - new aircraft on map (%s) [ref count: %d]\n", p.Name, s.State.Icao, refCount)
-
 	// Associate record with project (init project if necessary)
-	// m.projects read
-	// projectrecord write
 	state := m.projects[p.Name]
 	state.Lock()
 	state.aircraft = append(state.aircraft, s.State.Icao)
@@ -317,6 +311,8 @@ func (m *AircraftMap) aircraftJsonHandler(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	projectName := vars["project"]
 	proj, ok := m.projects[projectName]
+	proj.RLock()
+	defer proj.RUnlock()
 	if !ok {
 		w.WriteHeader(404)
 		return
