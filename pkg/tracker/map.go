@@ -6,6 +6,7 @@ import (
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+	"github.com/pkg/errors"
 	"net/http"
 	"sync"
 	"time"
@@ -177,42 +178,72 @@ func NewAircraftMap(cfg config.MapSettings) *AircraftMap {
 	return m
 }
 func (m *AircraftMap) registerProject(p *Project) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	fmt.Println("registering map project: "+p.Name)
+	if _, ok := m.projects[p.Name]; ok {
+		return errors.New("duplicate project")
+	}
+	m.projects[p.Name] = &projectState{
+		name: p.Name,
+		aircraft: []string{},
+	}
 	return nil
 }
 func (m *AircraftMap) deregisterProject(p *Project) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
 	fmt.Println("deregistering map project: "+p.Name)
+	proj, ok := m.projects[p.Name]
+	if !ok {
+		return errors.New("unknown project")
+	}
+	numAC := len(proj.aircraft)
+	for i := 0; i < numAC; i++ {
+		icao := proj.aircraft[i]
+		m.dereferenceAircraft(icao)
+	}
+	proj.aircraft = nil
 	return nil
+}
+func (m *AircraftMap) dereferenceAircraft(icao string) bool {
+	// m.ac write
+	m.ac[icao].referenceCount--
+	if m.ac[icao].referenceCount == 0 {
+		delete(m.ac, icao)
+		return true
+	}
+	return false
 }
 func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	fmt.Printf("project %s - new aircraft on map (%s)\n", p.Name, s.State.Icao)
+	// m.ac write
 	if _, ok := m.ac[s.State.Icao]; !ok {
 		m.ac[s.State.Icao] = &jsonAircraftField{
-			referenceCount: 1,
-			lastMsgTime: time.Now(),
-			Hex: s.State.Icao,
-			Flight: s.State.CallSign,
-			Latitude: s.State.Latitude,
-			Longitude: s.State.Longitude,
-			Squawk: s.State.Squawk,
+			lastMsgTime:     time.Now(),
+			Hex:             s.State.Icao,
+			Flight:          s.State.CallSign,
+			Latitude:        s.State.Latitude,
+			Longitude:       s.State.Longitude,
+			Squawk:          s.State.Squawk,
 			MagneticHeading: s.State.Track,
-			Track: s.State.Track,
-			GroundSpeed: s.State.GroundSpeed,
-			Messages: 1,
+			Track:           s.State.Track,
+			GroundSpeed:     s.State.GroundSpeed,
+			Messages:        1,
 		}
 	}
 
+	m.ac[s.State.Icao].referenceCount++
+	fmt.Printf("project %s - new aircraft on map (%s) [ref count: %d]\n", p.Name, s.State.Icao, m.ac[s.State.Icao].referenceCount)
+
 	// Associate record with project (init project if necessary)
-	if state, ok := m.projects[p.Name]; !ok {
-		m.projects[p.Name] = &projectState{
-			name: p.Name,
-			aircraft: []string{s.State.Icao},
-		}
-	} else {
-		state.aircraft = append(state.aircraft, s.State.Icao)
-	}
+	// m.projects read
+	// projectrecord write
+	state := m.projects[p.Name]
+	state.aircraft = append(state.aircraft, s.State.Icao)
+
 	m.messages++
 	return nil
 }
@@ -220,8 +251,8 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-
 	//fmt.Printf("project %s - updated aircraft on map (%s)\n", p.Name, s.State.Icao)
+	// m.ac read
 	acRecord := m.ac[s.State.Icao]
 
 	locationUpdated := s.State.Latitude != acRecord.Latitude || s.State.Longitude != acRecord.Longitude
@@ -242,11 +273,13 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	m.messages++
 	return nil
 }
+
 func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	fmt.Printf("project %s - lost aircraft on map (%s)\n", p.Name, s.State.Icao)
 
+	// m.projects read
+	// projectrecord write
 	projRecord := m.projects[p.Name]
 	numAc := int64(len(projRecord.aircraft))
 	var toDelete int64 = -1
@@ -256,25 +289,28 @@ func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 		}
 	}
 	projRecord.aircraft = append(projRecord.aircraft[:toDelete], projRecord.aircraft[toDelete+1:]...)
-	m.ac[s.State.Icao].referenceCount--
-	if m.ac[s.State.Icao].referenceCount == 0 {
-		delete(m.ac, s.State.Icao)
-	}
+	// m.ac write
+	m.dereferenceAircraft(s.State.Icao)
 	return nil
 }
 func (m *AircraftMap) aircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	// m.project read
+	// m.ac read
 	vars := mux.Vars(r)
-	project := vars["project"]
+	projectName := vars["project"]
+	proj, ok := m.projects[projectName]
+	if !ok {
+		w.WriteHeader(404)
+		return
+	}
 
-	numAc := len(m.ac)
-	l := make([]*jsonAircraftField, 0, numAc)
-	for _, v := range m.ac {
-		v.Seen = int64(time.Since(v.lastMsgTime).Seconds())
-		v.SeenPos = time.Since(v.lastMsgTime).Seconds()
-		l = append(l, v)
+	numAC := len(proj.aircraft)
+	l := make([]*jsonAircraftField, numAC)
+	for i := 0; i < numAC; i++ {
+		l[i] = m.ac[proj.aircraft[i]]
 	}
 	ac := jsonAircraft{
 		Now: float64(time.Now().Unix()),
@@ -291,6 +327,17 @@ func (m *AircraftMap) aircraftJsonHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 func (m *AircraftMap) Serve() {
+	go func() {
+		for {
+			<-time.After(time.Second)
+			m.mu.Lock()
+			for _, ac := range m.ac {
+				ac.Seen = int64(time.Since(ac.lastMsgTime).Seconds())
+				ac.SeenPos = time.Since(ac.lastMsgTime).Seconds()
+			}
+			m.mu.Unlock()
+		}
+	}()
 	go func() {
 		m.s.ListenAndServe()
 	}()
