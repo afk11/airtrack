@@ -2,6 +2,7 @@
 TESTARGS=$(TESTOPTIONS)
 # gather options for coverage
 COVERAGEARGS=$(COVERAGEOPTIONS)
+DUMP1090_VERSION=v3.8.1
 
 install-go-bindata:
 		go get -u github.com/jteeuwen/go-bindata/...
@@ -9,12 +10,14 @@ build-bindata-assets:
 		go-bindata -pkg asset -o ./pkg/assets/asset.go assets/...
 build-bindata-migrations:
 		go-bindata -pkg migrations -o ./pkg/db/migrations/migrations.go -prefix db/migrations db/migrations
+build-bindata-dump1090: dump1090
+		go-bindata -pkg acmap -o ./pkg/dump1090/acmap/assets.go dump1090/...
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
-build-linux-amd64: build-airtrack-linux-amd64 build-airtrack-qa-linux-amd64
-build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-protobuf
+build-linux-amd64: dump1090 build-airtrack-linux-amd64 build-airtrack-qa-linux-amd64
+build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-dump1090 build-protobuf
 		GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
-build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-protobuf
+build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-dump1090 build-protobuf
 		GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
 test: test-cleanup
@@ -38,3 +41,6 @@ coverage: coverage-concat
 # full coverage report
 coverage-html: coverage-concat
 	go tool cover -html=coverage/full $(COVERAGEARGS)
+
+dump1090:
+	./contrib/refresh_dump1090.sh "${DUMP1090_VERSION}"

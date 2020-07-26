@@ -10,6 +10,7 @@ import (
 	asset "github.com/afk11/airtrack/pkg/assets"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db"
+	"github.com/afk11/airtrack/pkg/dump1090/acmap"
 	"github.com/afk11/airtrack/pkg/fs"
 	"github.com/afk11/airtrack/pkg/geo"
 	"github.com/afk11/airtrack/pkg/geo/cup"
@@ -226,7 +227,14 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	}
 
 	if cfg.MapSettings.Enabled {
-		m := tracker.NewAircraftMap(cfg.MapSettings)
+		m, err := tracker.NewAircraftMap(cfg.MapSettings)
+		if err != nil {
+			return err
+		}
+		err = m.RegisterMapService(acmap.NewDump1090Map(m))
+		if err != nil {
+			return err
+		}
 		err = t.RegisterProjectStatusListener(tracker.NewMapProjectStatusListener(m))
 		if err != nil {
 			return err

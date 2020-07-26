@@ -1,7 +1,7 @@
 package tracker
 
+import "C"
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/gorilla/handlers"
@@ -12,6 +12,42 @@ import (
 	"sync/atomic"
 	"time"
 )
+
+var mapServices struct {
+	sync.RWMutex
+	s []MapService
+}
+
+// UnknownProject is returned by MapAccess.GetProjectAircraft
+var UnknownProject = errors.New("unknown project")
+type MapAccess interface {
+	GetProjectAircraft(projectName string, f func (int64, []*JsonAircraft) error) error
+}
+func RegisterMapBackend(service MapService) error {
+	mapServices.Lock()
+	defer mapServices.Unlock()
+	n := len(mapServices.s)
+	name := service.MapService()
+	for i := 0; i < n; i++ {
+		if mapServices.s[i].MapService() == name {
+			return errors.Errorf("%s map service already registered", name)
+		}
+	}
+
+	mapServices.s = append(mapServices.s, service)
+	return nil
+}
+func GetMapBackend(service string) (MapService, bool) {
+	mapServices.RLock()
+	defer mapServices.RUnlock()
+	n := len(mapServices.s)
+	for i := 0; i < n; i++ {
+		if mapServices.s[i].MapService() == service {
+			return mapServices.s[i], true
+		}
+	}
+	return nil, false
+}
 
 type MapProjectStatusListener struct {
 	m *AircraftMap
@@ -49,12 +85,7 @@ type projectState struct {
 	aircraft []string
 }
 
-type jsonAircraft struct {
-	Now float64 `json:"now"`
-	Messages int64 `json:"messages"`
-	Aircraft []*jsonAircraftField `json:"aircraft"`
-}
-type jsonAircraftField struct {
+type JsonAircraft struct {
 	sync.RWMutex
 	referenceCount int64
 	lastPosTime time.Time
@@ -154,37 +185,42 @@ type jsonAircraftField struct {
 }
 type AircraftMap struct {
 	s *http.Server
-	ac map[string]*jsonAircraftField
+	r *mux.Router
+	ac map[string]*JsonAircraft
 	acMu sync.RWMutex
 	projMu sync.RWMutex
 	projects map[string]*projectState
 	messages int64
 }
 
-func NewAircraftMap(cfg config.MapSettings) *AircraftMap {
+func NewAircraftMap(cfg config.MapSettings) (*AircraftMap, error) {
 	m := &AircraftMap{
-		ac: make(map[string]*jsonAircraftField),
+		ac: make(map[string]*JsonAircraft),
 		projects: make(map[string]*projectState),
+		r: mux.NewRouter(),
 	}
 	port := uint16(8080)
 	if cfg.Port != 0 {
 		port = cfg.Port
 	}
-	d := &Dump1090Map{m: m}
-	var maps = []MapService{d}
-	r := mux.NewRouter()
-	for _, m := range maps {
-		sub := r.PathPrefix("/"+m.MapService()).Subrouter()
-		m.RegisterRoutes(sub)
-	}
 	m.s = &http.Server{
 		Addr: fmt.Sprintf("%s:%d", cfg.Address, port),
-		Handler: handlers.CORS()(r),
+		Handler: handlers.CORS()(m.r),
 		// Good practice: enforce timeouts for servers you create!
 		WriteTimeout: 15 * time.Second,
 		ReadTimeout:  15 * time.Second,
 	}
-	return m
+	return m, nil
+}
+func (m *AircraftMap) RegisterMapService(services ...MapService) error {
+	for _, service := range services {
+		sub := m.r.PathPrefix("/"+service.MapService()).Subrouter()
+		err := service.RegisterRoutes(sub)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 func (m *AircraftMap) registerProject(p *Project) error {
 	m.projMu.Lock()
@@ -231,7 +267,7 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 
 	m.acMu.Lock()
 	if _, ok := m.ac[s.State.Icao]; !ok {
-		m.ac[s.State.Icao] = &jsonAircraftField{
+		m.ac[s.State.Icao] = &JsonAircraft{
 			lastMsgTime:     time.Now(),
 			Hex:             s.State.Icao,
 			Flight:          s.State.CallSign,
@@ -283,6 +319,38 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	return nil
 }
 
+func (m *AircraftMap) GetProjectAircraft(projectName string, f func (int64, []*JsonAircraft) error) error {
+	m.projMu.RLock()
+	defer m.projMu.RUnlock()
+	m.acMu.RLock()
+	defer m.acMu.RUnlock()
+
+	proj, ok := m.projects[projectName]
+	if !ok {
+		return UnknownProject
+	}
+
+	proj.RLock()
+	defer proj.RUnlock()
+
+	numAC := len(proj.aircraft)
+	l := make([]*JsonAircraft, numAC)
+	for i := 0; i < numAC; i++ {
+		l[i] = m.ac[proj.aircraft[i]]
+		l[i].RLock()
+	}
+	defer func() {
+		for i := 0; i < numAC; i++ {
+			l[i].RUnlock()
+		}
+	}()
+
+	err := f(m.messages, l)
+	if err != nil {
+		return err
+	}
+	return nil
+}
 func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 	m.projMu.RLock()
 	defer m.projMu.RUnlock()
@@ -327,57 +395,5 @@ func (m *AircraftMap) Serve() {
 
 type MapService interface {
 	MapService() string
-	RegisterRoutes(r *mux.Router)
-}
-type Dump1090Map struct {
-	m *AircraftMap
-}
-func (d *Dump1090Map) MapService() string {
-	return "dump1090"
-}
-func (d *Dump1090Map) RegisterRoutes(r *mux.Router) {
-	r.HandleFunc("/{project}/data/aircraft.json", d.JsonHandler)
-}
-func (d *Dump1090Map) JsonHandler(w http.ResponseWriter, r *http.Request) {
-	d.m.projMu.RLock()
-	defer d.m.projMu.RUnlock()
-	d.m.acMu.RLock()
-	defer d.m.acMu.RUnlock()
-
-	vars := mux.Vars(r)
-	projectName := vars["project"]
-	proj, ok := d.m.projects[projectName]
-	if !ok {
-		w.WriteHeader(404)
-		return
-	}
-
-	proj.RLock()
-	defer proj.RUnlock()
-
-	numAC := len(proj.aircraft)
-	l := make([]*jsonAircraftField, numAC)
-	for i := 0; i < numAC; i++ {
-		l[i] = d.m.ac[proj.aircraft[i]]
-		l[i].RLock()
-	}
-	defer func() {
-		for i := 0; i < numAC; i++ {
-			l[i].RUnlock()
-		}
-	}()
-
-	ac := jsonAircraft{
-		Now: float64(time.Now().Unix()),
-		Messages: d.m.messages,
-		Aircraft: l,
-	}
-	data, err := json.Marshal(ac)
-	if err != nil {
-		panic(err)
-	}
-	_, err = w.Write(data)
-	if err != nil {
-		panic(err)
-	}
+	RegisterRoutes(r *mux.Router) error
 }

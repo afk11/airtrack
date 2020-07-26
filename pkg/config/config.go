@@ -27,7 +27,10 @@ type (
 	}
 
 	MapSettings struct {
+		// Toggles whether map is enabled (default FALSE)
 		Enabled bool `yaml:"enabled"`
+		// Map interfaces to expose (default: dump1090 if none set)
+		Services []string `yaml:"services"`
 		Address string `yaml:"address"`
 		Port    uint16 `yaml:"port"`
 		BaseUrl string `yaml:""`
