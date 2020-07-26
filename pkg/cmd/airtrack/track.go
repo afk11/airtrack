@@ -26,12 +26,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime/pprof"
 	"syscall"
 	"time"
 )
 
 type TrackCmd struct {
 	Verbosity string `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
+	CPUProfile string `help:"Write CPU profile to file"`
 }
 
 func (c *TrackCmd) Run(ctx *Context) error {
@@ -272,6 +274,17 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		}()
 	}
 
+	if c.CPUProfile != "" {
+		f, err := os.Create(c.CPUProfile)
+		if err != nil {
+			return err
+		}
+		err = pprof.StartCPUProfile(f)
+		if err != nil {
+			return err
+		}
+		defer pprof.StopCPUProfile()
+	}
 	p.Start()
 
 	select {

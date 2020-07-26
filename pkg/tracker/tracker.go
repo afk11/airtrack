@@ -574,8 +574,9 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 	for msg := range msgs {
 		inflightMsgVec.WithLabelValues().Inc()
 		t.projectMu.RLock()
+		now := time.Now()
 		for _, proj := range t.projects {
-			err := t.ProcessMessage(proj, msg)
+			err := t.ProcessMessage(proj, now, msg)
 			if err != nil {
 				t.projectMu.RUnlock()
 				panic(err)
@@ -606,7 +607,7 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 	return s
 }
 
-func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
+func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Message) error {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
 		us := v * 1000000 // make microseconds
 		msgDurations.Observe(us)
@@ -616,7 +617,6 @@ func (t *Tracker) ProcessMessage(project *Project, msg *pb.Message) error {
 	s := t.getSighting(msg.Icao)
 	defer s.mu.Unlock()
 
-	now := time.Now()
 	s.lastSeen = now
 
 	// Update Sighting state

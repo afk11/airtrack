@@ -265,7 +265,7 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	acRecord.Messages++
 	acRecord.lastMsgTime = time.Now()
 	if locationUpdated {
-		acRecord.lastPosTime = time.Now()
+		acRecord.lastPosTime = acRecord.lastMsgTime
 	}
 	acRecord.Flight = s.State.CallSign
 	acRecord.BarometricAltitude = s.State.Altitude
@@ -311,12 +311,13 @@ func (m *AircraftMap) aircraftJsonHandler(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	projectName := vars["project"]
 	proj, ok := m.projects[projectName]
-	proj.RLock()
-	defer proj.RUnlock()
 	if !ok {
 		w.WriteHeader(404)
 		return
 	}
+
+	proj.RLock()
+	defer proj.RUnlock()
 
 	numAC := len(proj.aircraft)
 	l := make([]*jsonAircraftField, numAC)

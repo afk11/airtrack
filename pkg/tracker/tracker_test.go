@@ -79,7 +79,8 @@ func TestTracker(t *testing.T) {
 		assert.NoError(t, err)
 		err = doTest(opt, proj, func(tr *Tracker) error {
 			p := pb.Message{Source: sbs1Source, Icao: "444444"}
-			err := tr.ProcessMessage(proj, &p)
+			now := time.Now()
+			err := tr.ProcessMessage(proj, now, &p)
 			if err != nil {
 				return errors.Wrap(err, "process message")
 			}
