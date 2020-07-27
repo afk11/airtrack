@@ -207,7 +207,6 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 					}
 				} else {
 					log.Warnf("unexpected error: %s", err.Error())
-					log.Warnf("error: %+v", err)
 				}
 				if !degradedService {
 					degradedService = true
