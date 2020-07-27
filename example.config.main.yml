@@ -1,4 +1,7 @@
 timezone: UTC
+adsbx:
+  #  url: http://proxy.localhost:8080/api/aircraft/json/
+  apikey: ADSBX API KEY
 encryption:
   # Application encryption key: base64(random_bytes(32))
   # dd if=/dev/random bs=32 count=1 2>/dev/null | base64
@@ -28,6 +31,9 @@ email:
     port: SMTP PORT
     # activate and require STARTTLS
     mandatory_starttls: true
+metrics:
+  enabled: false
+  port: 9206
 sighting:
   # close sightings if no messages have been received in this long
   # unit: seconds
