@@ -14,7 +14,6 @@ build-bindata-dump1090: dump1090
 		go-bindata -pkg acmap -o ./pkg/dump1090/acmap/assets.go dump1090/...
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
-build-linux-amd64: dump1090 build-airtrack-linux-amd64 build-airtrack-qa-linux-amd64
 build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-dump1090 build-protobuf
 		GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
 build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-dump1090 build-protobuf
