@@ -170,7 +170,8 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 func (p *AdsbxProducer) producer(ctx context.Context) {
 	defer p.wg.Done()
 
-	wait := time.Second * 2
+	normalWait := time.Second * 2
+	wait := normalWait
 	src := &pb.Source{
 		Id:   "1",
 		Type: "adsbx",
@@ -213,9 +214,8 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 				}
 				retryCount++
 
-				sleep := time.Duration(10*retryCount) * time.Second
-				log.Warnf("adsbexchange producer %d, sleeping %s", retryCount, sleep)
-				time.Sleep(sleep)
+				wait = time.Duration(10*retryCount) * time.Second
+				log.Warnf("adsbexchange producer %d, sleeping %s", retryCount, wait)
 				continue
 			}
 
@@ -223,6 +223,7 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 				log.Warnf("adsbexchange - normal service restored after %d retries", retryCount)
 				degradedService = false
 				retryCount = 0
+				wait = normalWait
 			}
 		case <-ctx.Done():
 			return
