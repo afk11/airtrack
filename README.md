@@ -9,7 +9,7 @@ The airtrack project provides software to aid in monitoring of aircraft.
  - Filtering language: Projects can define filters to only focus on aircraft that meet specified conditions
  - Database storage: Projects save some minimal information about sighting open and close times, and the aircraft ICAO, as well as other data points about the flight.
  - Monitoring features: Features can be configured per-project. See the specific documentation for each.
- - Email notifications: Certain flight events also yield email notifications - enabled notifications can be specified in the config file
+ - Email notifications: Certain flight events also trigger email notifications - enabled notifications can be specified in the config file
  - Location geocoding: Find the nearest airports by importing OpenAIP files from https://openaip.net
 
 ### Configuration
