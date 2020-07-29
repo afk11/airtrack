@@ -573,6 +573,8 @@ func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Req
 		w.Header().Set("Content-Type", "text/css")
 	} else if len(h) > 3 && h[len(h)-3:] == ".js" {
 		w.Header().Set("Content-Type", "text/javascript")
+	} else if len(h) > 5 && h[len(h)-5:] == ".html" {
+		w.Header().Set("Content-Type", "text/html")
 	}
 	_, err := w.Write(dat)
 	if err != nil {
@@ -581,6 +583,7 @@ func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Req
 }
 func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/aircraft.json", d.JsonHandler)
+	r.HandleFunc("/{project}/data/receiver.json", d.ReceiverHandler)
 	for _, file := range d.statics() {
 		assetPath := "dump1090/public_html/"+file
 		_, err := Asset(assetPath)
@@ -591,6 +594,13 @@ func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
 		r.HandleFunc("/{project}/"+file, handler.responseHandler)
 	}
 	return nil
+}
+func (d *Dump1090Map) ReceiverHandler(w http.ResponseWriter, r *http.Request) {
+	_, err := w.Write([]byte("{ \"version\" : \"v3.8.3\", \"refresh\" : 1000, \"history\" : 32 }"))
+	if err != nil {
+		w.WriteHeader(500)
+		panic(err)
+	}
 }
 func (d *Dump1090Map) JsonHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)

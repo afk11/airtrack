@@ -10,7 +10,8 @@ import (
 	asset "github.com/afk11/airtrack/pkg/assets"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db"
-	"github.com/afk11/airtrack/pkg/dump1090/acmap"
+	dump1090 "github.com/afk11/airtrack/pkg/dump1090/acmap"
+	"github.com/afk11/airtrack/pkg/tar1090"
 	"github.com/afk11/airtrack/pkg/fs"
 	"github.com/afk11/airtrack/pkg/geo"
 	"github.com/afk11/airtrack/pkg/geo/cup"
@@ -231,7 +232,11 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		if err != nil {
 			return err
 		}
-		err = m.RegisterMapService(acmap.NewDump1090Map(m))
+		err = m.RegisterMapService(dump1090.NewDump1090Map(m))
+		if err != nil {
+			return err
+		}
+		err = m.RegisterMapService(tar1090.NewTar1090Map(m))
 		if err != nil {
 			return err
 		}
