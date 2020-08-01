@@ -23,22 +23,22 @@ func (cmd *MictronicsOperatorCountryQA) Run(ctx *Context) error {
 		return err
 	}
 
-	fixup := map[string]string {
-		"Netherlands": "Netherlands, Kingdom of",
-		"Tanzania": "United Republic of Tanzania",
-		"CÃ´te d'Ivoire": "Côte d Ivoire",
-		"Macedonia": "North Macedonia",
-		"Brunei": "Brunei Darussalam",
-		"Syria": "Syrian Arab Republic",
-		"Iran": "Iran, Islamic Republic",
-		"Russia": "Russian Federation",
-		"Moldova": "Republic of Moldova",
-		"Laos": "Lao People's Democratic Republic",
+	fixup := map[string]string{
+		"Netherlands":             "Netherlands, Kingdom of",
+		"Tanzania":                "United Republic of Tanzania",
+		"CÃ´te d'Ivoire":          "Côte d Ivoire",
+		"Macedonia":               "North Macedonia",
+		"Brunei":                  "Brunei Darussalam",
+		"Syria":                   "Syrian Arab Republic",
+		"Iran":                    "Iran, Islamic Republic",
+		"Russia":                  "Russian Federation",
+		"Moldova":                 "Republic of Moldova",
+		"Laos":                    "Lao People's Democratic Republic",
 		"SÃ£o TomÃ© and Principe": "Sao Tome",
-		"South Korea": "Republic of Korea",
-		"North Korea": "Democratic People's Republic of Korea",
-		"Congo (Brazzaville)": "Democratic Republic of the Congo",
-		"PerÃº": "Peru",
+		"South Korea":             "Republic of Korea",
+		"North Korea":             "Democratic People's Republic of Korea",
+		"Congo (Brazzaville)":     "Democratic Republic of the Congo",
+		"PerÃº":                   "Peru",
 	}
 	countryCodesData, err := asset.Asset("assets/iso3166_country_codes.txt")
 	if err != nil {
@@ -72,11 +72,11 @@ func (cmd *MictronicsOperatorCountryQA) Run(ctx *Context) error {
 			found++
 		}
 	}
-    fmt.Printf("records with a valid country: %d\n", found)
-    fmt.Printf("records with unknown/invalid country: %d\n", notFound)
+	fmt.Printf("records with a valid country: %d\n", found)
+	fmt.Printf("records with unknown/invalid country: %d\n", notFound)
 	fmt.Printf("invalid countries:\n")
 	for invalidCountry := range unknownCountries {
-		fmt.Println("`"+invalidCountry+"`")
+		fmt.Println("`" + invalidCountry + "`")
 	}
 	return nil
 }

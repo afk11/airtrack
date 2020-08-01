@@ -2,22 +2,238 @@ package tar1090
 
 import (
 	"encoding/json"
+	"fmt"
 	"github.com/afk11/airtrack/pkg/tracker"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"net/http"
+	"strconv"
+	"sync"
 	"time"
 )
 
-func NewTar1090Map(ma tracker.MapAccess) *Map {
-	return &Map{m: ma}
+type ProjectHistory struct {
+	// nextIdx counts from zero to maxHistory. When nextIdx == maxHistory
+	// it gets reset to zero
+	nextIdx    int
+	historyLen int
+	history    [][]byte
 }
+
+func newProjectHistory(maxHistory int) *ProjectHistory {
+	ph := &ProjectHistory{
+		history: make([][]byte, maxHistory),
+	}
+	return ph
+}
+func (ph *ProjectHistory) AddNextFile(maxHistory int, data []byte) error {
+	if ph.nextIdx == maxHistory {
+		ph.nextIdx = 0
+	}
+	if ph.historyLen < maxHistory-1 {
+		ph.historyLen++
+	}
+	ph.history[ph.nextIdx] = data
+	ph.nextIdx++
+	return nil
+}
+
+type History struct {
+	maxHistory int
+	history    map[string]*ProjectHistory
+	mu         sync.RWMutex
+}
+
+func NewHistory(maxHistory int) *History {
+	return &History{
+		maxHistory: maxHistory,
+		history:    make(map[string]*ProjectHistory),
+	}
+}
+func (h *History) SaveAircraftFile(project string, data []byte) error {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	hist, ok := h.history[project]
+	if !ok {
+		hist = newProjectHistory(h.maxHistory)
+		h.history[project] = hist
+	}
+	return hist.AddNextFile(h.maxHistory, data)
+}
+func (h *History) GetHistoryCount(project string) (int, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	hist, ok := h.history[project]
+	if !ok {
+		return 0, errors.New("unknown project")
+	}
+	return hist.historyLen, nil
+}
+func (h *History) GetHistoryFile(project string, file int64) ([]byte, error) {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	hist, ok := h.history[project]
+	if !ok {
+		return nil, errors.New("unknown project")
+	}
+	if file > int64(hist.historyLen) {
+		return nil, errors.New("history file is out of range")
+	}
+	fmt.Printf("getHistoryFile historyLen=%d file=%d\n", hist.historyLen, file)
+	return hist.history[file], nil
+}
+
+type HistoryUpdateScheduler struct {
+	m tracker.MapAccess
+	h *History
+}
+
+func (s *HistoryUpdateScheduler) UpdateHistory(projects []string) error {
+	var data []byte
+	for _, project := range projects {
+		err := s.m.GetProjectAircraft(project, func(messageCount int64, fields []*tracker.JsonAircraft) error {
+			ac := jsonAircraft{
+				Now:      float64(time.Now().Unix()),
+				Messages: messageCount,
+				Aircraft: fields,
+			}
+			var err error
+			data, err = json.Marshal(ac)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err == tracker.UnknownProject {
+			panic(err)
+		} else if err != nil {
+			panic(err)
+		}
+		err = s.h.SaveAircraftFile(project, data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type jsonAircraft struct {
+	Now      float64                 `json:"now"`
+	Messages int64                   `json:"messages"`
+	Aircraft []*tracker.JsonAircraft `json:"aircraft"`
+}
+
+type assetResponseHandler string
+
+func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
+	dat := MustAsset(string(h))
+	if len(h) > 4 && h[len(h)-4:] == ".css" {
+		w.Header().Set("Content-Type", "text/css")
+	} else if len(h) > 3 && h[len(h)-3:] == ".js" {
+		w.Header().Set("Content-Type", "text/javascript")
+	} else if len(h) > 5 && h[len(h)-5:] == ".html" {
+		w.Header().Set("Content-Type", "text/html")
+	}
+	_, err := w.Write(dat)
+	if err != nil {
+		log.Infof("error writing response: %s", err.Error())
+	}
+}
+
+func NewTar1090Map(ma tracker.MapAccess, maxHistory int) *Map {
+	return &Map{
+		m: ma,
+		h: NewHistory(maxHistory),
+	}
+}
+
 type Map struct {
 	m tracker.MapAccess
+	h *History
 }
+
 func (t *Map) MapService() string {
 	return "tar1090"
+}
+func (t *Map) UpdateScheduler() tracker.MapHistoryUpdateScheduler {
+	return &HistoryUpdateScheduler{t.m, t.h}
+}
+
+func (t *Map) RegisterRoutes(r *mux.Router) error {
+	r.HandleFunc("/{project}/data/aircraft.json", t.AircraftJsonHandler)
+	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJsonHandler)
+	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverJsonHandler)
+	for _, file := range t.statics() {
+		assetPath := "tar1090/html/" + file
+		_, err := Asset(assetPath)
+		if err != nil {
+			return errors.Wrap(err, "loading dump1090 asset "+file)
+		}
+		r.HandleFunc("/{project}/"+file, assetResponseHandler(assetPath).responseHandler)
+	}
+	return nil
+}
+func (t *Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	projectName := vars["project"]
+	count, err := t.h.GetHistoryCount(projectName)
+	if err != nil {
+		fmt.Println("UNKNOWN PROJECT - receiver handler")
+		w.WriteHeader(404)
+		return
+	}
+	data := []byte("{ \"version\" : \"v3.8.3\", \"refresh\" : 1000, \"history\" : " + strconv.Itoa(count) + " }")
+	_, err = w.Write(data)
+	if err != nil {
+		w.WriteHeader(500)
+		panic(err)
+	}
+}
+func (t *Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	err := t.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JsonAircraft) error {
+		ac := jsonAircraft{
+			Now:      float64(time.Now().Unix()),
+			Messages: messageCount,
+			Aircraft: fields,
+		}
+		data, err := json.Marshal(ac)
+		if err != nil {
+			return err
+		}
+		_, err = w.Write(data)
+		return err
+	})
+	if err == tracker.UnknownProject {
+		w.WriteHeader(404)
+	} else if err != nil {
+		w.WriteHeader(500)
+		panic(err)
+	}
+}
+func (t *Map) HistoryJsonHandler(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	projectName := vars["project"]
+	i, err := strconv.ParseInt(vars["file"], 10, 32)
+	if err != nil {
+		w.WriteHeader(401)
+		return
+	}
+
+	history, err := t.h.GetHistoryFile(projectName, i)
+	if err == tracker.UnknownProject {
+		w.WriteHeader(404)
+		return
+	} else if err != nil {
+		w.WriteHeader(500)
+		panic(err)
+	}
+	_, err = w.Write(history)
+	if err != nil {
+		log.Infof("error writing request")
+	}
 }
 func (t *Map) statics() []string {
 	return []string{
@@ -336,68 +552,4 @@ func (t *Map) statics() []string {
 		"config.js",
 		"script.js",
 	}
-}
-type assetResponseHandler string
-func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
-	dat := MustAsset(string(h))
-	if len(h) > 4 && h[len(h)-4:] == ".css" {
-		w.Header().Set("Content-Type", "text/css")
-	} else if len(h) > 3 && h[len(h)-3:] == ".js" {
-		w.Header().Set("Content-Type", "text/javascript")
-	} else if len(h) > 5 && h[len(h)-5:] == ".html" {
-		w.Header().Set("Content-Type", "text/html")
-	}
-	_, err := w.Write(dat)
-	if err != nil {
-		log.Infof("error writing response: %s", err.Error())
-	}
-}
-func (t *Map) RegisterRoutes(r *mux.Router) error {
-	r.HandleFunc("/{project}/data/aircraft.json", t.JsonHandler)
-	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverHandler)
-	for _, file := range t.statics() {
-		assetPath := "tar1090/html/"+file
-		_, err := Asset(assetPath)
-		if err != nil {
-			return errors.Wrap(err, "loading dump1090 asset "+file)
-		}
-		handler := assetResponseHandler(assetPath)
-		r.HandleFunc("/{project}/"+file, handler.responseHandler)
-	}
-	return nil
-}
-func (t *Map) ReceiverHandler(w http.ResponseWriter, r *http.Request) {
-	_, err := w.Write([]byte("{ \"version\" : \"v3.8.3\", \"refresh\" : 1000, \"history\" : 32 }"))
-	if err != nil {
-		w.WriteHeader(500)
-		panic(err)
-	}
-}
-func (t *Map) JsonHandler(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	err := t.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JsonAircraft) error {
-		ac := jsonAircraft{
-			Now: float64(time.Now().Unix()),
-			Messages: messageCount,
-			Aircraft: fields,
-		}
-		data, err := json.Marshal(ac)
-		if err != nil {
-			return err
-		}
-		_, err = w.Write(data)
-		return err
-	})
-	if err == tracker.UnknownProject {
-		w.WriteHeader(404)
-	} else if err != nil {
-		w.WriteHeader(500)
-		panic(err)
-	}
-}
-
-type jsonAircraft struct {
-	Now float64              `json:"now"`
-	Messages int64           `json:"messages"`
-	Aircraft []*tracker.JsonAircraft `json:"aircraft"`
 }

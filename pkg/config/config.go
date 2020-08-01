@@ -28,12 +28,14 @@ type (
 
 	MapSettings struct {
 		// Toggles whether map is enabled (default FALSE)
-		Enabled bool `yaml:"enabled"`
+		Enabled         bool  `yaml:"enabled"`
+		HistoryInterval int64 `yaml:"history_interval"`
+		HistoryCount    int   `yaml:"history_count"`
 		// Map interfaces to expose (default: dump1090 if none set)
 		Services []string `yaml:"services"`
-		Address string `yaml:"address"`
-		Port    uint16 `yaml:"port"`
-		BaseUrl string `yaml:""`
+		Address  string   `yaml:"address"`
+		Port     uint16   `yaml:"port"`
+		BaseUrl  string   `yaml:""`
 	}
 
 	EmailSettings struct {
@@ -51,11 +53,11 @@ type (
 	}
 
 	Project struct {
-		Name                    string
+		Name string
 		//
 		Disabled                bool `yaml:"disabled"`
 		Filter                  string
-		Map                     ProjectMap `yaml:"map"`
+		Map                     ProjectMap     `yaml:"map"`
 		Notifications           *Notifications `yaml:"notifications"`
 		Features                []string
 		ReopenSightings         bool   `yaml:"reopen_sightings"`

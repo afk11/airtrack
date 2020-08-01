@@ -5,14 +5,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-type countryCodes struct{
+type countryCodes struct {
 	alpha2 AlphaTwoCountryCode
 	alpha3 AlphaThreeCountryCode
 }
 type Store struct {
 	countries map[string]countryCodes
-	alpha2 map[AlphaTwoCountryCode]*Country
-	alpha3 map[AlphaThreeCountryCode]*Country
+	alpha2    map[AlphaTwoCountryCode]*Country
+	alpha3    map[AlphaThreeCountryCode]*Country
 }
 
 func (s *Store) GetCountryCode(cc AlphaTwoCountryCode) (*Country, bool) {
@@ -25,8 +25,8 @@ func (s *Store) GetCountryCode(cc AlphaTwoCountryCode) (*Country, bool) {
 func emptyStore() *Store {
 	return &Store{
 		countries: make(map[string]countryCodes),
-		alpha2: make(map[AlphaTwoCountryCode]*Country),
-		alpha3: make(map[AlphaThreeCountryCode]*Country),
+		alpha2:    make(map[AlphaTwoCountryCode]*Country),
+		alpha3:    make(map[AlphaThreeCountryCode]*Country),
 	}
 }
 func New(list [][3]string) (*Store, error) {

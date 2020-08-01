@@ -14,12 +14,12 @@ type (
 	Feature           string
 	EmailNotification string
 	Project           struct {
-		Name     string
-		Site     *db.CollectionSite
-		Session  *db.CollectionSession
-		Filter   string
-		Program  cel.Program
-		Features []Feature
+		Name               string
+		Site               *db.CollectionSite
+		Session            *db.CollectionSession
+		Filter             string
+		Program            cel.Program
+		Features           []Feature
 		NotifyEmail        string
 		EmailNotifications []EmailNotification
 

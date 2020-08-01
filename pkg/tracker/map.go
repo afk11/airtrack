@@ -13,6 +13,10 @@ import (
 	"time"
 )
 
+var (
+	DefaultHistoryInterval = time.Second * 30
+)
+
 var mapServices struct {
 	sync.RWMutex
 	s []MapService
@@ -20,9 +24,19 @@ var mapServices struct {
 
 // UnknownProject is returned by MapAccess.GetProjectAircraft
 var UnknownProject = errors.New("unknown project")
+
 type MapAccess interface {
-	GetProjectAircraft(projectName string, f func (int64, []*JsonAircraft) error) error
+	GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error
 }
+type MapHistoryUpdateScheduler interface {
+	UpdateHistory(projects []string) error
+}
+type MapService interface {
+	MapService() string
+	RegisterRoutes(r *mux.Router) error
+	UpdateScheduler() MapHistoryUpdateScheduler
+}
+
 func RegisterMapBackend(service MapService) error {
 	mapServices.Lock()
 	defer mapServices.Unlock()
@@ -52,6 +66,7 @@ func GetMapBackend(service string) (MapService, bool) {
 type MapProjectStatusListener struct {
 	m *AircraftMap
 }
+
 func NewMapProjectStatusListener(m *AircraftMap) *MapProjectStatusListener {
 	return &MapProjectStatusListener{m: m}
 }
@@ -65,6 +80,7 @@ func (p *MapProjectStatusListener) Deactivated(project *Project) {
 type MapProjectAircraftUpdateListener struct {
 	m *AircraftMap
 }
+
 func NewMapProjectAircraftUpdateListener(m *AircraftMap) *MapProjectAircraftUpdateListener {
 	return &MapProjectAircraftUpdateListener{m}
 }
@@ -81,15 +97,15 @@ func (l *MapProjectAircraftUpdateListener) LostAircraft(p *Project, s *Sighting)
 
 type projectState struct {
 	sync.RWMutex
-	name string
+	name     string
 	aircraft []string
 }
 
 type JsonAircraft struct {
 	sync.RWMutex
 	referenceCount int64
-	lastPosTime time.Time
-	lastMsgTime time.Time
+	lastPosTime    time.Time
+	lastMsgTime    time.Time
 	// hex: the 24-bit ICAO identifier of the aircraft, as 6 hex digits. The identifier may start with '~', this means that the address is a non-ICAO address (e.g. from TIS-B).
 	Hex string `json:"hex"`
 	// type: type of underlying message, one of:
@@ -147,7 +163,7 @@ type JsonAircraft struct {
 	// nav_modes: set of engaged automation modes: 'autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'
 	NavModes string `json:"nav_modes,omitempty"`
 	// lat, lon: the aircraft position in decimal degrees
-	Latitude float64 `json:"lat,omitempty"`
+	Latitude  float64 `json:"lat,omitempty"`
 	Longitude float64 `json:"lon,omitempty"`
 	// nic: Navigation Integrity Category (2.2.3.2.7.2.6)
 	Nic string `json:"nic,omitempty"`
@@ -184,27 +200,33 @@ type JsonAircraft struct {
 	Rssi float64 `json:"rssi"`
 }
 type AircraftMap struct {
-	s *http.Server
-	r *mux.Router
-	ac map[string]*JsonAircraft
-	acMu sync.RWMutex
-	projMu sync.RWMutex
-	projects map[string]*projectState
-	messages int64
+	s               *http.Server
+	r               *mux.Router
+	historyInterval time.Duration
+	ac              map[string]*JsonAircraft
+	acMu            sync.RWMutex
+	projMu          sync.RWMutex
+	projects        map[string]*projectState
+	services        []MapService
+	messages        int64
 }
 
 func NewAircraftMap(cfg config.MapSettings) (*AircraftMap, error) {
 	m := &AircraftMap{
-		ac: make(map[string]*JsonAircraft),
-		projects: make(map[string]*projectState),
-		r: mux.NewRouter(),
+		ac:              make(map[string]*JsonAircraft),
+		projects:        make(map[string]*projectState),
+		r:               mux.NewRouter(),
+		historyInterval: DefaultHistoryInterval,
+	}
+	if cfg.HistoryInterval != 0 {
+		m.historyInterval = time.Second * time.Duration(cfg.HistoryInterval)
 	}
 	port := uint16(8080)
 	if cfg.Port != 0 {
 		port = cfg.Port
 	}
 	m.s = &http.Server{
-		Addr: fmt.Sprintf("%s:%d", cfg.Address, port),
+		Addr:    fmt.Sprintf("%s:%d", cfg.Address, port),
 		Handler: handlers.CORS()(m.r),
 		// Good practice: enforce timeouts for servers you create!
 		WriteTimeout: 15 * time.Second,
@@ -214,12 +236,13 @@ func NewAircraftMap(cfg config.MapSettings) (*AircraftMap, error) {
 }
 func (m *AircraftMap) RegisterMapService(services ...MapService) error {
 	for _, service := range services {
-		sub := m.r.PathPrefix("/"+service.MapService()).Subrouter()
+		sub := m.r.PathPrefix("/" + service.MapService()).Subrouter()
 		err := service.RegisterRoutes(sub)
 		if err != nil {
 			return err
 		}
 	}
+	m.services = append(m.services, services...)
 	return nil
 }
 func (m *AircraftMap) registerProject(p *Project) error {
@@ -229,7 +252,7 @@ func (m *AircraftMap) registerProject(p *Project) error {
 		return errors.New("duplicate project")
 	}
 	m.projects[p.Name] = &projectState{
-		name: p.Name,
+		name:     p.Name,
 		aircraft: []string{},
 	}
 	return nil
@@ -276,7 +299,7 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 			Squawk:          s.State.Squawk,
 			MagneticHeading: s.State.Track,
 			Track:           s.State.Track,
-			BarometricRate:           s.State.VerticalRate,
+			BarometricRate:  s.State.VerticalRate,
 			GroundSpeed:     s.State.GroundSpeed,
 			Messages:        1,
 		}
@@ -319,7 +342,7 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	return nil
 }
 
-func (m *AircraftMap) GetProjectAircraft(projectName string, f func (int64, []*JsonAircraft) error) error {
+func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error {
 	m.projMu.RLock()
 	defer m.projMu.RUnlock()
 	m.acMu.RLock()
@@ -376,6 +399,8 @@ func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 
 func (m *AircraftMap) Serve() {
 	go func() {
+		lastHistoryUpdate := time.Now()
+		firstRun := true
 		for {
 			<-time.After(time.Second)
 			m.acMu.RLock()
@@ -386,14 +411,25 @@ func (m *AircraftMap) Serve() {
 				ac.Unlock()
 			}
 			m.acMu.RUnlock()
+			if firstRun || time.Since(lastHistoryUpdate) > m.historyInterval {
+				if firstRun {
+					firstRun = false
+				}
+
+				m.projMu.RLock()
+				projects := make([]string, 0, len(m.projects))
+				for _, project := range m.projects {
+					projects = append(projects, project.name)
+				}
+				for _, service := range m.services {
+					service.UpdateScheduler().UpdateHistory(projects)
+				}
+				m.projMu.RUnlock()
+				lastHistoryUpdate = time.Now()
+			}
 		}
 	}()
 	go func() {
 		m.s.ListenAndServe()
 	}()
-}
-
-type MapService interface {
-	MapService() string
-	RegisterRoutes(r *mux.Router) error
 }

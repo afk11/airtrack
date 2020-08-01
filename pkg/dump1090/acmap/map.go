@@ -10,14 +10,45 @@ import (
 	"time"
 )
 
+type HistoryUpdateScheduler struct {
+	m tracker.MapAccess
+}
+
+func (s *HistoryUpdateScheduler) UpdateHistory(projects []string) error {
+	for _, project := range projects {
+		err := s.m.GetProjectAircraft(project, func(messageCount int64, fields []*tracker.JsonAircraft) error {
+			ac := jsonAircraft{
+				Now:      float64(time.Now().Unix()),
+				Messages: messageCount,
+				Aircraft: fields,
+			}
+			_, err := json.Marshal(ac)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err == tracker.UnknownProject {
+		} else if err != nil {
+			panic(err)
+		}
+	}
+	return nil
+}
+
 func NewDump1090Map(ma tracker.MapAccess) *Dump1090Map {
 	return &Dump1090Map{m: ma}
 }
+
 type Dump1090Map struct {
 	m tracker.MapAccess
 }
+
 func (d *Dump1090Map) MapService() string {
 	return "dump1090"
+}
+func (d *Dump1090Map) UpdateScheduler() tracker.MapHistoryUpdateScheduler {
+	return &HistoryUpdateScheduler{d.m}
 }
 func (d *Dump1090Map) statics() []string {
 	return []string{"planeObject.js",
@@ -566,7 +597,9 @@ func (d *Dump1090Map) statics() []string {
 		"registrations.js",
 	}
 }
+
 type assetResponseHandler string
+
 func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
 	dat := MustAsset(string(h))
 	if len(h) > 4 && h[len(h)-4:] == ".css" {
@@ -585,7 +618,7 @@ func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/aircraft.json", d.JsonHandler)
 	r.HandleFunc("/{project}/data/receiver.json", d.ReceiverHandler)
 	for _, file := range d.statics() {
-		assetPath := "dump1090/public_html/"+file
+		assetPath := "dump1090/public_html/" + file
 		_, err := Asset(assetPath)
 		if err != nil {
 			return errors.Wrap(err, "loading dump1090 asset "+file)
@@ -606,7 +639,7 @@ func (d *Dump1090Map) JsonHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	err := d.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JsonAircraft) error {
 		ac := jsonAircraft{
-			Now: float64(time.Now().Unix()),
+			Now:      float64(time.Now().Unix()),
 			Messages: messageCount,
 			Aircraft: fields,
 		}
@@ -626,7 +659,7 @@ func (d *Dump1090Map) JsonHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 type jsonAircraft struct {
-	Now float64              `json:"now"`
-	Messages int64           `json:"messages"`
+	Now      float64                 `json:"now"`
+	Messages int64                   `json:"messages"`
 	Aircraft []*tracker.JsonAircraft `json:"aircraft"`
 }

@@ -11,7 +11,6 @@ import (
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db"
 	dump1090 "github.com/afk11/airtrack/pkg/dump1090/acmap"
-	"github.com/afk11/airtrack/pkg/tar1090"
 	"github.com/afk11/airtrack/pkg/fs"
 	"github.com/afk11/airtrack/pkg/geo"
 	"github.com/afk11/airtrack/pkg/geo/cup"
@@ -19,6 +18,7 @@ import (
 	"github.com/afk11/airtrack/pkg/iso3166"
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/tar1090"
 	"github.com/afk11/airtrack/pkg/tracker"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
@@ -34,7 +34,7 @@ import (
 )
 
 type TrackCmd struct {
-	Verbosity string `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
+	Verbosity  string `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
 	CPUProfile string `help:"Write CPU profile to file"`
 }
 
@@ -228,6 +228,10 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	}
 
 	if cfg.MapSettings.Enabled {
+		historyFiles := 60
+		if cfg.MapSettings.HistoryCount != 0 {
+			historyFiles = cfg.MapSettings.HistoryCount
+		}
 		m, err := tracker.NewAircraftMap(cfg.MapSettings)
 		if err != nil {
 			return err
@@ -236,7 +240,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		if err != nil {
 			return err
 		}
-		err = m.RegisterMapService(tar1090.NewTar1090Map(m))
+		err = m.RegisterMapService(tar1090.NewTar1090Map(m, historyFiles))
 		if err != nil {
 			return err
 		}

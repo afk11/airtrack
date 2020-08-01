@@ -67,18 +67,18 @@ type (
 		altitude int64
 
 		haveGS bool
-		gs float64
+		gs     float64
 
 		haveTrack bool
-		track float64
+		track     float64
 
 		tags SightingTags
 
-		haveLocation  bool
-		latitude      float64
-		longitude     float64
+		haveLocation       bool
+		latitude           float64
+		longitude          float64
 		lastLocationUpdate *time.Time
-		locationCount int64
+		locationCount      int64
 	}
 	Sighting struct {
 		State           pb.State
@@ -96,18 +96,18 @@ type (
 		mu sync.RWMutex
 	}
 	Tracker struct {
-		dbConn            *sqlx.DB
-		opt               Options
-		projects          []*Project
-		projectMu         sync.RWMutex
-		sightingMu        sync.Mutex
-		sighting          map[string]*Sighting
-		projectStatusListeners []ProjectStatusListener
+		dbConn                   *sqlx.DB
+		opt                      Options
+		projects                 []*Project
+		projectMu                sync.RWMutex
+		sightingMu               sync.Mutex
+		sighting                 map[string]*Sighting
+		projectStatusListeners   []ProjectStatusListener
 		projectAcUpdateListeners []ProjectAircraftUpdateListener
-		consumerCanceller context.CancelFunc
-		lostAcCanceller   context.CancelFunc
-		consumerWG        sync.WaitGroup
-		mailTemplates     *email.MailTemplates
+		consumerCanceller        context.CancelFunc
+		lostAcCanceller          context.CancelFunc
+		consumerWG               sync.WaitGroup
+		mailTemplates            *email.MailTemplates
 	}
 	lostSighting struct {
 		s       *Sighting
@@ -162,12 +162,12 @@ func New(dbConn *sqlx.DB, opt Options) (*Tracker, error) {
 	}
 
 	return &Tracker{
-		sighting:      make(map[string]*Sighting),
-		dbConn:        dbConn,
-		opt:           opt,
-		projectStatusListeners: make([]ProjectStatusListener, 0),
+		sighting:                 make(map[string]*Sighting),
+		dbConn:                   dbConn,
+		opt:                      opt,
+		projectStatusListeners:   make([]ProjectStatusListener, 0),
 		projectAcUpdateListeners: make([]ProjectAircraftUpdateListener, 0),
-		mailTemplates: tpls,
+		mailTemplates:            tpls,
 	}, nil
 }
 func (t *Tracker) RegisterProjectStatusListener(l ProjectStatusListener) error {
@@ -675,7 +675,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 		s.State.HaveTrack = true
 	}
 	if msg.GroundSpeed != "" {
-		gs, err := strconv.ParseFloat(msg.GroundSpeed,  64)
+		gs, err := strconv.ParseFloat(msg.GroundSpeed, 64)
 		if err != nil {
 			return errors.Wrapf(err, "parse msg latitude")
 		}

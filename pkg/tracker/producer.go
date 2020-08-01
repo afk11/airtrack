@@ -158,8 +158,8 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 			Longitude:    ac.Lon,
 			IsOnGround:   ac.Ground == "1",
 			VerticalRate: ac.Vsi,
-			Track: ac.Trak,
-			GroundSpeed: ac.Spd,
+			Track:        ac.Trak,
+			GroundSpeed:  ac.Spd,
 		}
 		msgs <- msg
 	}
