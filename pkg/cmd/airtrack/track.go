@@ -228,7 +228,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	}
 
 	if cfg.MapSettings.Enabled {
-		historyFiles := 60
+		historyFiles := tracker.DefaultHistoryFileCount
 		if cfg.MapSettings.HistoryCount != 0 {
 			historyFiles = cfg.MapSettings.HistoryCount
 		}

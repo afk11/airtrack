@@ -68,15 +68,12 @@ func (e *jsonDecodeError) Error() string {
 	return e.err.Error()
 }
 
-var counter int
-var firstTime time.Time
-var numReqs int
-
 type AdsbxProducer struct {
 	url                 string
 	apikey              string
 	messages            chan *pb.Message
 	wg                  sync.WaitGroup
+	numReqs             int
 	jsonPayloadDumpFile string
 	canceller           func()
 }
@@ -95,15 +92,15 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 	cancelled := make(chan bool)
 	defer func() {
 		cancelled <- true
-		numReqs++
+		p.numReqs++
 	}()
 
 	go func() {
 		select {
 		case <-time.After(time.Minute):
-			panic(fmt.Errorf("running after 1 minute, on request %d", numReqs))
+			panic(fmt.Errorf("running after 1 minute, on request %d", p.numReqs))
 		case <-cancelled:
-			log.Debugf("terminated normally after %s", time.Since(start))
+			log.Debugf("adsbx http request terminated normally after %s", time.Since(start))
 			break
 		}
 	}()

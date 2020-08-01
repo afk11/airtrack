@@ -4,6 +4,7 @@ import "C"
 import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
+	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -13,102 +14,122 @@ import (
 	"time"
 )
 
-var (
-	DefaultHistoryInterval = time.Second * 30
+const (
+	// DefaultHistoryInterval - the default time between history
+	// updates
+	DefaultHistoryInterval  = time.Second * 30
+	// DefaultHistoryFileCount - the default number of history
+	// files to keep
+	DefaultHistoryFileCount = 60
 )
-
-var mapServices struct {
-	sync.RWMutex
-	s []MapService
-}
 
 // UnknownProject is returned by MapAccess.GetProjectAircraft
 var UnknownProject = errors.New("unknown project")
 
+// MapAccess provides access to the current map view
 type MapAccess interface {
+	// GetProjectAircraft loads the subset of aircraft in
+	// view for this project, and the current message count
+	// and []*JsonAircraft is passed to the provided closure.
+	// The aircraft are locked for the lifetime of the closure
+	// and must be copied to be safely used elsewhere.
 	GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error
 }
+
+// MapHistoryUpdateScheduler defines an interface allowing
+// AircraftMap trigger MapServices to save a new history file
+// Used by AircraftMap
 type MapHistoryUpdateScheduler interface {
+	// UpdateHistory triggers the MapService to save
+	// a new history file
 	UpdateHistory(projects []string) error
 }
+
+// MapService is a contract for map backends.
 type MapService interface {
+	// MapService returns the name of the backend
 	MapService() string
+	// RegisterRoutes allows the MapService to add
+	// it's map related routes to the router
 	RegisterRoutes(r *mux.Router) error
+	// UpdateScheduler returns a MapHistoryUpdateScheduler
+	// for this map service for history purposes
 	UpdateScheduler() MapHistoryUpdateScheduler
 }
 
-func RegisterMapBackend(service MapService) error {
-	mapServices.Lock()
-	defer mapServices.Unlock()
-	n := len(mapServices.s)
-	name := service.MapService()
-	for i := 0; i < n; i++ {
-		if mapServices.s[i].MapService() == name {
-			return errors.Errorf("%s map service already registered", name)
-		}
-	}
-
-	mapServices.s = append(mapServices.s, service)
-	return nil
-}
-func GetMapBackend(service string) (MapService, bool) {
-	mapServices.RLock()
-	defer mapServices.RUnlock()
-	n := len(mapServices.s)
-	for i := 0; i < n; i++ {
-		if mapServices.s[i].MapService() == service {
-			return mapServices.s[i], true
-		}
-	}
-	return nil, false
-}
-
+// MapProjectStatusListener implements the ProjectStatusListener
+// allowing tracker to notify us about new or closed projects
 type MapProjectStatusListener struct {
 	m *AircraftMap
 }
 
+// NewMapProjectStatusListener creates a new *MapProjectStatusListener
 func NewMapProjectStatusListener(m *AircraftMap) *MapProjectStatusListener {
 	return &MapProjectStatusListener{m: m}
 }
+
+// Activated - see ProjectStatusListener.Activated. This function
+// informs the map about a new project to track.
 func (p *MapProjectStatusListener) Activated(project *Project) {
 	p.m.registerProject(project)
 }
+
+// Deactivated - implements ProjectStatusListener.Activated. This
+// function removes the data about this project from the map service.
 func (p *MapProjectStatusListener) Deactivated(project *Project) {
 	p.m.deregisterProject(project)
 }
 
+// MapProjectAircraftUpdateListener implements ProjectAircraftUpdateListener
+// and dispatches notifications to the AircraftMap so they can be applied to the map.
 type MapProjectAircraftUpdateListener struct {
 	m *AircraftMap
 }
 
+// NewMapProjectAircraftUpdateListener returns a new MapProjectAircraftUpdateListener
 func NewMapProjectAircraftUpdateListener(m *AircraftMap) *MapProjectAircraftUpdateListener {
 	return &MapProjectAircraftUpdateListener{m}
 }
 
+// NewAircraft informs map about new aircraft. Implements
+// ProjectAircraftUpdateListener.NewAircraft
 func (l *MapProjectAircraftUpdateListener) NewAircraft(p *Project, s *Sighting) {
 	l.m.projectNewAircraft(p, s)
 }
+
+// NewAircraft informs map about updated aircraft. Implements
+// ProjectAircraftUpdateListener.UpdatedAircraft
 func (l *MapProjectAircraftUpdateListener) UpdatedAircraft(p *Project, s *Sighting) {
 	l.m.projectUpdatedAircraft(p, s)
 }
+
+// NewAircraft informs map about lost aircraft. Implements
+// ProjectAircraftUpdateListener.LostAircraft
 func (l *MapProjectAircraftUpdateListener) LostAircraft(p *Project, s *Sighting) {
 	l.m.projectLostAircraft(p, s)
 }
 
+// projectState stores the subset of the map this project
+// is tracking
 type projectState struct {
 	sync.RWMutex
 	name     string
 	aircraft []string
 }
 
+// JsonAircraft is a dump1090 aircraft structure
 type JsonAircraft struct {
 	sync.RWMutex
+	// referenceCount tracks how many projects currently refer
+	// to this aircraft
 	referenceCount int64
+	// last time our position was updated
 	lastPosTime    time.Time
+	// last time we received a message
 	lastMsgTime    time.Time
-	// hex: the 24-bit ICAO identifier of the aircraft, as 6 hex digits. The identifier may start with '~', this means that the address is a non-ICAO address (e.g. from TIS-B).
+	// Hex: the 24-bit ICAO identifier of the aircraft, as 6 hex digits. The identifier may start with '~', this means that the address is a non-ICAO address (e.g. from TIS-B).
 	Hex string `json:"hex"`
-	// type: type of underlying message, one of:
+	// Type: type of underlying message, one of:
 	// adsb_icao: messages from a Mode S or ADS-B transponder, using a 24-bit ICAO address
 	// adsb_icao_nt: messages from an ADS-B equipped "non-transponder" emitter e.g. a ground vehicle, using a 24-bit ICAO address
 	// adsr_icao: rebroadcast of ADS-B messages originally sent via another data link e.g. UAT, using a 24-bit ICAO address
@@ -118,87 +139,104 @@ type JsonAircraft struct {
 	// tisb_other: traffic information about a non-ADS-B target using a non-ICAO address
 	// tisb_trackfile: traffic information about a non-ADS-B target using a track/file identifier, typically from primary or Mode A/C radar
 	Type string `json:"type,omitempty"`
-	// flight: callsign, the flight name or aircraft registration as 8 chars (2.2.8.2.6)
+	// Flight: callsign, the flight name or aircraft registration as 8 chars (2.2.8.2.6)
 	Flight string `json:"flight,omitempty"`
-	// alt_baro: the aircraft barometric altitude in feet
+	// BarometricAltitude: the aircraft barometric altitude in feet
 	BarometricAltitude int64 `json:"alt_baro,omitempty"`
-	// alt_geom: geometric (GNSS / INS) altitude in feet referenced to the WGS84 ellipsoid
+	// GeometricAltitude: geometric (GNSS / INS) altitude in feet referenced to the WGS84 ellipsoid
 	GeometricAltitude string `json:"alt_geom,omitempty"`
-	// gs: ground speed in knots
+	// GroundSpeed: ground speed in knots
 	GroundSpeed float64 `json:"gs,omitempty"`
-	// ias: indicated air speed in knots
+	// IndicatedAirSpeed: indicated air speed in knots
 	IndicatedAirSpeed int64 `json:"ias,omitempty"`
-	// tas: true air speed in knots
+	// TrueAirSpeed: true air speed in knots
 	TrueAirSpeed int64 `json:"tas,omitempty"`
-	// mach: Mach number
+	// Mach: Mach number
 	Mach float64 `json:"mach,omitempty"`
-	// track: true track over ground in degrees (0-359)
+	// Track: true track over ground in degrees (0-359)
 	Track float64 `json:"track,omitempty"`
-	// track_rate: Rate of change of track, degrees/second
+	// TrackRate: Rate of change of track, degrees/second
 	TrackRate float64 `json:"track_rate,omitempty"`
-	// roll: Roll, degrees, negative is left roll
+	// Roll: Roll, degrees, negative is left roll
 	Roll float64 `json:"roll,omitempty"`
-	// mag_heading: Heading, degrees clockwise from magnetic north
+	// MagneticHeading: Heading, degrees clockwise from magnetic north
 	MagneticHeading float64 `json:"mag_heading,omitempty"`
-	// true_heading: Heading, degrees clockwise from true north
+	// TrueHeading: Heading, degrees clockwise from true north
 	TrueHeading float64 `json:"true_heading,omitempty"`
-	// baro_rate: Rate of change of barometric altitude, feet/minute
+	// BarometricRate: Rate of change of barometric altitude, feet/minute
 	BarometricRate int64 `json:"baro_rate,omitempty"`
-	// geom_rate: Rate of change of geometric (GNSS / INS) altitude, feet/minute
+	// GeometricRate: Rate of change of geometric (GNSS / INS) altitude, feet/minute
 	GeometricRate int64 `json:"geom_rate,omitempty"`
-	// squawk: Mode A code (Squawk), encoded as 4 octal digits
+	// Squawk: Mode A code (Squawk), encoded as 4 octal digits
 	Squawk string `json:"squawk,omitempty"`
-	// emergency: ADS-B emergency/priority status, a superset of the 7x00 squawks (2.2.3.2.7.8.1.1)
+	// Emergency: ADS-B emergency/priority status, a superset of the 7x00 squawks (2.2.3.2.7.8.1.1)
 	Emergency string `json:"emergency,omitempty"`
-	// category: emitter category to identify particular aircraft or vehicle classes (values A0 - D7) (2.2.3.2.5.2)
+	// Category: emitter category to identify particular aircraft or vehicle classes (values A0 - D7) (2.2.3.2.5.2)
 	Category string `json:"category,omitempty"`
-	// nav_qnh: altimeter setting (QFE or QNH/QNE), hPa
+	// NavQNH: altimeter setting (QFE or QNH/QNE), hPa
 	NavQNH string `json:"nav_qnh,omitempty"`
-	// nav_altitude_mcp: selected altitude from the Mode Control Panel / Flight Control Unit (MCP/FCU) or equivalent equipment
+	// NavAltitudeMCP: selected altitude from the Mode Control Panel / Flight Control Unit (MCP/FCU) or equivalent equipment
 	NavAltitudeMCP int64 `json:"nav_altitude_mcp,omitempty"`
-	// nav_altitude_fms: selected altitude from the Flight Manaagement System (FMS) (2.2.3.2.7.1.3.3)
+	// NavAltitudeFMS: selected altitude from the Flight Manaagement System (FMS) (2.2.3.2.7.1.3.3)
 	NavAltitudeFMS int64 `json:"nav_altitude_fms,omitempty"`
-	// nav_heading: selected heading (True or Magnetic is not defined in DO-260B, mostly Magnetic as that is the de facto standard) (2.2.3.2.7.1.3.7)
+	// NavHeading: selected heading (True or Magnetic is not defined in DO-260B, mostly Magnetic as that is the de facto standard) (2.2.3.2.7.1.3.7)
 	NavHeading string `json:"nav_heading,omitempty"`
-	// nav_modes: set of engaged automation modes: 'autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'
+	// NavModes: set of engaged automation modes: 'autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'
 	NavModes string `json:"nav_modes,omitempty"`
-	// lat, lon: the aircraft position in decimal degrees
+	// Latitude: the aircraft position in decimal degrees
 	Latitude  float64 `json:"lat,omitempty"`
+	// Longitude: the aircraft longitude in decimal degrees
 	Longitude float64 `json:"lon,omitempty"`
-	// nic: Navigation Integrity Category (2.2.3.2.7.2.6)
+	// Nic: Navigation Integrity Category (2.2.3.2.7.2.6)
 	Nic string `json:"nic,omitempty"`
-	// rc: Radius of Containment, meters; a measure of position integrity derived from NIC & supplementary bits. (2.2.3.2.7.2.6, Table 2-69)
+	// RadiusOfContainment: Radius of Containment, meters; a measure of position integrity derived from NIC & supplementary bits. (2.2.3.2.7.2.6, Table 2-69)
 	RadiusOfContainment int64 `json:"rc,omitempty"`
-	// seen_pos: how long ago (in seconds before "now") the position was last updated
+	// SeenPos: how long ago (in seconds before "now") the position was last updated
 	SeenPos float64 `json:"seen_pos,omitempty"`
-	// version: ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
+	// Version: ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
 	Version int64 `json:"version,omitempty"`
-	// nic_baro: Navigation Integrity Category for Barometric Altitude (2.2.5.1.35)
+	// NicBaro: Navigation Integrity Category for Barometric Altitude (2.2.5.1.35)
 	NicBaro int64 `json:"nic_baro,omitempty"`
-	// nac_p: Navigation Accuracy for Position (2.2.5.1.35)
+	// NacP: Navigation Accuracy for Position (2.2.5.1.35)
 	NacP int64 `json:"nac_p,omitempty"`
-	// nac_v: Navigation Accuracy for Velocity (2.2.5.1.19)
+	// NacV: Navigation Accuracy for Velocity (2.2.5.1.19)
 	NacV string `json:"nac_v,omitempty"`
-	// sil: Source Integity Level (2.2.5.1.40)
+	// Sil: Source Integity Level (2.2.5.1.40)
 	Sil int64 `json:"sil,omitempty"`
-	// sil_type: interpretation of SIL: unknown, perhour, persample
+	// SilType: interpretation of SIL: unknown, perhour, persample
 	SilType string `json:"sil_type,omitempty"`
-	// gva: Geometric Vertical Accuracy  (2.2.3.2.7.2.8)
+	// GVA: Geometric Vertical Accuracy  (2.2.3.2.7.2.8)
 	GVA int64 `json:"gva,omitempty"`
-	// sda: System Design Assurance (2.2.3.2.7.2.4.6)
+	// SDA: System Design Assurance (2.2.3.2.7.2.4.6)
 	SDA int64 `json:"sda,omitempty"`
-	// mlat: list of fields derived from MLAT data
+	// MLAT: list of fields derived from MLAT data
 	//MLAT string `json:"mlat"`
-	// tisb: list of fields derived from TIS-B data
+	// TISB: list of fields derived from TIS-B data
 	//TISB string `json:"tisb"`
 
-	// messages: total number of Mode S messages received from this aircraft
+	// Messages: total number of Mode S messages received from this aircraft
 	Messages int64 `json:"messages"`
-	// seen: how long ago (in seconds before "now") a message was last received from this aircraft
+	// Seen: how long ago (in seconds before "now") a message was last received from this aircraft
 	Seen int64 `json:"seen"`
-	// rssi: recent average RSSI (signal power), in dbFS; this will always be negative.
+	// Rssi: recent average RSSI (signal power), in dbFS; this will always be negative.
 	Rssi float64 `json:"rssi"`
 }
+
+// UpdateWithState updates JsonAircraft with the latest state
+func (j *JsonAircraft) UpdateWithState(state *pb.State) {
+	j.Flight = state.CallSign
+	j.Latitude = state.Latitude
+	j.Longitude = state.Longitude
+	j.Squawk = state.Squawk
+	j.MagneticHeading = state.Track
+	j.Track = state.Track
+	j.BarometricAltitude = state.Altitude
+	j.BarometricRate = state.VerticalRate
+	j.GroundSpeed = state.GroundSpeed
+}
+
+// AircraftMap is the main service for receiving project+aircraft
+// updates. Implements MapAccess.
 type AircraftMap struct {
 	s               *http.Server
 	r               *mux.Router
@@ -211,6 +249,8 @@ type AircraftMap struct {
 	messages        int64
 }
 
+// NewAircraftMap initializes a new AircraftMap using
+// configuration
 func NewAircraftMap(cfg config.MapSettings) (*AircraftMap, error) {
 	m := &AircraftMap{
 		ac:              make(map[string]*JsonAircraft),
@@ -234,6 +274,9 @@ func NewAircraftMap(cfg config.MapSettings) (*AircraftMap, error) {
 	}
 	return m, nil
 }
+
+// RegisterMapService uses the MapService.RegisterRoutes
+// to register each service's routes
 func (m *AircraftMap) RegisterMapService(services ...MapService) error {
 	for _, service := range services {
 		sub := m.r.PathPrefix("/" + service.MapService()).Subrouter()
@@ -245,6 +288,9 @@ func (m *AircraftMap) RegisterMapService(services ...MapService) error {
 	m.services = append(m.services, services...)
 	return nil
 }
+
+// registerProject creates a new project entry with
+// no aircraft associated
 func (m *AircraftMap) registerProject(p *Project) error {
 	m.projMu.Lock()
 	defer m.projMu.Unlock()
@@ -257,6 +303,9 @@ func (m *AircraftMap) registerProject(p *Project) error {
 	}
 	return nil
 }
+
+// deregisterProject deletes a project and dereferences
+// each aircraft.
 func (m *AircraftMap) deregisterProject(p *Project) error {
 	m.projMu.Lock()
 	defer m.projMu.Unlock()
@@ -276,6 +325,11 @@ func (m *AircraftMap) deregisterProject(p *Project) error {
 	delete(m.projects, p.Name)
 	return nil
 }
+
+// dereferenceAircraft takes an ICAO of a known aircraft, and
+// decrements it's reference count. The aircraft record will not
+// be deleted unless it's reference count reaches zero. Returns
+// true if was deleted, false if references still exist.
 func (m *AircraftMap) dereferenceAircraft(icao string) bool {
 	m.ac[icao].referenceCount--
 	if m.ac[icao].referenceCount == 0 {
@@ -284,30 +338,27 @@ func (m *AircraftMap) dereferenceAircraft(icao string) bool {
 	}
 	return false
 }
+
+// projectNewAircraft associates a new aircraft with
+// an existing project.
 func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 	m.projMu.RLock()
 	defer m.projMu.RUnlock()
 
 	m.acMu.Lock()
 	if _, ok := m.ac[s.State.Icao]; !ok {
-		m.ac[s.State.Icao] = &JsonAircraft{
-			lastMsgTime:     time.Now(),
-			Hex:             s.State.Icao,
-			Flight:          s.State.CallSign,
-			Latitude:        s.State.Latitude,
-			Longitude:       s.State.Longitude,
-			Squawk:          s.State.Squawk,
-			MagneticHeading: s.State.Track,
-			Track:           s.State.Track,
-			BarometricRate:  s.State.VerticalRate,
-			GroundSpeed:     s.State.GroundSpeed,
-			Messages:        1,
+		ac := &JsonAircraft{
+			lastMsgTime: time.Now(),
+			Hex:         s.State.Icao,
+			Messages:    1,
 		}
+		ac.UpdateWithState(&s.State)
+		m.ac[s.State.Icao] = ac
 	}
 	m.ac[s.State.Icao].referenceCount++
 	m.acMu.Unlock()
 
-	// Associate record with project (init project if necessary)
+	// Associate record with project
 	state := m.projects[p.Name]
 	state.Lock()
 	state.aircraft = append(state.aircraft, s.State.Icao)
@@ -316,6 +367,8 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 	atomic.AddInt64(&m.messages, 1)
 	return nil
 }
+// projectUpdateAircraft updates the json aircraft record
+// with the current aircraft state
 func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	m.acMu.RLock()
 	defer m.acMu.RUnlock()
@@ -330,18 +383,11 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	if locationUpdated {
 		acRecord.lastPosTime = acRecord.lastMsgTime
 	}
-	acRecord.Flight = s.State.CallSign
-	acRecord.BarometricAltitude = s.State.Altitude
-	acRecord.Latitude = s.State.Latitude
-	acRecord.Longitude = s.State.Longitude
-	acRecord.Squawk = s.State.Squawk
-	acRecord.MagneticHeading = s.State.Track
-	acRecord.Track = s.State.Track
-	acRecord.GroundSpeed = s.State.GroundSpeed
+	acRecord.UpdateWithState(&s.State)
 	atomic.AddInt64(&m.messages, 1)
 	return nil
 }
-
+// Implements MapAccess.GetProjectAircraft.
 func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error {
 	m.projMu.RLock()
 	defer m.projMu.RUnlock()
@@ -374,6 +420,8 @@ func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*Js
 	}
 	return nil
 }
+// projectLostAircraft disassociates an aircraft from a project
+// (and dereferences it)
 func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 	m.projMu.RLock()
 	defer m.projMu.RUnlock()
@@ -396,7 +444,9 @@ func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 	m.acMu.Unlock()
 	return nil
 }
-
+// Serve launches background services
+// - aircraft Seen / SeenPos updates each second
+// - triggers history updates on registered MapServices every m.historyInterval
 func (m *AircraftMap) Serve() {
 	go func() {
 		lastHistoryUpdate := time.Now()

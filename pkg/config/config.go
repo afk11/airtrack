@@ -30,12 +30,14 @@ type (
 		// Toggles whether map is enabled (default FALSE)
 		Enabled         bool  `yaml:"enabled"`
 		HistoryInterval int64 `yaml:"history_interval"`
-		HistoryCount    int   `yaml:"history_count"`
+		// HistoryCount worth of history files will be kept. (default: 60)
+		HistoryCount int `yaml:"history_count"`
 		// Map interfaces to expose (default: dump1090 if none set)
 		Services []string `yaml:"services"`
-		Address  string   `yaml:"address"`
-		Port     uint16   `yaml:"port"`
-		BaseUrl  string   `yaml:""`
+		// Address webserver should listen on.
+		Address string `yaml:"address"`
+		// Port webserver should listen on (default: 8080)
+		Port uint16 `yaml:"port"`
 	}
 
 	EmailSettings struct {
