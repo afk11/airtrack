@@ -12,7 +12,7 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/mail.v2"
+	"github.com/afk11/mail"
 	"io"
 	"strings"
 	"sync"
@@ -152,6 +152,7 @@ func (m *Mailer) processMails() error {
 	}
 
 	if len(jobs) > 0 {
+
 		sendCloser, err := m.dialer.Dial()
 		if err != nil {
 			log.Warnf("failed to connect to SMTP server: %s", err.Error())

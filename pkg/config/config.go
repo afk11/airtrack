@@ -33,8 +33,14 @@ type (
 		Host              string `yaml:"host"`
 		// Port - the SMTP server port
 		Port              int    `yaml:"port"`
-		// MandatoryStartTLS - whether to enforce STARTTLS on the connection
+		// TLS - whether to connect using TLS
+		TLS               bool   `yaml:"tls"`
+		// MandatoryStartTLS - if set to true, connections to servers
+		// which do not advertise STARTTLS support will cause an error.
 		MandatoryStartTLS bool   `yaml:"mandatory_starttls"`
+		// NoStartTLS set to true disables opportunistic STARTTLS behaviour,
+		// where the connection will be completely plaintext
+		NoStartTLS        bool   `yaml:"nostarttls"`
 	}
 
 	// MapSettings contains configuration for providing

@@ -24,7 +24,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/mail.v2"
+	smtp "github.com/afk11/mail"
 	"net/http"
 	"os"
 	"os/signal"
@@ -109,10 +109,17 @@ func (c *TrackCmd) Run(ctx *Context) error {
 				return errors.New("email.sender not set")
 			}
 
-			dialer := mail.NewDialer(
+			dialer := smtp.NewDialer(
 				settings.Host, settings.Port, settings.Username, settings.Password)
-			if settings.MandatoryStartTLS {
-				dialer.StartTLSPolicy = mail.MandatoryStartTLS
+			if settings.TLS {
+				dialer.SSL = true
+			}
+			if settings.NoStartTLS {
+				dialer.StartTLSPolicy = smtp.NoStartTLS
+			} else if settings.MandatoryStartTLS {
+				dialer.StartTLSPolicy = smtp.MandatoryStartTLS
+			} else {
+				dialer.StartTLSPolicy = smtp.OpportunisticStartTLS
 			}
 			dialer.Timeout = time.Second * 30
 			m := mailer.NewMailer(dbConn, settings.Sender, dialer, aesgcm)
