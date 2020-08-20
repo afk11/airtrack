@@ -13,7 +13,7 @@ var cli struct {
 	AirportFileStats            airtrackqa.OpenAipAirportStats         `cmd help:"print stats for openaip airport file"`
 	EmptyKml                    airtrackqa.EmptyKml                    `cmd help:"compare kml files"`
 	DumpMigration               airtrackqa.DumpMigration               `cmd help:"dump a migration file"`
-	MictronicsOperatorCountryQA airtrackqa.MictronicsOperatorCountryQA `cmd help:"analyse countries in mictronics operators database"`
+	//MictronicsOperatorCountryQA airtrackqa.MictronicsOperatorCountryQA `cmd help:"analyse countries in mictronics operators database"`
 }
 
 func main() {
