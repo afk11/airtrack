@@ -24,7 +24,7 @@ build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-
 build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
-test: test-cleanup
+test: test-cleanup build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090
 	go test -coverprofile=./coverage/tests.out ./... \
 	$(TESTARGS)
 
