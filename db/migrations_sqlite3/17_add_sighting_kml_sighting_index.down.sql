@@ -1,0 +1,1 @@
+drop index `sighting_kml_sighting_id_index`;

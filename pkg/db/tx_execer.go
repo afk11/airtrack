@@ -2,15 +2,14 @@ package db
 
 import (
 	"database/sql"
-	"github.com/jmoiron/sqlx"
 )
 
 type TxExecer struct {
-	db   *sqlx.DB
+	db   *sql.DB
 	exec func(tx *sql.Tx) error
 }
 
-func NewTxExecer(db *sqlx.DB, f func(tx *sql.Tx) error) *TxExecer {
+func NewTxExecer(db *sql.DB, f func(tx *sql.Tx) error) *TxExecer {
 	return &TxExecer{
 		db:   db,
 		exec: f,

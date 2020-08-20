@@ -1,0 +1,1 @@
+alter table `sighting` add `transmission_types` int unsigned not null default '0';

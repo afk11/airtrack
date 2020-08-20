@@ -10,6 +10,8 @@ require (
 	github.com/docker/docker v1.13.1 // indirect
 	github.com/docker/go-connections v0.4.0 // indirect
 	github.com/docker/go-units v0.4.0 // indirect
+	github.com/doug-martin/goqu v5.0.0+incompatible // indirect
+	github.com/doug-martin/goqu/v9 v9.9.0
 	github.com/emersion/go-sasl v0.0.0-20200509203442-7bfe0ed36a21
 	github.com/emersion/go-smtp v0.13.0
 	github.com/go-sql-driver/mysql v1.5.0

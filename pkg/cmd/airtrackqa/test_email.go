@@ -9,8 +9,10 @@ import (
 	"github.com/afk11/airtrack/pkg/kml"
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/tracker"
+	"github.com/afk11/mail"
+	"github.com/doug-martin/goqu/v9"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"gopkg.in/mail.v2"
 	"time"
 )
 
@@ -51,18 +53,22 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return errors.Wrapf(err, "invalid timezone %s", ctx.Config.TimeZone)
 	}
 
-	dbConn, err := db.NewConn(cfg.Database.Driver, cfg.Database.Username, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Database, loc)
+	dbUrl, err := cfg.Database.DataSource(loc)
 	if err != nil {
 		return err
 	}
-
+	dbConn, err := sqlx.Connect(cfg.Database.Driver, dbUrl)
+	if err != nil {
+		return err
+	}
+	database := db.NewDatabase(dbConn, goqu.Dialect(cfg.Database.Driver))
 	settings := cfg.EmailSettings.Smtp
 	dialer := mail.NewDialer(
 		settings.Host, settings.Port, settings.Username, settings.Password)
 	if settings.MandatoryStartTLS {
 		dialer.StartTLSPolicy = mail.MandatoryStartTLS
 	}
-	m := mailer.NewMailer(dbConn, settings.Sender, dialer, aesgcm)
+	m := mailer.NewMailer(database, settings.Sender, dialer, aesgcm)
 	m.Start()
 	defer m.Stop()
 	tpls, err := email.LoadMailTemplates(email.GetTemplates()...)
@@ -70,11 +76,11 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return err
 	}
 
-	sighting, err := db.LoadSightingById(dbConn, e.Sighting)
+	sighting, err := database.LoadSightingById(e.Sighting)
 	if err != nil {
 		return err
 	}
-	ac, err := db.LoadAircraftById(dbConn, int64(sighting.AircraftId))
+	ac, err := database.LoadAircraftById(int64(sighting.AircraftId))
 	if err != nil {
 		return err
 	}
@@ -100,7 +106,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 
 		var numPoints int
 		var firstLocation, lastLocation *db.SightingLocation
-		err := db.GetLocationHistoryWalkBatch(dbConn, sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
+		err := database.GetLocationHistoryWalkBatch(sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
 			w.Write(location)
 			if firstLocation == nil {
 				firstLocation = &location[0]
@@ -145,7 +151,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 			return err
 		}
 	case tracker.SpottedInFlight:
-		history, err := db.GetFullLocationHistory(dbConn, sighting, tracker.LocationFetchBatchSize)
+		history, err := database.GetFullLocationHistory(sighting, tracker.LocationFetchBatchSize)
 		if err != nil {
 			return err
 		}

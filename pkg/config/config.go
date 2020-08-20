@@ -1,15 +1,21 @@
 package config
 
 import (
+	"fmt"
 	"github.com/pkg/errors"
 	"gopkg.in/yaml.v2"
 	"io"
+	"net/url"
 	"os"
+	"time"
 )
 
 const (
 	// MailDriverSmtp - the only support SMTP driver
 	MailDriverSmtp = "smtp"
+	DatabaseDriverMySQL = "mysql"
+	DatabaseDriverPostgresql = "postgresql"
+	DatabaseDriverSqlite3 = "sqlite3"
 )
 
 type (
@@ -106,12 +112,17 @@ type (
 
 	// Database - connection information about the database
 	Database struct {
-		// Driver to use for connections
+		// Driver to use for connections: sqlite3, mysql, postgresql
 		Driver   string `yaml:"driver"`
+		// Host applies to mysql/postgresql - the DB server to connect to
 		Host     string `yaml:"host"`
+		// Port applies to mysql/postgresql - the DB server port to connect to
 		Port     int    `yaml:"port"`
+		// Username is the username used when connecting to mysql/postgresql
 		Username string `yaml:"username"`
+		// Password is the password used when connecting to mysql/postgresql
 		Password string `yaml:"password"`
+		// Database - filesystem path to sqlite3 file, or database name on mysql/postgresql
 		Database string `yaml:"database"`
 	}
 
@@ -148,6 +159,26 @@ type (
 		Projects []Project `yaml:"projects"`
 	}
 )
+func (d *Database) DataSource(loc *time.Location) (string, error) {
+	switch d.Driver {
+	case "":
+		return "", errors.New("no database driver configured")
+	case DatabaseDriverMySQL, DatabaseDriverPostgresql:
+		return d.NetworkDatabaseUrl(loc), nil
+	case DatabaseDriverSqlite3:
+		return d.Sqlite3Url(loc), nil
+	default:
+		return "", errors.Errorf("unsupported database driver `%s`", d.Driver)
+	}
+}
+func (d *Database) NetworkDatabaseUrl(location *time.Location) string {
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
+		d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(location.String()))
+}
+func (d *Database) Sqlite3Url(location *time.Location) string {
+	return fmt.Sprintf("file:%s?parseTime=true&loc=%s",
+		d.Database, url.PathEscape(location.String()))
+}
 
 // ReadConfigFromFile will read `filepath` and attempt to parse into
 // a Config structure. An error will be returned if duplicated project

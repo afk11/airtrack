@@ -15,7 +15,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -96,7 +95,7 @@ type (
 		mu sync.RWMutex
 	}
 	Tracker struct {
-		dbConn                   *sqlx.DB
+		database                 db.Database
 		opt                      Options
 		projects                 []*Project
 		projectMu                sync.RWMutex
@@ -149,7 +148,7 @@ func NewSighting(icao string) *Sighting {
 	}
 }
 
-func New(dbConn *sqlx.DB, opt Options) (*Tracker, error) {
+func New(database db.Database, opt Options) (*Tracker, error) {
 	if opt.SightingTimeout < time.Second*30 {
 		return nil, errors.New("invalid sighting timeout - must be at least 30 seconds")
 	} else if opt.OnGroundUpdateThreshold < 1 {
@@ -163,7 +162,7 @@ func New(dbConn *sqlx.DB, opt Options) (*Tracker, error) {
 
 	return &Tracker{
 		sighting:                 make(map[string]*Sighting),
-		dbConn:                   dbConn,
+		database:                 database,
 		opt:                      opt,
 		projectStatusListeners:   make([]ProjectStatusListener, 0),
 		projectAcUpdateListeners: make([]ProjectAircraftUpdateListener, 0),
@@ -228,7 +227,7 @@ func (t *Tracker) Stop() error {
 	log.Infof("closed with %d aircraft being monitored", pAircraft)
 
 	t.sighting = make(map[string]*Sighting)
-	err := db.CloseSightingBatch(t.dbConn, pSightings)
+	err := t.database.CloseSightingBatch(pSightings)
 	if err != nil {
 		return err
 	}
@@ -238,7 +237,7 @@ func (t *Tracker) Stop() error {
 	defer t.projectMu.RUnlock()
 	for _, p := range t.projects {
 		log.Debugf("close session %d", p.Session.Id)
-		res, err := db.CloseSession(t.dbConn, p.Session)
+		res, err := t.database.CloseSession(p.Session)
 		if err != nil {
 			return err
 		} else if err = db.CheckRowsUpdated(res, 1); err != nil {
@@ -263,29 +262,30 @@ func (t *Tracker) AddProject(p *Project) error {
 		return errors.Errorf("geocoder must be available for %s feature to work", GeocodeEndpoints)
 	}
 
-	site, err := db.LoadCollectionSite(t.dbConn, p.Name)
+	site, err := t.database.LoadCollectionSite(p.Name)
 	if err == sql.ErrNoRows {
-		_, err := db.NewCollectionSite(t.dbConn, p.Name, time.Now())
+		_, err := t.database.NewCollectionSite(p.Name, time.Now())
 		if err != nil {
 			return errors.Wrap(err, "create new project")
 		}
-		site, err = db.LoadCollectionSite(t.dbConn, p.Name)
+		site, err = t.database.LoadCollectionSite(p.Name)
 		if err != nil {
 			return errors.Wrap(err, "load new project")
 		}
 	} else if err != nil {
 		return errors.Wrap(err, "query collection site")
 	}
+
 	sessId, err := uuid.NewUUID()
 	if err != nil {
 		return errors.Wrap(err, "failed to generate session id")
 	}
-	_, err = db.NewCollectionSession(t.dbConn, site, sessId.String(),
+	_, err = t.database.NewCollectionSession(site, sessId.String(),
 		p.IsFeatureEnabled(TrackSquawks), p.IsFeatureEnabled(TrackTxTypes), p.IsFeatureEnabled(TrackCallSigns))
 	if err != nil {
 		return errors.Wrap(err, "create session record")
 	}
-	session, err := db.LoadSessionByIdentifier(t.dbConn, site, sessId.String())
+	session, err := t.database.LoadSessionByIdentifier(site, sessId.String())
 	if err != nil {
 		return errors.Wrap(err, "load session record")
 	}
@@ -389,7 +389,7 @@ func (t *Tracker) doLostAircraftCheck() error {
 		aircraftCountVec.WithLabelValues().Set(float64(len(t.sighting)))
 	}()
 
-	err := db.CloseSightingBatch(t.dbConn, lostDbSightings)
+	err := t.database.CloseSightingBatch(lostDbSightings)
 	if err != nil {
 		return err
 	}
@@ -486,7 +486,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 
 		var numPoints int
 		var firstPos, lastPos *db.SightingLocation
-		err := db.GetLocationHistoryWalkBatch(t.dbConn, observation.sighting, LocationFetchBatchSize, func(location []db.SightingLocation) {
+		err := t.database.GetLocationHistoryWalkBatch(observation.sighting, LocationFetchBatchSize, func(location []db.SightingLocation) {
 			if firstPos == nil {
 				firstPos = &location[0]
 			}
@@ -505,18 +505,24 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			project.Session.Id, sighting.a.Icao, numPoints)
 
 		var mapUpdated bool
-		sightingKml, err := db.LoadSightingKml(t.dbConn, observation.sighting)
+		sightingKml, err := t.database.LoadSightingKml(observation.sighting)
 		if err == sql.ErrNoRows {
 			log.Debugf("[session %d] creating KML for %s", project.Session.Id, sighting.a.Icao)
 			// Can be created
-			_, err = db.CreateSightingKml(t.dbConn, observation.sighting, kmlStr)
+			_, err = t.database.CreateSightingKml(observation.sighting, kmlStr)
 			if err != nil {
 				err = errors.Wrap(err, "create sighting kml")
 			}
 		} else if err == nil {
 			mapUpdated = true
 			log.Debugf("[session %d] updating KML for %s", project.Session.Id, sighting.a.Icao)
-			_, err = db.UpdateSightingKml(t.dbConn, sightingKml, kmlStr)
+			isSameKml := sightingKml.Kml == kmlStr
+			if isSameKml {
+				log.Warnf("sighting %d sighting_kml %d - tried to update kml with same content",
+					sightingKml.SightingId, sightingKml.Id)
+			}
+
+			_, err = t.database.UpdateSightingKml(sightingKml, kmlStr)
 			if err != nil {
 				err = errors.Wrap(err, "update sighting kml")
 			}
@@ -857,7 +863,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	if s.State.HaveAltitude && s.State.HaveLocation && project.IsFeatureEnabled(TrackKmlLocation) {
 		// We have alt + location, and there's been an update - save the location
 		if (observation.haveAlt && observation.haveLocation) && (updatedAlt || updatedLocation) {
-			_, err = db.InsertSightingLocation(t.dbConn, observation.sighting.Id, now,
+			_, err = t.database.InsertSightingLocation(observation.sighting.Id, now,
 				observation.altitude, observation.latitude, observation.longitude)
 			if err != nil {
 				return err
@@ -869,20 +875,19 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	}
 
 	if updatedCallSign && project.IsFeatureEnabled(TrackCallSigns) {
-		txExecer := db.NewTxExecer(t.dbConn, func(tx *sql.Tx) error {
-			res, err := db.UpdateSightingCallsignTx(tx, observation.sighting, s.State.CallSign)
+		err := t.database.Transaction(func(tx *sql.Tx) error {
+			res, err := t.database.UpdateSightingCallsignTx(tx, observation.sighting, s.State.CallSign)
 			if err != nil {
 				return errors.Wrap(err, "updating sighting callsign")
 			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
 				return err
 			}
-			_, err = db.CreateNewSightingCallSignTx(tx, observation.sighting, s.State.CallSign, now)
+			_, err = t.database.CreateNewSightingCallSignTx(tx, observation.sighting, s.State.CallSign, now)
 			if err != nil {
 				return errors.Wrap(err, "creating callsign record")
 			}
 			return nil
 		})
-		err := txExecer.Exec()
 		if err != nil {
 			return errors.Wrap(err, "saving callsign")
 		}
@@ -902,8 +907,8 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 		}
 
 		// db
-		txExecer := db.NewTxExecer(t.dbConn, func(tx *sql.Tx) error {
-			res, err := db.UpdateSightingSquawkTx(tx, observation.sighting, s.State.Squawk)
+		err := t.database.Transaction(func(tx *sql.Tx) error {
+			res, err := t.database.UpdateSightingSquawkTx(tx, observation.sighting, s.State.Squawk)
 			// todo: add this back in once we have 'sighting restore' added.
 			// reopened sightings trigger update though row count will be zero
 			if err != nil {
@@ -918,14 +923,13 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			}
 			// work around - don't repeatedly save squawks, til we deal with 'sighting restore'
 			if affected > 0 {
-				_, err = db.CreateNewSightingSquawkTx(tx, observation.sighting, s.State.Squawk, now)
+				_, err = t.database.CreateNewSightingSquawkTx(tx, observation.sighting, s.State.Squawk, now)
 				if err != nil {
 					return errors.Wrap(err, "creating squawk record")
 				}
 			}
 			return nil
 		})
-		err := txExecer.Exec()
 		if err != nil {
 			return errors.Wrap(err, "saving squawk")
 		}
@@ -969,9 +973,9 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 
 func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 	// create sighting
-	a, err := db.LoadAircraftByIcao(t.dbConn, icao)
+	a, err := t.database.LoadAircraftByIcao(icao)
 	if err == sql.ErrNoRows {
-		acRes, err := db.CreateAircraft(t.dbConn, icao)
+		acRes, err := t.database.CreateAircraft(icao)
 		if err != nil {
 			return nil, err
 		}
@@ -979,7 +983,7 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 		if err != nil {
 			return nil, err
 		}
-		a, err = db.LoadAircraftById(t.dbConn, acId)
+		a, err = t.database.LoadAircraftById(acId)
 		if err != nil {
 			return nil, err
 		}
@@ -991,7 +995,7 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 }
 
 func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting, bool, error) {
-	s, err := db.LoadLastSighting(t.dbConn, p.Session, ac)
+	s, err := t.database.LoadLastSighting(p.Session, ac)
 	if err != nil {
 		return nil, false, err
 	}
@@ -1005,7 +1009,7 @@ func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting
 		// todo: maybe other checks here, like, finished_on_ground or something to avoid rapid stops, so
 		// we break up legs of the journey
 		if timeSinceClosed < p.ReopenSightingsInterval {
-			res, err := db.ReopenSighting(t.dbConn, s)
+			res, err := t.database.ReopenSighting(s)
 			if err != nil {
 				return nil, false, errors.Wrap(err, "reopening sighting")
 			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
@@ -1018,7 +1022,7 @@ func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting
 	}
 
 	// A new sighting is needed
-	res, err := db.CreateSighting(t.dbConn, p.Session, ac)
+	res, err := t.database.CreateSighting(p.Session, ac)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "creating sighting record failed")
 	}
@@ -1026,7 +1030,7 @@ func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "fetching sighting id failed")
 	}
-	s, err = db.LoadSightingById(t.dbConn, sightingId)
+	s, err = t.database.LoadSightingById(sightingId)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "load sighting by id failed")
 	}

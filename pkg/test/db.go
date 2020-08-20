@@ -2,9 +2,12 @@ package test
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/afk11/airtrack/pkg/db/migrations"
+	"github.com/afk11/airtrack/pkg/db/migrations_sqlite3"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
+	"github.com/golang-migrate/migrate/database/sqlite3"
 	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 	"os"
 	"strconv"
@@ -90,7 +93,7 @@ func LoadTestDbConfig() (*TestDbConfig, error) {
 	return cfg, nil
 }
 
-func InitMigration(database string, db *sql.DB) (*migrate.Migrate, error) {
+func InitMysqlMigration(database string, db *sql.DB) (*migrate.Migrate, error) {
 	s := bindata.Resource(migrations.AssetNames(),
 		func(name string) ([]byte, error) {
 			return migrations.Asset(name)
@@ -106,6 +109,35 @@ func InitMigration(database string, db *sql.DB) (*migrate.Migrate, error) {
 	m, err := migrate.NewWithInstance(
 		"go-bindata",
 		d,
+		database,
+		driver,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+func InitSqliteMigration(database string, sqliteFile string, db *sql.DB) (*migrate.Migrate, error) {
+	dbUrl := fmt.Sprintf("file:"+sqliteFile)
+	db, err := sql.Open("sqlite3", dbUrl)
+	if err != nil {
+		return nil, err
+	}
+	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
+	if err != nil {
+		return nil, err
+	}
+	s := bindata.Resource(migrations_sqlite3.AssetNames(),
+		func(name string) ([]byte, error) {
+			return migrations_sqlite3.Asset(name)
+		})
+	src, err := bindata.WithInstance(s)
+	if err != nil {
+		return nil, err
+	}
+	m, err := migrate.NewWithInstance(
+		"go-bindata",
+		src,
 		database,
 		driver,
 	)

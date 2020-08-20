@@ -11,16 +11,18 @@ build-bindata-assets:
 		go-bindata -pkg asset -o ./pkg/assets/asset.go assets/...
 build-bindata-migrations:
 		go-bindata -pkg migrations -o ./pkg/db/migrations/migrations.go -prefix db/migrations db/migrations
+build-bindata-migrations-sqlite3:
+		go-bindata -pkg migrations_sqlite3 -o ./pkg/db/migrations_sqlite3/migrations.go -prefix db/migrations_sqlite3 db/migrations_sqlite3
 build-bindata-dump1090: dump1090
 		go-bindata -pkg acmap -o ./pkg/dump1090/acmap/assets.go dump1090/...
 build-bindata-tar1090: tar1090
 		go-bindata -pkg tar1090 -o ./pkg/tar1090/assets.go tar1090/...
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
-build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-dump1090 build-bindata-tar1090 build-protobuf
-		GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
-build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-dump1090 build-bindata-tar1090 build-protobuf
-		GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
+build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
+		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
+build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
+		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
 test: test-cleanup
 	go test -coverprofile=./coverage/tests.out ./... \

@@ -1,12 +1,13 @@
 package tracker
 
 import (
+	"database/sql"
 	"fmt"
-	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/airtrack/pkg/test"
+	"github.com/doug-martin/goqu/v9"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
-	"strings"
+	"os"
 	"sync"
 	"time"
 )
@@ -23,17 +24,12 @@ var dbs []*TestDB
 var claimNextDBLock = &sync.Mutex{}
 
 func init() {
-	dbConf := test.MustLoadTestDbConfig()
 	tz := test.MustLoadTestTimeZone()
 
-	if !strings.Contains(dbConf.DatabaseFmt, "%d") {
-		panic(errors.Errorf("database name (%s) must contain '%%d'", dbConf.DatabaseFmt))
-	}
-
-	dbs = make([]*TestDB, dbConf.NumDbs)
-	for i := 0; i < dbConf.NumDbs; i++ {
-		dbs[i] = &TestDB{conf: dbConf,
-			db:    fmt.Sprintf(dbConf.DatabaseFmt, i),
+	dbs = make([]*TestDB, 4)
+	for i := 0; i < 4; i++ {
+		dbs[i] = &TestDB{
+			db:    fmt.Sprintf("airtrack_%d", i),
 			tz:    tz.Tz,
 			inUse: false}
 	}
@@ -94,15 +90,29 @@ func dropTables(db *sqlx.DB) error {
 	return nil
 }
 
-func initDB() (*sqlx.DB, string, func()) {
+func initDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 	testDB := claimNextDB()
-	dbConf := testDB.conf
-	dbConn, err := db.NewMultiStmtConn(dbConf.Driver, dbConf.Username, dbConf.Password, dbConf.Host, dbConf.Port, testDB.db, testDB.tz)
+
+	tmpFile := "/tmp/"+testDB.db+".sqlite3"
+	if _, err := os.Stat(tmpFile); err == nil {
+		err = os.Remove(tmpFile)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	dbUrl := fmt.Sprintf("file:"+tmpFile)
+	sqlConn, err := sql.Open("sqlite3", dbUrl)
+	dbConn := sqlx.NewDb(sqlConn, "sqlite3")
 	if err != nil {
 		panic(fmt.Sprintf("error creating database connection %s", err.Error()))
 	}
 
-	err = dropTables(dbConn)
+	migrate, err := test.InitSqliteMigration(testDB.db, tmpFile, dbConn.DB)
+	if err != nil {
+		panic(err)
+	}
+	err = migrate.Up()
 	if err != nil {
 		panic(err)
 	}
@@ -112,21 +122,14 @@ func initDB() (*sqlx.DB, string, func()) {
 		dbConn.Close()
 		testDB.inUse = false
 	}
-
-	return dbConn, testDB.db, closeFn
+	dialect := goqu.Dialect("sqlite3")
+	return dbConn, dialect, testDB.db, closeFn
 }
 
-func initDBUp() (*sqlx.DB, string, func()) {
-	dbConn, dbName, closeFn := initDB()
+func initDBUp() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
+	dbConn, dialect, dbName, closeFn := initDB()
 
-	migrate, err := test.InitMigration(dbName, dbConn.DB)
-	if err != nil {
-		panic(err)
-	}
-	err = migrate.Up()
-	if err != nil {
-		panic(err)
-	}
 
-	return dbConn, dbName, closeFn
+
+	return dbConn, dialect, dbName, closeFn
 }
