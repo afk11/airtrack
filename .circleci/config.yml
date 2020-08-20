@@ -13,6 +13,9 @@ jobs: # basic units of work in a run
             - go-mod-v4-{{ checksum "go.sum" }}
 
       - run:
+          name: Install go-bindata
+          command: make install-go-bindata
+      - run:
           name: Run unit tests
           # store the results of our tests in the $TEST_RESULTS directory
           command: TESTOPTIONS="-v " make test
