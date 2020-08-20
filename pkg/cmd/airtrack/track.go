@@ -20,11 +20,16 @@ import (
 	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/afk11/airtrack/pkg/tar1090"
 	"github.com/afk11/airtrack/pkg/tracker"
+	smtp "github.com/afk11/mail"
+	"github.com/doug-martin/goqu/v9"
+	_ "github.com/doug-martin/goqu/v9/dialect/mysql"
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
+	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/mail.v2"
 	"net/http"
 	"os"
 	"os/signal"
@@ -61,10 +66,21 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	if err != nil {
 		return errors.Wrapf(err, "Invalid timezone `%s`", ctx.Config.TimeZone)
 	}
-	dbConn, err := db.NewConn(cfg.Database.Driver, cfg.Database.Username, cfg.Database.Password, cfg.Database.Host, cfg.Database.Port, cfg.Database.Database, loc)
+
+	dbUrl, err := cfg.Database.DataSource(loc)
+	if cfg.Database.Driver != config.DatabaseDriverMySQL && cfg.Database.Driver != config.DatabaseDriverSqlite3 {
+		return errors.New("postgresql not yet supported")
+	}
+
 	if err != nil {
 		return err
 	}
+	dbConn, err := sqlx.Connect(cfg.Database.Driver, dbUrl)
+	if err != nil {
+		return err
+	}
+	dialect := goqu.Dialect(cfg.Database.Driver)
+	database := db.NewDatabase(dbConn, dialect)
 
 	opt := tracker.Options{
 		Workers:                   64,
@@ -109,13 +125,20 @@ func (c *TrackCmd) Run(ctx *Context) error {
 				return errors.New("email.sender not set")
 			}
 
-			dialer := mail.NewDialer(
+			dialer := smtp.NewDialer(
 				settings.Host, settings.Port, settings.Username, settings.Password)
-			if settings.MandatoryStartTLS {
-				dialer.StartTLSPolicy = mail.MandatoryStartTLS
+			if settings.TLS {
+				dialer.SSL = true
+			}
+			if settings.NoStartTLS {
+				dialer.StartTLSPolicy = smtp.NoStartTLS
+			} else if settings.MandatoryStartTLS {
+				dialer.StartTLSPolicy = smtp.MandatoryStartTLS
+			} else {
+				dialer.StartTLSPolicy = smtp.OpportunisticStartTLS
 			}
 			dialer.Timeout = time.Second * 30
-			m := mailer.NewMailer(dbConn, settings.Sender, dialer, aesgcm)
+			m := mailer.NewMailer(database, settings.Sender, dialer, aesgcm)
 			m.Start()
 			opt.Mailer = m
 			defer func() {
@@ -222,13 +245,13 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	}
 	p := tracker.NewAdsbxProducer(msgs, adsbxEndpoint, adsbxApiKey)
 
-	t, err := tracker.New(dbConn, opt)
+	t, err := tracker.New(database, opt)
 	if err != nil {
 		return err
 	}
 
 	if cfg.MapSettings.Enabled {
-		historyFiles := 60
+		historyFiles := tracker.DefaultHistoryFileCount
 		if cfg.MapSettings.HistoryCount != 0 {
 			historyFiles = cfg.MapSettings.HistoryCount
 		}

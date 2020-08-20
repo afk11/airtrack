@@ -9,10 +9,9 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/airtrack/pkg/zlib"
-	"github.com/jmoiron/sqlx"
+	"github.com/afk11/mail"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"gopkg.in/mail.v2"
 	"io"
 	"strings"
 	"sync"
@@ -24,7 +23,7 @@ type MailSender interface {
 }
 
 type Mailer struct {
-	dbConn    *sqlx.DB
+	database  db.Database
 	from      string
 	key       []byte
 	dialer    *mail.Dialer
@@ -88,19 +87,19 @@ func decodeJob(aes cipher.AEAD, jobBytes []byte) (db.EmailJob, error) {
 	return job, nil
 }
 func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
-	return db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
+	return m.database.Transaction(func(tx *sql.Tx) error {
 		for _, job := range queued {
 			ciphertext, err := encodeJob(m.aesgcm, &job)
 			if err != nil {
 				return err
 			}
-			_, err = db.CreateEmailJobTx(tx, now, ciphertext)
+			_, err = m.database.CreateEmailJobTx(tx, now, ciphertext)
 			if err != nil {
 				return err
 			}
 		}
 		return nil
-	}).Exec()
+	})
 }
 func (m *Mailer) processMails() error {
 	start := time.Now()
@@ -130,7 +129,7 @@ func (m *Mailer) processMails() error {
 		}
 	}
 
-	records, err := db.GetPendingEmailJobs(m.dbConn, time.Now())
+	records, err := m.database.GetPendingEmailJobs(time.Now())
 	if err == sql.ErrNoRows {
 		return nil
 	} else if err != nil {
@@ -152,6 +151,7 @@ func (m *Mailer) processMails() error {
 	}
 
 	if len(jobs) > 0 {
+
 		sendCloser, err := m.dialer.Dial()
 		if err != nil {
 			log.Warnf("failed to connect to SMTP server: %s", err.Error())
@@ -184,37 +184,37 @@ func (m *Mailer) processMails() error {
 		}
 
 		if len(finished) > 0 {
-			err = db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
+			err = m.database.Transaction(func(tx *sql.Tx) error {
 				for _, email := range finished {
-					_, err = db.DeleteCompletedEmail(tx, email)
+					_, err = m.database.DeleteCompletedEmail(tx, email)
 					if err != nil {
 						return errors.Wrapf(err, "deleting completed email %d", email.Id)
 					}
 				}
 				return nil
-			}).Exec()
+			})
 			if err != nil {
 				return err
 			}
 		}
 
 		if len(failed) > 0 {
-			err = db.NewTxExecer(m.dbConn, func(tx *sql.Tx) error {
+			err = m.database.Transaction(func(tx *sql.Tx) error {
 				for _, email := range failed {
 					if email.Retries == 4 {
-						_, err = db.MarkEmailFailedTx(tx, email)
+						_, err = m.database.MarkEmailFailedTx(tx, email)
 						if err != nil {
 							return errors.Wrapf(err, "marking email failed %d", email.Id)
 						}
 					} else {
-						_, err = db.RetryEmailAfter(tx, email, time.Now().Add(time.Minute*2))
+						_, err = m.database.RetryEmailAfter(tx, email, time.Now().Add(time.Minute*2))
 						if err != nil {
 							return errors.Wrapf(err, "updating email retry information %d", email.Id)
 						}
 					}
 				}
 				return nil
-			}).Exec()
+			})
 			if err != nil {
 				return err
 			}
@@ -254,9 +254,9 @@ func (m *Mailer) Stop() {
 		panic(err)
 	}
 }
-func NewMailer(dbConn *sqlx.DB, from string, dialer *mail.Dialer, aesgcm cipher.AEAD) *Mailer {
+func NewMailer(database db.Database, from string, dialer *mail.Dialer, aesgcm cipher.AEAD) *Mailer {
 	return &Mailer{
-		dbConn: dbConn,
+		database: database,
 		dialer: dialer,
 		from:   from,
 		aesgcm: aesgcm,

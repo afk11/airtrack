@@ -6,12 +6,17 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db/migrations"
+	"github.com/afk11/airtrack/pkg/db/migrations_sqlite3"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate"
+	"github.com/golang-migrate/migrate/database"
 	"github.com/golang-migrate/migrate/database/mysql"
+	"github.com/golang-migrate/migrate/database/sqlite3"
+	"github.com/golang-migrate/migrate/source"
 	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 	"github.com/pkg/errors"
 	"os"
+	"time"
 )
 
 type (
@@ -28,7 +33,11 @@ type (
 )
 
 func (c *MigrateUpCmd) Run(ctx *Context) error {
-	m, err := initMigrations(&ctx.Config.Database)
+	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	if err != nil {
+		return err
+	}
+	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -48,7 +57,11 @@ func (c *MigrateUpCmd) Run(ctx *Context) error {
 }
 
 func (c *MigrateDownCmd) Run(ctx *Context) error {
-	m, err := initMigrations(&ctx.Config.Database)
+	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	if err != nil {
+		return err
+	}
+	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -71,8 +84,11 @@ func (c *MigrateStepsCmd) Run(ctx *Context) error {
 	if c.N == 0 {
 		return errors.Errorf("cannot set n=0 (stay where we are)")
 	}
-
-	m, err := initMigrations(&ctx.Config.Database)
+	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	if err != nil {
+		return err
+	}
+	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -97,29 +113,53 @@ func (c *MigrateStepsCmd) Run(ctx *Context) error {
 	return nil
 }
 
-func initMigrations(dbConf *config.Database) (*migrate.Migrate, error) {
-	dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?multiStatements=true",
-		dbConf.Username, dbConf.Password,
-		dbConf.Host, dbConf.Port, dbConf.Database)
-	s := bindata.Resource(migrations.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
-		})
-	d, err := bindata.WithInstance(s)
-	if err != nil {
-		return nil, err
+func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migrate, error) {
+	var db *sql.DB
+	var driver database.Driver
+	var src source.Driver
+	var err error
+	switch dbConf.Driver {
+	case config.DatabaseDriverMySQL:
+		db, err = sql.Open("mysql", dbConf.NetworkDatabaseUrl(loc))
+		if err != nil {
+			return nil, err
+		}
+		driver, err = mysql.WithInstance(db, &mysql.Config{})
+		if err != nil {
+			return nil, err
+		}
+		s := bindata.Resource(migrations.AssetNames(),
+			func(name string) ([]byte, error) {
+				return migrations.Asset(name)
+			})
+		src, err = bindata.WithInstance(s)
+		if err != nil {
+			return nil, err
+		}
+	case config.DatabaseDriverSqlite3:
+		db, err = sql.Open("sqlite3", dbConf.Sqlite3Url(loc))
+		if err != nil {
+			return nil, err
+		}
+		driver, err = sqlite3.WithInstance(db, &sqlite3.Config{})
+		if err != nil {
+			return nil, err
+		}
+		s := bindata.Resource(migrations_sqlite3.AssetNames(),
+			func(name string) ([]byte, error) {
+				return migrations_sqlite3.Asset(name)
+			})
+		src, err = bindata.WithInstance(s)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, errors.New("unsupported database driver `"+dbConf.Driver+"`")
 	}
-	db, err := sql.Open("mysql", dbUrl)
-	if err != nil {
-		return nil, err
-	}
-	driver, err := mysql.WithInstance(db, &mysql.Config{})
-	if err != nil {
-		return nil, err
-	}
+
 	m, err := migrate.NewWithInstance(
 		"go-bindata",
-		d,
+		src,
 		dbConf.Database,
 		driver,
 	)

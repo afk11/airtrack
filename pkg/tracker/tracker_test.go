@@ -7,7 +7,6 @@ import (
 	"github.com/pkg/errors"
 	assert "github.com/stretchr/testify/require"
 
-	"github.com/jmoiron/sqlx"
 	"sync"
 	"testing"
 	"time"
@@ -21,8 +20,8 @@ var basicOptions = Options{
 	OnGroundUpdateThreshold: 1,
 }
 
-func startTracker(dbConn *sqlx.DB, c chan *pb.Message, opt Options) *Tracker {
-	tr, err := New(dbConn, opt)
+func startTracker(database db.Database, c chan *pb.Message, opt Options) *Tracker {
+	tr, err := New(database, opt)
 	if err != nil {
 		panic(err)
 	}
@@ -30,11 +29,12 @@ func startTracker(dbConn *sqlx.DB, c chan *pb.Message, opt Options) *Tracker {
 	return tr
 }
 func doTest(opt Options, proj *Project, testFunc func(tr *Tracker) error) error {
-	dbConn, _, closer := initDBUp()
+	dbConn, dialect, _, closer := initDBUp()
 	defer closer()
 
 	c := make(chan *pb.Message)
-	tr := startTracker(dbConn, c, opt)
+	database := db.NewDatabase(dbConn, dialect)
+	tr := startTracker(database, c, opt)
 	defer tr.Stop()
 
 	err := tr.AddProject(proj)
@@ -59,10 +59,11 @@ func doTest(opt Options, proj *Project, testFunc func(tr *Tracker) error) error 
 }
 func TestTracker(t *testing.T) {
 	t.Run("startstop", func(t *testing.T) {
-		dbConn, _, closer := initDBUp()
+		dbConn, dialect, _, closer := initDBUp()
 		defer closer()
 		c := make(chan *pb.Message)
-		tr := startTracker(dbConn, c, basicOptions)
+		database := db.NewDatabase(dbConn, dialect)
+		tr := startTracker(database, c, basicOptions)
 
 		err := tr.Stop()
 		if err != nil {
@@ -94,14 +95,14 @@ func TestTracker(t *testing.T) {
 			assert.Equal(t, p.Icao, s.a.Icao)
 
 			// aircraft in DB matches expected values
-			ac, err := db.LoadAircraftByIcao(tr.dbConn, p.Icao)
+			ac, err := tr.database.LoadAircraftByIcao(p.Icao)
 			assert.NoError(t, err, "expecting aircraft to exist")
 			assert.NotNil(t, ac, "expecting aircraft to be returned")
 			assert.Equal(t, p.Icao, ac.Icao)
 			assert.Equal(t, s.a.Id, ac.Id)
 
 			// can load sighting for our project
-			ourSighting, err := db.LoadLastSighting(tr.dbConn, proj.Session, ac)
+			ourSighting, err := tr.database.LoadLastSighting(proj.Session, ac)
 			assert.NoError(t, err, "expected last sighting, not error")
 			assert.NotNil(t, ourSighting)
 
