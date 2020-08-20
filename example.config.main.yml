@@ -41,17 +41,19 @@ sighting:
   # The number of messages with the same value required to change on_ground status
   onground_update_threshold: 6
 database:
-  # golang Mysql driver
+  # Database driver. Currently supports 'mysql' and 'sqlite3'
   driver: mysql
-  # DB Host
+  # DB Host - server to connect to if using mysql
   host: server.local
-  # DB Port
+  # DB Port - server port if using mysql
   port: 3306
-  # DB Username
+  # DB Username - username for mysql connection
   username: airtrack
-  # DB Password
+  # DB Password - password for mysql connection
   password: password
   # Selected Database
+  # if driver is mysql, this is the database on the mysql server
+  # if driver is sqlite3, this is the filesystem path to the DB
   database: airtrack
 projects:
   # Sample project configuration
