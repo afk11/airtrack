@@ -16,6 +16,7 @@ import (
 	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 	"github.com/pkg/errors"
 	"os"
+	"time"
 )
 
 type (
@@ -32,7 +33,11 @@ type (
 )
 
 func (c *MigrateUpCmd) Run(ctx *Context) error {
-	m, err := initMigrations(&ctx.Config.Database)
+	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	if err != nil {
+		return err
+	}
+	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -52,7 +57,11 @@ func (c *MigrateUpCmd) Run(ctx *Context) error {
 }
 
 func (c *MigrateDownCmd) Run(ctx *Context) error {
-	m, err := initMigrations(&ctx.Config.Database)
+	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	if err != nil {
+		return err
+	}
+	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -75,8 +84,11 @@ func (c *MigrateStepsCmd) Run(ctx *Context) error {
 	if c.N == 0 {
 		return errors.Errorf("cannot set n=0 (stay where we are)")
 	}
-
-	m, err := initMigrations(&ctx.Config.Database)
+	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	if err != nil {
+		return err
+	}
+	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -101,17 +113,14 @@ func (c *MigrateStepsCmd) Run(ctx *Context) error {
 	return nil
 }
 
-func initMigrations(dbConf *config.Database) (*migrate.Migrate, error) {
+func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migrate, error) {
 	var db *sql.DB
 	var driver database.Driver
 	var src source.Driver
 	var err error
 	switch dbConf.Driver {
 	case config.DatabaseDriverMySQL:
-		dbUrl := fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?multiStatements=true",
-			dbConf.Username, dbConf.Password,
-			dbConf.Host, dbConf.Port, dbConf.Database)
-		db, err = sql.Open("mysql", dbUrl)
+		db, err = sql.Open("mysql", dbConf.NetworkDatabaseUrl(loc))
 		if err != nil {
 			return nil, err
 		}
@@ -128,8 +137,7 @@ func initMigrations(dbConf *config.Database) (*migrate.Migrate, error) {
 			return nil, err
 		}
 	case config.DatabaseDriverSqlite3:
-		dbUrl := fmt.Sprintf("file:airtrack.sqlite3")
-		db, err = sql.Open("sqlite3", dbUrl)
+		db, err = sql.Open("sqlite3", dbConf.Sqlite3Url(loc))
 		if err != nil {
 			return nil, err
 		}
