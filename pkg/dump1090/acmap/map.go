@@ -601,7 +601,10 @@ func (d *Dump1090Map) statics() []string {
 type assetResponseHandler string
 
 func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
-	dat := MustAsset(string(h))
+	dat, err := Asset(string(h))
+	if err != nil {
+		panic("asset: Asset(" + string(h) + "): " + err.Error())
+	}
 	if len(h) > 4 && h[len(h)-4:] == ".css" {
 		w.Header().Set("Content-Type", "text/css")
 	} else if len(h) > 3 && h[len(h)-3:] == ".js" {
@@ -609,7 +612,7 @@ func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Req
 	} else if len(h) > 5 && h[len(h)-5:] == ".html" {
 		w.Header().Set("Content-Type", "text/html")
 	}
-	_, err := w.Write(dat)
+	_, err = w.Write(dat)
 	if err != nil {
 		log.Infof("error writing response: %s", err.Error())
 	}
