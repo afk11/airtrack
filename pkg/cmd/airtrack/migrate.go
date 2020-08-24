@@ -154,7 +154,7 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 			return nil, err
 		}
 	default:
-		return nil, errors.New("unsupported database driver `"+dbConf.Driver+"`")
+		return nil, errors.New("unsupported database driver `" + dbConf.Driver + "`")
 	}
 
 	m, err := migrate.NewWithInstance(

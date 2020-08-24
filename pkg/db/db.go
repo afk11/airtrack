@@ -10,8 +10,8 @@ import (
 )
 
 const (
-	EmailPending = 1
-	EmailFailed  = 0
+	EmailPending            = 1
+	EmailFailed             = 0
 	KmlPlainTextContentType = 0
 )
 
@@ -157,13 +157,14 @@ type Database interface {
 	RetryEmailAfter(tx *sql.Tx, job Email, retryAfter time.Time) (sql.Result, error)
 }
 type DatabaseImpl struct {
-	db *sqlx.DB
+	db      *sqlx.DB
 	dialect goqu.DialectWrapper
 }
+
 func NewDatabase(db *sqlx.DB, dialect goqu.DialectWrapper) *DatabaseImpl {
 	return &DatabaseImpl{db: db, dialect: dialect}
 }
-func (d *DatabaseImpl) Transaction(f func (tx *sql.Tx) error) error {
+func (d *DatabaseImpl) Transaction(f func(tx *sql.Tx) error) error {
 	return NewTxExecer(d.db.DB, f).Exec()
 }
 func (d *DatabaseImpl) NewCollectionSite(siteName string, now time.Time) (sql.Result, error) {
@@ -201,7 +202,7 @@ func (d *DatabaseImpl) NewCollectionSession(site *CollectionSite, identifier str
 	s, p, err := d.dialect.
 		Insert("collection_session").
 		Prepared(true).
-		Cols("collection_site_id", "identifier", "with_squawks",	"with_transmission_types",
+		Cols("collection_site_id", "identifier", "with_squawks", "with_transmission_types",
 			"with_callsigns", "created_at", "updated_at", "closed_at").
 		Vals(goqu.Vals{site.Id, identifier, withSquawks, withTxTypes, withCallSigns, now, now, nil}).
 		ToSQL()
@@ -220,7 +221,7 @@ func (d *DatabaseImpl) LoadSessionByIdentifier(site *CollectionSite, identifier 
 		Prepared(true).
 		Where(goqu.Ex{
 			"collection_site_id": site.Id,
-			"identifier": identifier,
+			"identifier":         identifier,
 		}).
 		ToSQL()
 	if err != nil {
@@ -341,7 +342,7 @@ func (d *DatabaseImpl) LoadLastSighting(session *CollectionSession, ac *Aircraft
 		Prepared(true).
 		Where(goqu.Ex{
 			"collection_session_id": session.Id,
-			"aircraft_id": ac.Id,
+			"aircraft_id":           ac.Id,
 		}).
 		Order(goqu.C("id").Desc()).
 		Limit(1).
@@ -477,7 +478,7 @@ func (d *DatabaseImpl) GetLocationHistory(sighting *Sighting, lastId int64, batc
 		Prepared(true).
 		Where(goqu.Ex{
 			"sighting_id": sighting.Id,
-			"id": lastId,
+			"id":          lastId,
 		}).
 		Limit(uint(batchSize)).
 		ToSQL()
@@ -546,7 +547,7 @@ func (d *DatabaseImpl) CreateNewSightingSquawkTx(tx *sql.Tx, sighting *Sighting,
 	}
 	return tx.Exec(s, p...)
 }
-func (d *DatabaseImpl) LoadSightingKml( sighting *Sighting) (*SightingKml, error) {
+func (d *DatabaseImpl) LoadSightingKml(sighting *Sighting) (*SightingKml, error) {
 	s, p, err := d.dialect.
 		From("sighting_kml").
 		Prepared(true).

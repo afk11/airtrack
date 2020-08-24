@@ -32,8 +32,8 @@ const (
             <extrude>1</extrude>
             <tessellate>1</tessellate>
             <altitudeMode>absolute</altitudeMode>
-            <when>2020-05-22T20:12:49+01:00</when>
-            <when>2020-05-22T20:13:09+01:00</when>
+            <when>2020-05-22T20:12:49Z</when>
+            <when>2020-05-22T20:13:09Z</when>
             <gx:coord>-0.039302 51.496711 100</gx:coord>
             <gx:coord>-0.039302 51.496711 100</gx:coord>
         </gx:Track>
@@ -52,17 +52,20 @@ const (
 )
 
 func TestWriterBasic(t *testing.T) {
+	loc, err := time.LoadLocation("UTC")
+	assert.NoError(t, err)
+
 	First := db.SightingLocation{
 		Latitude:  51.4967107,
 		Longitude: -0.0393017,
 		Altitude:  100,
-		TimeStamp: time.Unix(1590174769, 0),
+		TimeStamp: time.Date(2020, 05, 22, 20, 12, 49, 0, loc),
 	}
 	Second := db.SightingLocation{
 		Latitude:  51.4967107,
 		Longitude: -0.0393015,
 		Altitude:  100,
-		TimeStamp: time.Unix(1590174789, 0),
+		TimeStamp: time.Date(2020, 05, 22, 20, 13, 9, 0, loc),
 	}
 
 	t.Run("single write", func(t *testing.T) {

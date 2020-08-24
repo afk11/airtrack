@@ -257,9 +257,9 @@ func (m *Mailer) Stop() {
 func NewMailer(database db.Database, from string, dialer *mail.Dialer, aesgcm cipher.AEAD) *Mailer {
 	return &Mailer{
 		database: database,
-		dialer: dialer,
-		from:   from,
-		aesgcm: aesgcm,
-		queued: make([]db.EmailJob, 0),
+		dialer:   dialer,
+		from:     from,
+		aesgcm:   aesgcm,
+		queued:   make([]db.EmailJob, 0),
 	}
 }

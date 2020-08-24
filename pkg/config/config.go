@@ -12,10 +12,10 @@ import (
 
 const (
 	// MailDriverSmtp - the only support SMTP driver
-	MailDriverSmtp = "smtp"
-	DatabaseDriverMySQL = "mysql"
+	MailDriverSmtp           = "smtp"
+	DatabaseDriverMySQL      = "mysql"
 	DatabaseDriverPostgresql = "postgresql"
-	DatabaseDriverSqlite3 = "sqlite3"
+	DatabaseDriverSqlite3    = "sqlite3"
 )
 
 type (
@@ -24,36 +24,36 @@ type (
 		// OpenAIPDirectories defined here will be scanned for .aip files
 		OpenAIPDirectories []string `yaml:"openaip"`
 		// CupDirecories defined here will be scanned for .cup files
-		CupDirectories     []string `yaml:"cup"`
+		CupDirectories []string `yaml:"cup"`
 	}
 
 	// SmtpSettings - contains connection information for SMTP server.
 	SmtpSettings struct {
 		// Username - the SMTP username
-		Username          string `yaml:"username"`
+		Username string `yaml:"username"`
 		// Password - the SMTP password
-		Password          string `yaml:"password"`
+		Password string `yaml:"password"`
 		// Sender - the originating email address
-		Sender            string `yaml:"sender"`
-		// Host - the SMTP server's hostname
-		Host              string `yaml:"host"`
+		Sender string `yaml:"sender"`
+		// Host - the SMTP server's hostname/ip
+		Host string `yaml:"host"`
 		// Port - the SMTP server port
-		Port              int    `yaml:"port"`
-		// TLS - whether to connect using TLS
-		TLS               bool   `yaml:"tls"`
+		Port int `yaml:"port"`
+		// TLS - whether to connect using TLS (port 587)
+		TLS bool `yaml:"tls"`
 		// MandatoryStartTLS - if set to true, connections to servers
 		// which do not advertise STARTTLS support will cause an error.
-		MandatoryStartTLS bool   `yaml:"mandatory_starttls"`
+		MandatoryStartTLS bool `yaml:"mandatory_starttls"`
 		// NoStartTLS set to true disables opportunistic STARTTLS behaviour,
 		// where the connection will be completely plaintext
-		NoStartTLS        bool   `yaml:"nostarttls"`
+		NoStartTLS bool `yaml:"nostarttls"`
 	}
 
 	// MapSettings contains configuration for providing
 	// aircraft maps
 	MapSettings struct {
 		// Toggles whether map is enabled (default FALSE)
-		Enabled         bool  `yaml:"enabled"`
+		Enabled bool `yaml:"enabled"`
 		// HistoryInterval - number of seconds between new history files
 		HistoryInterval int64 `yaml:"history_interval"`
 		// HistoryCount worth of history files will be kept. (default: 60)
@@ -69,10 +69,10 @@ type (
 	// EmailSettings is where email support is configured
 	EmailSettings struct {
 		// Driver - currently only 'smtp' is supported
-		Driver string        `yaml:"driver"`
+		Driver string `yaml:"driver"`
 		// Smtp points to a SmtpSettings struct for use with
 		// the 'smtp' driver
-		Smtp   *SmtpSettings `yaml:"smtp"`
+		Smtp *SmtpSettings `yaml:"smtp"`
 	}
 
 	// Notifications - contains configuration of events to
@@ -91,20 +91,20 @@ type (
 		// Name - the name of the project (required)
 		Name string
 		//
-		Disabled                bool `yaml:"disabled"`
+		Disabled bool `yaml:"disabled"`
 		// Filter - an optional filter to apply to incoming messages
-		Filter                  string
-		Map                     ProjectMap     `yaml:"map"`
+		Filter string
+		Map    ProjectMap `yaml:"map"`
 		// Notifications - per project configuration of event notifications
-		Notifications           *Notifications `yaml:"notifications"`
+		Notifications *Notifications `yaml:"notifications"`
 		// Features - per project extra features
-		Features                []string
+		Features []string
 		// ReopenSightings - whether to reopen a previously closed sighting
 		// if a new sighting is within a certain timeframe
-		ReopenSightings         bool   `yaml:"reopen_sightings"`
+		ReopenSightings bool `yaml:"reopen_sightings"`
 		// ReopenSightingsInterval - How long after an aircraft goes out of range
 		// before we no longer reopen a recently closed session
-		ReopenSightingsInterval int    `yaml:"reopen_sightings_interval"`
+		ReopenSightingsInterval int `yaml:"reopen_sightings_interval"`
 		// OnGroundUpdateThreshold - how many on_ground messages before we propagate
 		// the change in status
 		OnGroundUpdateThreshold *int64 `yaml:"onground_update_threshold"`
@@ -113,11 +113,11 @@ type (
 	// Database - connection information about the database
 	Database struct {
 		// Driver to use for connections: sqlite3, mysql, postgresql
-		Driver   string `yaml:"driver"`
+		Driver string `yaml:"driver"`
 		// Host applies to mysql/postgresql - the DB server to connect to
-		Host     string `yaml:"host"`
+		Host string `yaml:"host"`
 		// Port applies to mysql/postgresql - the DB server port to connect to
-		Port     int    `yaml:"port"`
+		Port int `yaml:"port"`
 		// Username is the username used when connecting to mysql/postgresql
 		Username string `yaml:"username"`
 		// Password is the password used when connecting to mysql/postgresql
@@ -136,29 +136,33 @@ type (
 	}
 
 	AdsbxConfig struct {
+		// Custom ADSB Exchange URL (not required, but useful if
+		// you've a proxy setup)
 		ApiUrl string `yaml:"url"`
+		// ADSB Exchange API key
 		ApiKey string `yaml:"apikey"`
 	}
 
 	Config struct {
-		TimeZone    string      `yaml:"timezone"`
-		Encryption  Encryption  `yaml:"encryption"`
-		Airports    Airports    `yaml:"airports"`
-		Metrics     *Metrics    `yaml:"metrics"`
-		AdsbxConfig AdsbxConfig `yaml:"adsbx"`
-		MapSettings MapSettings `yaml:"map"`
-		Sighting    struct {
+		TimeZone      string         `yaml:"timezone"`
+		Encryption    Encryption     `yaml:"encryption"`
+		AdsbxConfig   AdsbxConfig    `yaml:"adsbx"`
+		Airports      Airports       `yaml:"airports"`
+		EmailSettings *EmailSettings `yaml:"email"`
+		Database      Database       `yaml:"database"`
+		Metrics       *Metrics       `yaml:"metrics"`
+		MapSettings   MapSettings    `yaml:"map"`
+		Sighting      struct {
 			Timeout *int64 `yaml:"timeout"`
 		} `yaml:"sighting"`
-		Database      Database       `yaml:"database"`
-		EmailSettings *EmailSettings `yaml:"email"`
-		Projects      []Project      `yaml:"projects"`
+		Projects []Project `yaml:"projects"`
 	}
 
 	ProjectsConfig struct {
 		Projects []Project `yaml:"projects"`
 	}
 )
+
 func (d *Database) DataSource(loc *time.Location) (string, error) {
 	switch d.Driver {
 	case "":
