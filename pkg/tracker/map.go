@@ -17,7 +17,7 @@ import (
 const (
 	// DefaultHistoryInterval - the default time between history
 	// updates
-	DefaultHistoryInterval  = time.Second * 30
+	DefaultHistoryInterval = time.Second * 30
 	// DefaultHistoryFileCount - the default number of history
 	// files to keep
 	DefaultHistoryFileCount = 60
@@ -124,9 +124,9 @@ type JsonAircraft struct {
 	// to this aircraft
 	referenceCount int64
 	// last time our position was updated
-	lastPosTime    time.Time
+	lastPosTime time.Time
 	// last time we received a message
-	lastMsgTime    time.Time
+	lastMsgTime time.Time
 	// Hex: the 24-bit ICAO identifier of the aircraft, as 6 hex digits. The identifier may start with '~', this means that the address is a non-ICAO address (e.g. from TIS-B).
 	Hex string `json:"hex"`
 	// Type: type of underlying message, one of:
@@ -184,7 +184,7 @@ type JsonAircraft struct {
 	// NavModes: set of engaged automation modes: 'autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'
 	NavModes string `json:"nav_modes,omitempty"`
 	// Latitude: the aircraft position in decimal degrees
-	Latitude  float64 `json:"lat,omitempty"`
+	Latitude float64 `json:"lat,omitempty"`
 	// Longitude: the aircraft longitude in decimal degrees
 	Longitude float64 `json:"lon,omitempty"`
 	// Nic: Navigation Integrity Category (2.2.3.2.7.2.6)
@@ -367,6 +367,7 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 	atomic.AddInt64(&m.messages, 1)
 	return nil
 }
+
 // projectUpdateAircraft updates the json aircraft record
 // with the current aircraft state
 func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
@@ -387,6 +388,7 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	atomic.AddInt64(&m.messages, 1)
 	return nil
 }
+
 // Implements MapAccess.GetProjectAircraft.
 func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error {
 	m.projMu.RLock()
@@ -420,6 +422,7 @@ func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*Js
 	}
 	return nil
 }
+
 // projectLostAircraft disassociates an aircraft from a project
 // (and dereferences it)
 func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
@@ -444,6 +447,7 @@ func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 	m.acMu.Unlock()
 	return nil
 }
+
 // Serve launches background services
 // - aircraft Seen / SeenPos updates each second
 // - triggers history updates on registered MapServices every m.historyInterval

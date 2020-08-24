@@ -93,7 +93,7 @@ func dropTables(db *sqlx.DB) error {
 func initDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 	testDB := claimNextDB()
 
-	tmpFile := "/tmp/"+testDB.db+".sqlite3"
+	tmpFile := "/tmp/" + testDB.db + ".sqlite3"
 	if _, err := os.Stat(tmpFile); err == nil {
 		err = os.Remove(tmpFile)
 		if err != nil {
@@ -101,7 +101,7 @@ func initDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 		}
 	}
 
-	dbUrl := fmt.Sprintf("file:"+tmpFile)
+	dbUrl := fmt.Sprintf("file:" + tmpFile)
 	sqlConn, err := sql.Open("sqlite3", dbUrl)
 	dbConn := sqlx.NewDb(sqlConn, "sqlite3")
 	if err != nil {
@@ -128,8 +128,6 @@ func initDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 
 func initDBUp() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 	dbConn, dialect, dbName, closeFn := initDB()
-
-
 
 	return dbConn, dialect, dbName, closeFn
 }

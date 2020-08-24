@@ -1,11 +1,11 @@
 timezone: UTC
-adsbx:
-  #  url: http://proxy.localhost:8080/api/aircraft/json/
-  apikey: ADSBX API KEY
 encryption:
   # Application encryption key: base64(random_bytes(32))
   # dd if=/dev/random bs=32 count=1 2>/dev/null | base64
   key: G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=
+adsbx:
+  #  url: http://proxy.localhost:8080/api/aircraft/json/
+  apikey: ADSBX API KEY
 airports:
   # Directories containing OpenAIP files for airport geocoding.
   # Register an account on openaip.net to download the files you need.
@@ -25,21 +25,18 @@ email:
     username: sender@domain.local
     # smtp password
     password: YOUR PASSWORD
-    # smtp host
+    # the SMTP server's hostname/ip
     host: SMTP HOST
-    # smtp port
+    # the SMTP server port
     port: SMTP PORT
-    # activate and require STARTTLS
+    # whether to connect using TLS (port 587)
+    tls: false
+    # if set to true, connections to servers which do not
+    # advertise STARTTLS support will cause an error.
     mandatory_starttls: true
-metrics:
-  enabled: false
-  port: 9206
-sighting:
-  # close sightings if no messages have been received in this long
-  # unit: seconds
-  timeout: 60
-  # The number of messages with the same value required to change on_ground status
-  onground_update_threshold: 6
+    # disables opportunistic encryption of connection with STARTTLS
+    # if this is set to true
+    nostarttls: false
 database:
   # Database driver. Currently supports 'mysql' and 'sqlite3'
   driver: mysql
@@ -55,6 +52,18 @@ database:
   # if driver is mysql, this is the database on the mysql server
   # if driver is sqlite3, this is the filesystem path to the DB
   database: airtrack
+sighting:
+  # close sightings if no messages have been received in this long
+  # unit: seconds
+  timeout: 60
+  # The number of messages with the same value required to change on_ground status
+  onground_update_threshold: 6
+# Prometheus metrics configuration (pull based)
+metrics:
+  # Whether to enable prometheus metrics
+  enabled: false
+  # Exposed HTTP metrics on this port
+  port: 9206
 projects:
   # Sample project configuration
   - name: German aircraft
@@ -63,9 +72,9 @@ projects:
     # Whether to reopen a sighting if it was closed recently, due
     # to bad coverage, etc
     reopen_sightings: true
-    # Notification configuration
+    # Project specific notification configuration
     notifications:
-      # Address to send notifications to
+      # Destination for notifications
       email: mymail@domain.local
       # List of enabled email notifications
       events:

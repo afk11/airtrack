@@ -118,7 +118,7 @@ func InitMysqlMigration(database string, db *sql.DB) (*migrate.Migrate, error) {
 	return m, nil
 }
 func InitSqliteMigration(database string, sqliteFile string, db *sql.DB) (*migrate.Migrate, error) {
-	dbUrl := fmt.Sprintf("file:"+sqliteFile)
+	dbUrl := fmt.Sprintf("file:" + sqliteFile)
 	db, err := sql.Open("sqlite3", dbUrl)
 	if err != nil {
 		return nil, err
