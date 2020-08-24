@@ -29,6 +29,13 @@ const (
 	DefaultNearestAirportMaxDistance float64 = 3000
 	DefaultOnGroundUpdateThreshold   int64   = 6
 	DefaultGeoHashLength             uint    = 4
+
+	Dump1090MapService = "dump1090"
+	Tar1090MapService  = "tar1090"
+)
+
+var (
+	DefaultMapServices = []string{Dump1090MapService, Tar1090MapService}
 )
 
 type (

@@ -14,7 +14,9 @@ type (
 	Feature           string
 	EmailNotification string
 	Project           struct {
-		Name               string
+		Name string
+		// ShouldMap indicates whether the map should be built for this project
+		ShouldMap          bool
 		Site               *db.CollectionSite
 		Session            *db.CollectionSession
 		Filter             string
@@ -107,6 +109,10 @@ func InitProject(cfg config.Project) (*Project, error) {
 		ReopenSightings:         cfg.ReopenSightings,
 		ReopenSightingsInterval: DefaultSightingReopenInterval,
 		OnGroundUpdateThreshold: DefaultOnGroundUpdateThreshold,
+		ShouldMap:               true,
+	}
+	if cfg.Map != nil {
+		p.ShouldMap = cfg.Map.Disabled == false
 	}
 	if p.ReopenSightings {
 		p.ReopenSightingsInterval = time.Duration(cfg.ReopenSightingsInterval) * time.Second

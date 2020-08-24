@@ -250,7 +250,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	if cfg.MapSettings.Enabled {
+	if cfg.MapSettings != nil && cfg.MapSettings.Disabled == false {
 		historyFiles := tracker.DefaultHistoryFileCount
 		if cfg.MapSettings.HistoryCount != 0 {
 			historyFiles = cfg.MapSettings.HistoryCount
@@ -259,13 +259,22 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		if err != nil {
 			return err
 		}
-		err = m.RegisterMapService(dump1090.NewDump1090Map(m))
-		if err != nil {
-			return err
+		mapsToUse := tracker.DefaultMapServices
+		if cfg.MapSettings.Services != nil {
+			mapsToUse = cfg.MapSettings.Services
 		}
-		err = m.RegisterMapService(tar1090.NewTar1090Map(m, historyFiles))
-		if err != nil {
-			return err
+		for _, mapService := range mapsToUse {
+			switch mapService {
+			case tracker.Dump1090MapService:
+				err = m.RegisterMapService(dump1090.NewDump1090Map(m))
+			case tracker.Tar1090MapService:
+				err = m.RegisterMapService(tar1090.NewTar1090Map(m, historyFiles))
+			default:
+				return errors.New("unsupported map service: " + mapService)
+			}
+			if err != nil {
+				return errors.Wrapf(err, "registering map service (%s)", mapService)
+			}
 		}
 		err = t.RegisterProjectStatusListener(tracker.NewMapProjectStatusListener(m))
 		if err != nil {
