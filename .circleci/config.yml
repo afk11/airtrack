@@ -1,5 +1,21 @@
 version: 2 # use CircleCI 2.0
 jobs: # basic units of work in a run
+  docs:
+    docker:
+      - image: circleci/golang:1.15
+    steps:
+      - checkout
+
+      - run:
+          name: "Test Markdown Files"
+          command: |
+            wget https://github.com/felicianotech/md-proofer/releases/download/v0.1.0/md-proofer-v0.1.0-linux-amd64.tar.gz
+            tar xfz md-proofer-v*.tar.gz
+            sudo chmod +x ./md-proofer
+            echo "Test Airtrack documentation Markdown files"
+            echo "===================================================================================="
+            ./md-proofer lint docs/
+
   build: # runs not using Workflows must have a `build` job as entry point
     docker: # run the steps with Docker
       # CircleCI Go images available at: https://hub.docker.com/r/circleci/golang/
@@ -31,3 +47,4 @@ workflows:
   build-workflow:
     jobs:
       - build
+      - docs
