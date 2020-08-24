@@ -251,7 +251,7 @@ type AircraftMap struct {
 
 // NewAircraftMap initializes a new AircraftMap using
 // configuration
-func NewAircraftMap(cfg config.MapSettings) (*AircraftMap, error) {
+func NewAircraftMap(cfg *config.MapSettings) (*AircraftMap, error) {
 	m := &AircraftMap{
 		ac:              make(map[string]*JsonAircraft),
 		projects:        make(map[string]*projectState),
@@ -294,6 +294,9 @@ func (m *AircraftMap) RegisterMapService(services ...MapService) error {
 func (m *AircraftMap) registerProject(p *Project) error {
 	m.projMu.Lock()
 	defer m.projMu.Unlock()
+	if !p.ShouldMap {
+		return nil
+	}
 	if _, ok := m.projects[p.Name]; ok {
 		return errors.New("duplicate project")
 	}
@@ -307,6 +310,9 @@ func (m *AircraftMap) registerProject(p *Project) error {
 // deregisterProject deletes a project and dereferences
 // each aircraft.
 func (m *AircraftMap) deregisterProject(p *Project) error {
+	if !p.ShouldMap {
+		return nil
+	}
 	m.projMu.Lock()
 	defer m.projMu.Unlock()
 	m.acMu.Lock()
@@ -342,6 +348,9 @@ func (m *AircraftMap) dereferenceAircraft(icao string) bool {
 // projectNewAircraft associates a new aircraft with
 // an existing project.
 func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
+	if !p.ShouldMap {
+		return nil
+	}
 	m.projMu.RLock()
 	defer m.projMu.RUnlock()
 
@@ -371,6 +380,9 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 // projectUpdateAircraft updates the json aircraft record
 // with the current aircraft state
 func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
+	if !p.ShouldMap {
+		return nil
+	}
 	m.acMu.RLock()
 	defer m.acMu.RUnlock()
 
@@ -386,6 +398,34 @@ func (m *AircraftMap) projectUpdatedAircraft(p *Project, s *Sighting) error {
 	}
 	acRecord.UpdateWithState(&s.State)
 	atomic.AddInt64(&m.messages, 1)
+	return nil
+}
+
+// projectLostAircraft disassociates an aircraft from a project
+// (and dereferences it)
+func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
+	if !p.ShouldMap {
+		return nil
+	}
+	m.projMu.RLock()
+	defer m.projMu.RUnlock()
+
+	projRecord := m.projects[p.Name]
+	projRecord.Lock()
+	numAc := int64(len(projRecord.aircraft))
+	var toDelete int64 = -1
+	for i := int64(0); i < numAc && toDelete == -1; i++ {
+		if projRecord.aircraft[i] == s.State.Icao {
+			toDelete = i
+		}
+	}
+	projRecord.aircraft = append(projRecord.aircraft[:toDelete], projRecord.aircraft[toDelete+1:]...)
+	projRecord.Unlock()
+
+	// m.ac write
+	m.acMu.Lock()
+	m.dereferenceAircraft(s.State.Icao)
+	m.acMu.Unlock()
 	return nil
 }
 
@@ -420,31 +460,6 @@ func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*Js
 	if err != nil {
 		return err
 	}
-	return nil
-}
-
-// projectLostAircraft disassociates an aircraft from a project
-// (and dereferences it)
-func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
-	m.projMu.RLock()
-	defer m.projMu.RUnlock()
-
-	projRecord := m.projects[p.Name]
-	projRecord.Lock()
-	numAc := int64(len(projRecord.aircraft))
-	var toDelete int64 = -1
-	for i := int64(0); i < numAc && toDelete == -1; i++ {
-		if projRecord.aircraft[i] == s.State.Icao {
-			toDelete = i
-		}
-	}
-	projRecord.aircraft = append(projRecord.aircraft[:toDelete], projRecord.aircraft[toDelete+1:]...)
-	projRecord.Unlock()
-
-	// m.ac write
-	m.acMu.Lock()
-	m.dereferenceAircraft(s.State.Icao)
-	m.acMu.Unlock()
 	return nil
 }
 

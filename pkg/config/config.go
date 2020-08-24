@@ -53,12 +53,13 @@ type (
 	// aircraft maps
 	MapSettings struct {
 		// Toggles whether map is enabled (default FALSE)
-		Enabled bool `yaml:"enabled"`
+		Disabled bool `yaml:"enabled"`
 		// HistoryInterval - number of seconds between new history files
+		// (default: 30 seconds)
 		HistoryInterval int64 `yaml:"history_interval"`
 		// HistoryCount worth of history files will be kept. (default: 60)
 		HistoryCount int `yaml:"history_count"`
-		// Map interfaces to expose (default: dump1090 if none set)
+		// Map interfaces to expose (default: dump1090 + tar1090)
 		Services []string `yaml:"services"`
 		// Address webserver should listen on.
 		Address string `yaml:"address"`
@@ -82,19 +83,25 @@ type (
 		Enabled []string `yaml:"events"`
 	}
 
-	ProjectMap struct {
-		Enabled bool `yaml:"enabled"`
+	// ProjectMapSettings contains project level configuration
+	// for the HTTP map UI
+	ProjectMapSettings struct {
+		// Disabled controls whether this project's map shall be
+		// displayed on the HTTP map server. (default: false)
+		Disabled bool `yaml:"disabled"`
 	}
 
 	// Project contains configuration for a single project
 	Project struct {
 		// Name - the name of the project (required)
 		Name string
-		//
+		// Disabled controls whether the project should be running or not
+		// this session. (default: false)
 		Disabled bool `yaml:"disabled"`
 		// Filter - an optional filter to apply to incoming messages
 		Filter string
-		Map    ProjectMap `yaml:"map"`
+		// Map contains project level configuration for the map UI
+		Map *ProjectMapSettings `yaml:"map"`
 		// Notifications - per project configuration of event notifications
 		Notifications *Notifications `yaml:"notifications"`
 		// Features - per project extra features
@@ -151,7 +158,7 @@ type (
 		EmailSettings *EmailSettings `yaml:"email"`
 		Database      Database       `yaml:"database"`
 		Metrics       *Metrics       `yaml:"metrics"`
-		MapSettings   MapSettings    `yaml:"map"`
+		MapSettings   *MapSettings   `yaml:"map"`
 		Sighting      struct {
 			Timeout *int64 `yaml:"timeout"`
 		} `yaml:"sighting"`
