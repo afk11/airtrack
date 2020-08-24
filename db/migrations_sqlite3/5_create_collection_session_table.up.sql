@@ -8,4 +8,4 @@ create table `collection_session` (
     `deleted_at` timestamp null
                                   );
 
-create unique index closed_at on collection_session(`collection_site_id`);
+create index closed_at on collection_session(`collection_site_id`);
