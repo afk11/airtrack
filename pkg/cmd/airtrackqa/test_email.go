@@ -29,9 +29,9 @@ func (e *TestEmail) Run(ctx *Context) error {
 	}
 	cfg := ctx.Config
 
-	loc, err := time.LoadLocation(cfg.TimeZone)
+	loc, err := cfg.GetTimeLocation()
 	if err != nil {
-		return errors.Wrapf(err, "invalid timezone %s", ctx.Config.TimeZone)
+		return err
 	}
 
 	dbUrl, err := cfg.Database.DataSource(loc)
