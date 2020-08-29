@@ -49,6 +49,7 @@ to `true`.
     project with the `aircraft` record. The `sighting` record is attached to the `ProjectObservation`
     allowing the project to associate tracking information with it's `sighting` in the database. This is
     referred to opening a sighting.
+
  3. Compare our `ProjectObservation` copy of data with the `State` object, to see if any data has been
     changed. In this phase, we check for enabled features, and save any relevant flight information to our
     database. It can also result in some event notifications being triggered. If so, and the project
