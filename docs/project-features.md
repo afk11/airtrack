@@ -67,7 +67,13 @@ notifications to be produced.
 
 ## track_takeoff
 
-monitor for aircraft in the takeoff state (only in logs currently)
+Enabling `track_takeoff` doesn't change what is tracked currently, although takeoff event notifications
+are not emitted unless this feature is enabled.
 
 ## geocode_endpoints
-reverse location lookup sighting origin and destination positions (only in logs currently)
+
+`geocode_endpoints` causes airtrack to try and determine the `origin` airport when the aircraft sighting
+opens, and to determine the `destination` airport when the sighting closes. The aircraft must be within a
+certain distance and altitude for the result to be accepted.
+
+The locations are not saved currently but are included in some event notifications.
