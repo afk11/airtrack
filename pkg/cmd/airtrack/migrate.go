@@ -120,7 +120,11 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 	var err error
 	switch dbConf.Driver {
 	case config.DatabaseDriverMySQL:
-		db, err = sql.Open("mysql", dbConf.NetworkDatabaseUrl(loc))
+		u, err := dbConf.NetworkDatabaseUrl(loc)
+		if err != nil {
+			return nil, err
+		}
+		db, err = sql.Open("mysql", u)
 		if err != nil {
 			return nil, err
 		}
@@ -137,7 +141,11 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 			return nil, err
 		}
 	case config.DatabaseDriverSqlite3:
-		db, err = sql.Open("sqlite3", dbConf.Sqlite3Url(loc))
+		u, err := dbConf.Sqlite3Url(loc)
+		if err != nil {
+			return nil, err
+		}
+		db, err = sql.Open("sqlite3", u)
 		if err != nil {
 			return nil, err
 		}

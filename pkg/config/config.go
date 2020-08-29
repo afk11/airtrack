@@ -53,7 +53,7 @@ type (
 	// aircraft maps
 	MapSettings struct {
 		// Toggles whether map is enabled (default FALSE)
-		Disabled bool `yaml:"enabled"`
+		Disabled bool `yaml:"disabled"`
 		// HistoryInterval - number of seconds between new history files
 		// (default: 30 seconds)
 		HistoryInterval int64 `yaml:"history_interval"`
@@ -94,7 +94,7 @@ type (
 	// Project contains configuration for a single project
 	Project struct {
 		// Name - the name of the project (required)
-		Name string
+		Name string `yaml:"name"`
 		// Disabled controls whether the project should be running or not
 		// this session. (default: false)
 		Disabled bool `yaml:"disabled"`
@@ -110,7 +110,7 @@ type (
 		// if a new sighting is within a certain timeframe
 		ReopenSightings bool `yaml:"reopen_sightings"`
 		// ReopenSightingsInterval - How long after an aircraft goes out of range
-		// before we no longer reopen a recently closed session
+		// before we no longer reopen a recently closed session. Default 5m.
 		ReopenSightingsInterval int `yaml:"reopen_sightings_interval"`
 		// OnGroundUpdateThreshold - how many on_ground messages before we propagate
 		// the change in status
@@ -175,20 +175,26 @@ func (d *Database) DataSource(loc *time.Location) (string, error) {
 	case "":
 		return "", errors.New("no database driver configured")
 	case DatabaseDriverMySQL, DatabaseDriverPostgresql:
-		return d.NetworkDatabaseUrl(loc), nil
+		return d.NetworkDatabaseUrl(loc)
 	case DatabaseDriverSqlite3:
-		return d.Sqlite3Url(loc), nil
+		return d.Sqlite3Url(loc)
 	default:
 		return "", errors.Errorf("unsupported database driver `%s`", d.Driver)
 	}
 }
-func (d *Database) NetworkDatabaseUrl(location *time.Location) string {
+func (d *Database) NetworkDatabaseUrl(location *time.Location) (string, error) {
+	if d.Database == "" {
+		return "", errors.New("database cannot be empty")
+	}
 	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
-		d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(location.String()))
+		d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(location.String())), nil
 }
-func (d *Database) Sqlite3Url(location *time.Location) string {
+func (d *Database) Sqlite3Url(location *time.Location) (string, error) {
+	if (d.Database == "") {
+		return "", errors.New("database filesystem path cannot be empty")
+	}
 	return fmt.Sprintf("file:%s?parseTime=true&loc=%s",
-		d.Database, url.PathEscape(location.String()))
+		d.Database, url.PathEscape(location.String())), nil
 }
 
 // ReadConfigFromFile will read `filepath` and attempt to parse into
