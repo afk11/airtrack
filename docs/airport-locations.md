@@ -10,11 +10,12 @@ loading airport locations from files in openaip `aip` format[^1], or SeeYou `cup
 
 ## openAIP
 
-A community backed source for airport information is [openAIP](http://openaip.net). The files
-can be downloaded from the `Airport Files` section at [this location](http://www.openaip.net/downloads)
+[openAIP](http://openaip.net) is an open, community-driven source for airport information.
+Registration is required in order to download, but it's free. The files are available for download
+from the `Airport Files` section of [this webpage](http://www.openaip.net/downloads).
 
 openAIP is a great resource as they have files for most countries. If you notice something missing
-from your countries airport file, please add it on openAIP so it can be added to the files.
+from your countries airport file, please add it on openAIP.
 
 ## Custom airport lists
 
