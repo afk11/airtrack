@@ -5,14 +5,28 @@ title: Project event notifications
 Each project may define a list of events which if they arise will trigger an email notification.
 
 The list of supported events and their description:
+ * (takeoff_start)[#takeoff_start]
+ * (takeoff_complete)[#takeoff_complete]
+ * (spotted_in_flight)[#spotted_in_flight]
+ * (map_produced)[#map_produced]
 
-<dl>
-<dt>takeoff_start</dt>
-<dd>Triggered when a takeoff first begins.</dd>
-<dt>takeoff_complete</dt>
-<dd>Triggered when a takeoff is complete.</dd>
-<dt>spotted_in_flight</dt>
-<dd>Triggered when a sighting is opened. The message includes the time/location/ICAO/callsign.</dd>
-<dt>map_produced</dt>
-<dd>Triggered when a sighting closes if a map was created. The message contains the initial and final time and location, and has the Google Earth KML file attached.</dd>
-</dl>
+## takeoff_start
+
+This event is triggered when a takeoff first begins. This signal comes from the aircrafts `State.IsOnGround`
+field changes from `true` to `false`. Internally, this sets the `IsInTakeoff` `SightingTag`.
+
+## takeoff_complete
+
+This event is triggered when a takeoff is finished. This event can only be produced if the `takeoff_start`
+event was encountered, as it relies on the `IsInTakeoff` `SightingTag`. The actual signal comes from
+the vertical rate finally being set to zero, if and only if the `IsInTakeoff` `SightingTag` is `true`.
+
+## spotted_in_flight
+
+This event gets triggered when an aircraft sighting is first opened.
+
+## map_produced
+
+This event gets triggered when an aircraft sighting closes, if a KML was produced.
+
+**Note** this event requires the `track_kml` feature to be enabled.
