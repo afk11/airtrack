@@ -1,8 +1,4 @@
 timezone: UTC
-encryption:
-  # Application encryption key: base64(random_bytes(32))
-  # dd if=/dev/random bs=32 count=1 2>/dev/null | base64
-  key: G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=
 adsbx:
   # URL for ADSB Exchange. Not required unless you have
   # a local cache of the API

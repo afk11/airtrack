@@ -2,8 +2,6 @@ package mailer
 
 import (
 	"context"
-	"crypto/cipher"
-	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -12,7 +10,6 @@ import (
 	"github.com/afk11/mail"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"io"
 	"strings"
 	"sync"
 	"time"
@@ -25,10 +22,8 @@ type MailSender interface {
 type Mailer struct {
 	database  db.Database
 	from      string
-	key       []byte
 	dialer    *mail.Dialer
 	queued    []db.EmailJob
-	aesgcm    cipher.AEAD
 	canceller func()
 	mu        sync.RWMutex
 	wg        sync.WaitGroup
@@ -40,7 +35,7 @@ func (m *Mailer) Queue(msg db.EmailJob) error {
 	m.queued = append(m.queued, msg)
 	return nil
 }
-func encodeJob(aes cipher.AEAD, job *db.EmailJob) ([]byte, error) {
+func encodeJob(job *db.EmailJob) ([]byte, error) {
 	// make json
 	raw, err := json.Marshal(job)
 	if err != nil {
@@ -51,28 +46,9 @@ func encodeJob(aes cipher.AEAD, job *db.EmailJob) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "zlib decode email")
 	}
-	// encrypt
-	// Never use more than 2^32 random nonces with a given key because of the risk of a repeat.
-	nonce := make([]byte, aes.NonceSize())
-	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, err
-	}
-	ciphertext := aes.Seal(nil, nonce, compressed, nil)
-	ciphertext = append(ciphertext, nonce...)
-	return ciphertext, nil
+	return compressed, nil
 }
-func decodeJob(aes cipher.AEAD, jobBytes []byte) (db.EmailJob, error) {
-	ctLen := len(jobBytes)
-	if ctLen < aes.NonceSize() {
-		return db.EmailJob{}, errors.New("ciphertext too small")
-	}
-	// decrypt
-	nonce := jobBytes[ctLen-aes.NonceSize():]
-	ct := jobBytes[0 : ctLen-aes.NonceSize()]
-	compressed, err := aes.Open(nil, nonce, ct, nil)
-	if err != nil {
-		return db.EmailJob{}, err
-	}
+func decodeJob(compressed []byte) (db.EmailJob, error) {
 	// decompress
 	raw, err := zlib.Decode(compressed)
 	if err != nil {
@@ -89,7 +65,7 @@ func decodeJob(aes cipher.AEAD, jobBytes []byte) (db.EmailJob, error) {
 func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
 	return m.database.Transaction(func(tx *sql.Tx) error {
 		for _, job := range queued {
-			ciphertext, err := encodeJob(m.aesgcm, &job)
+			ciphertext, err := encodeJob(&job)
 			if err != nil {
 				return err
 			}
@@ -143,7 +119,7 @@ func (m *Mailer) processMails() error {
 
 	jobs := make([]db.EmailJob, 0, len(records))
 	for _, record := range records {
-		job, err := decodeJob(m.aesgcm, record.Job)
+		job, err := decodeJob(record.Job)
 		if err != nil {
 			return errors.Wrapf(err, "decoding job")
 		}
@@ -151,7 +127,6 @@ func (m *Mailer) processMails() error {
 	}
 
 	if len(jobs) > 0 {
-
 		sendCloser, err := m.dialer.Dial()
 		if err != nil {
 			log.Warnf("failed to connect to SMTP server: %s", err.Error())
@@ -254,12 +229,11 @@ func (m *Mailer) Stop() {
 		panic(err)
 	}
 }
-func NewMailer(database db.Database, from string, dialer *mail.Dialer, aesgcm cipher.AEAD) *Mailer {
+func NewMailer(database db.Database, from string, dialer *mail.Dialer) *Mailer {
 	return &Mailer{
 		database: database,
 		dialer:   dialer,
 		from:     from,
-		aesgcm:   aesgcm,
 		queued:   make([]db.EmailJob, 0),
 	}
 }

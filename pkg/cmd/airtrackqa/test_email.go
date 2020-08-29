@@ -1,9 +1,6 @@
 package airtrackqa
 
 import (
-	"crypto/aes"
-	"crypto/cipher"
-	"encoding/base64"
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/airtrack/pkg/email"
 	"github.com/afk11/airtrack/pkg/kml"
@@ -31,22 +28,6 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return errors.New("missing sighting id")
 	}
 	cfg := ctx.Config
-	key, err := base64.StdEncoding.DecodeString(cfg.Encryption.Key)
-	if err != nil {
-		return errors.Wrap(err, "decoding encryption.key base64")
-	} else if len(key) != 32 {
-		return errors.New("encryption.key should be base64 encoding of 32 random bytes")
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return err
-	}
 
 	loc, err := time.LoadLocation(cfg.TimeZone)
 	if err != nil {
@@ -68,7 +49,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 	if settings.MandatoryStartTLS {
 		dialer.StartTLSPolicy = mail.MandatoryStartTLS
 	}
-	m := mailer.NewMailer(database, settings.Sender, dialer, aesgcm)
+	m := mailer.NewMailer(database, settings.Sender, dialer)
 	m.Start()
 	defer m.Stop()
 	tpls, err := email.LoadMailTemplates(email.GetTemplates()...)

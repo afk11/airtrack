@@ -2,9 +2,6 @@ package airtrack
 
 import (
 	"bytes"
-	"crypto/aes"
-	"crypto/cipher"
-	"encoding/base64"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/aircraft/ccode"
 	asset "github.com/afk11/airtrack/pkg/assets"
@@ -93,28 +90,6 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		opt.SightingTimeout = time.Second * time.Duration(*cfg.Sighting.Timeout)
 	}
 
-	if cfg.Encryption.Key == "" {
-		return errors.New("encryption.key not set or empty")
-		//return errors.Wrap(err, "")
-	}
-
-	key, err := base64.StdEncoding.DecodeString(cfg.Encryption.Key)
-	if err != nil {
-		return errors.Wrap(err, "decoding encryption.key base64")
-	} else if len(key) != 32 {
-		return errors.New("encryption.key should be base64 encoding of 32 random bytes")
-	}
-
-	block, err := aes.NewCipher(key)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	aesgcm, err := cipher.NewGCM(block)
-	if err != nil {
-		return err
-	}
-
 	if cfg.EmailSettings != nil {
 		switch cfg.EmailSettings.Driver {
 		case config.MailDriverSmtp:
@@ -138,7 +113,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 				dialer.StartTLSPolicy = smtp.OpportunisticStartTLS
 			}
 			dialer.Timeout = time.Second * 30
-			m := mailer.NewMailer(database, settings.Sender, dialer, aesgcm)
+			m := mailer.NewMailer(database, settings.Sender, dialer)
 			m.Start()
 			opt.Mailer = m
 			defer func() {
