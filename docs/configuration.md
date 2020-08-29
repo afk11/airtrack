@@ -37,9 +37,6 @@ The `--config` command line option specifies the main configuration file.
 # Local time zone
 timezone: <string>
 
-# Encryption configuration settings
-encryption: <encryption_config>
-
 # Configuration for ADSBExchange API
 adsbx: <adsbexchange_config>
 
@@ -69,15 +66,6 @@ only configuration files.
 # Project configurations
 projects:
 [ - <project_config> | default = none ]
-```
-
-### `<encryption_config>`
-Encryption configuration.. REMOVE after removing feature
-
-```yaml
-# Application encryption key: base64(random_bytes(32))
-# dd if=/dev/random bs=32 count=1 2>/dev/null | base64
-key: <secret>
 ```
 
 ### `<adsbexchange_config>`

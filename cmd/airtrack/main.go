@@ -11,7 +11,6 @@ var cli struct {
 	Projects []string `help:"Projects configuration file (may be repeated, and in addition to main configuration file)"`
 
 	Track       airtrack.TrackCmd    `cmd help:"Track aircraft"`
-	GenerateKey airtrack.GenerateKey `cmd help:"Generate an application encryption key"`
 
 	Migrate struct {
 		Up    airtrack.MigrateUpCmd    `cmd help:"Migrate to latest database migration"`

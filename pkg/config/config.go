@@ -138,10 +138,6 @@ type (
 		Port    int  `yaml:"port"`
 	}
 
-	Encryption struct {
-		Key string `yaml:"key"`
-	}
-
 	AdsbxConfig struct {
 		// Custom ADSB Exchange URL (not required, but useful if
 		// you've a proxy setup)
@@ -152,7 +148,6 @@ type (
 
 	Config struct {
 		TimeZone      string         `yaml:"timezone"`
-		Encryption    Encryption     `yaml:"encryption"`
 		AdsbxConfig   AdsbxConfig    `yaml:"adsbx"`
 		Airports      Airports       `yaml:"airports"`
 		EmailSettings *EmailSettings `yaml:"email"`
