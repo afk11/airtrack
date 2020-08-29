@@ -1,5 +1,4 @@
 syntax = "proto3";
-
 package airtrack;
 option go_package = "github.com/afk11/airtrack/pkg/pb";
 
@@ -10,7 +9,7 @@ message Source {
 };
 message Message {
   Source Source = 1;
-
+  // 6 character hex identifier for aircraft
   string Icao = 10;
   string Squawk = 11;
   string CallSign = 12;
@@ -27,28 +26,39 @@ message Message {
   string GroundSpeed = 90;
 }
 message State {
+  // 6 character hex identifier for aircraft
   string Icao = 1;
 
   bool HaveAltitude = 10;
+  // Aircraft altitude in feet
   int64 Altitude = 11;
 
   bool HaveLocation = 20;
+  // Latitude
   double Latitude = 21;
+  // Longitude
   double Longitude = 22;
 
   bool HaveCallsign = 30;
+  // Callsign or flight identifier
   string CallSign = 31;
 
   bool HaveSquawk = 40;
+  // 4 digit octal number (as string)
   string Squawk = 41;
 
   bool HaveCountry = 50;
+  // Aircraft registration country determined by ICAO Country Allocation
+  // CountryCode is ISO3166 2 letter code
   string CountryCode = 51;
+  // Country is the long country name
   string Country = 52;
 
+  // IsOnGround tracks whether the aircraft is on ground or in the air.
   bool IsOnGround = 60;
 
   bool HaveVerticalRate = 70;
+  // VerticalRate is the change in vertical rate (+/-) in feet per minute
   int64 VerticalRate = 71;
 
   bool HaveTrack = 80;

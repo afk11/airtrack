@@ -2,6 +2,11 @@
 title: Project tracking features
 ---
 
+Each aircraft sighting leads to a record in the `sighting` table.
+
+At minimum, the sighting refers to the `aircraft` record and tracks
+the sightings `created_at` and `closed_at` time.
+
 The list of supported features and their description:
 
 <dl>
