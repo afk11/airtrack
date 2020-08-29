@@ -1,3 +1,24 @@
+---
+title: Project filter
+---
+
+# Project filters
+
+Filters allow us to make our tracking project focused on certain aircraft or conditions.
+
+Filters are simple expressions which are evaluated on incoming messages. If the expression
+returns false, the project ignores the message.
+
+Airtrack uses [Googles CEL - Common Expression Language](https://github.com/google/cel-spec/blob/master/doc/langdef.md)
+for writing, parsing, and evaluation expressions. For an introduction to CEL, [see this guide](https://github.com/google/cel-spec/blob/master/doc/intro.md)
+
+The expressions have access to the current state of the aircraft, and the incoming
+message.
+ * `state` - the State message for this aircraft
+ * `m` - the new Message
+
+The definition for these structures is here:
+```proto
 syntax = "proto3";
 package airtrack;
 option go_package = "github.com/afk11/airtrack/pkg/pb";
@@ -67,3 +88,23 @@ message State {
   bool HaveGroundSpeed = 90;
   double GroundSpeed = 91;
 }
+```
+
+## Example Filters
+
+We can detect the Google WIFI balloons based their altitude. An expression to track only aircraft above 50000ft:
+
+    state.Altitude > 50000
+
+Using the state.CountryCode field, we can focus on aircraft from a certain country:
+
+    state.CountryCode == "US"
+
+Simple expressions above can be combined with the logical AND operator (`&&`) to restrict sightings to aircraft from the United States above 50000ft
+
+    state.CountryCode == "US" && state.Altitude > 50000
+
+If we wanted to include balloons from Russia and Norway we can use the logical OR operator (`||`)
+
+    (state.CountryCode == "US" || state.CountryCode == "RU" ||
+         state.CountryCode == "NO") && state.Altitude > 50000

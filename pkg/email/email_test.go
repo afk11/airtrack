@@ -8,16 +8,19 @@ import (
 
 func TestGetTemplates(t *testing.T) {
 	tpl := GetTemplates()
-	assert.Equal(t, 2, len(tpl))
+	assert.Equal(t, 5, len(tpl))
 	assert.Equal(t, MapProducedEmail, tpl[0])
 	assert.Equal(t, SpottedInFlight, tpl[1])
+	assert.Equal(t, TakeoffUnknownAirport, tpl[2])
+	assert.Equal(t, TakeoffFromAirport, tpl[3])
+	assert.Equal(t, TakeoffComplete, tpl[4])
 }
 
 func TestLoadMailTemplates(t *testing.T) {
 	t.Run("defaults", func(t *testing.T) {
 		tpls, err := LoadMailTemplates(GetTemplates()...)
 		assert.NoError(t, err)
-		assert.Equal(t, 2, len(tpls.m))
+		assert.Equal(t, 5, len(tpls.m))
 		mapProduced, err := tpls.Get(MapProducedEmail)
 		assert.NoError(t, err)
 		assert.NotNil(t, mapProduced)

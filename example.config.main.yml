@@ -4,7 +4,9 @@ encryption:
   # dd if=/dev/random bs=32 count=1 2>/dev/null | base64
   key: G7ZgLnbGr9YVI+w+rHEhs2MDtVxLI68AqMWv+9dl0zk=
 adsbx:
-  #  url: http://proxy.localhost:8080/api/aircraft/json/
+  # URL for ADSB Exchange. Not required unless you have
+  # a local cache of the API
+  # url: http://proxy.localhost:8080/api/aircraft/json/
   apikey: ADSBX API KEY
 airports:
   # Directories containing OpenAIP files for airport geocoding.
@@ -19,15 +21,15 @@ email:
   # Notifications driver. Currently only smtp is supported
   driver: "smtp"
   smtp:
-    # sender email address
+    # Sender email address
     sender: sender@domain.local
-    # smtp username
+    # SMTP username
     username: sender@domain.local
-    # smtp password
+    # SMTP password
     password: YOUR PASSWORD
-    # the SMTP server's hostname/ip
+    # The SMTP server's hostname/ip
     host: SMTP HOST
-    # the SMTP server port
+    # The SMTP server port
     port: SMTP PORT
     # whether to connect using TLS (port 587)
     tls: false
@@ -64,6 +66,25 @@ metrics:
   enabled: false
   # Exposed HTTP metrics on this port
   port: 9206
+# Configuration for map HTTP server. This section
+# matches the defaults
+map:
+  # Interface the HTTP server will listen on
+  host: 0.0.0.0
+  # Port for the HTTP server. Default is 8080
+  port: 8080
+  # Disable map server. Default is false.
+  disabled: false
+  # Number of seconds before creating a new history file. Default
+  # is every 30 seconds.
+  history_interval: 30
+  # Number of history files to maintain. Default is to
+  # store 60 files. Defaults should store 30 minutes of history files.
+  history_count: 60
+  # The map layouts to provide. Essentially different map skins.
+  services:
+    - dump1090
+    - tar1090
 projects:
   # Sample project configuration
   - name: German aircraft
@@ -82,7 +103,7 @@ projects:
         - spotted_in_flight
         - takeoff_start
         - takeoff_complete
-    # List of enabled project features
+    # List of features enabled for the project
     features:
       - track_tx_types
       - track_callsigns

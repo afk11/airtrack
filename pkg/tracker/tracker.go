@@ -810,41 +810,81 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	if s.Tags.IsInTakeoff != observation.tags.IsInTakeoff {
 		observation.tags.IsInTakeoff = s.Tags.IsInTakeoff
 		if project.IsFeatureEnabled(TrackTakeoff) {
+			geocodeOK := observation.origin != nil && observation.origin.ok
 			if observation.tags.IsInTakeoff {
-				if project.IsEmailNotificationEnabled(TakeoffStart) {
-					// takeoff begin
-				}
 				log.Infof("[session %d] %s: has begun takeoff",
 					project.Session.Id, s.State.Icao)
-				if observation.origin != nil {
-					if !observation.origin.ok && project.IsEmailNotificationEnabled(TakeoffUnknownAirport) {
-						// didn't geocode origin airport
-						log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, TakeoffUnknownAirport)
-						msg, err := email.PrepareTakeoffUnknownAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffUnknownAirportParams{
-							Project:      project.Name,
-							Icao:         s.State.Icao,
-							CallSign:     s.State.CallSign,
-							StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
-							StartLocation: email.Location{
-								Latitude:  s.State.Latitude,
-								Longitude: s.State.Longitude,
-							},
-						})
-						if err != nil {
-							return err
-						}
-						err = t.opt.Mailer.Queue(*msg)
-						if err != nil {
-							return nil
-						}
+				if geocodeOK && project.IsEmailNotificationEnabled(TakeoffStart) {
+					// takeoff start
+					log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, TakeoffStart)
+					msg, err := email.PrepareTakeoffFromAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffParams{
+						Project:      project.Name,
+						Icao:         s.State.Icao,
+						CallSign:     s.State.CallSign,
+						AirportName:  observation.origin.address,
+						StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+						StartLocation: email.Location{
+							Latitude:  s.State.Latitude,
+							Longitude: s.State.Longitude,
+						},
+					})
+					if err != nil {
+						return err
+					}
+					err = t.opt.Mailer.Queue(*msg)
+					if err != nil {
+						return nil
+					}
+				} else if !geocodeOK && project.IsEmailNotificationEnabled(TakeoffUnknownAirport) {
+					// didn't geocode origin airport
+					log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, TakeoffUnknownAirport)
+					msg, err := email.PrepareTakeoffUnknownAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffUnknownAirportParams{
+						Project:      project.Name,
+						Icao:         s.State.Icao,
+						CallSign:     s.State.CallSign,
+						StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+						StartLocation: email.Location{
+							Latitude:  s.State.Latitude,
+							Longitude: s.State.Longitude,
+						},
+					})
+					if err != nil {
+						return err
+					}
+					err = t.opt.Mailer.Queue(*msg)
+					if err != nil {
+						return nil
 					}
 				}
 			} else {
-				if project.IsEmailNotificationEnabled(TakeoffComplete) {
-
-				}
 				log.Infof("[session %d] %s: has finished takeoff",
 					project.Session.Id, s.State.Icao)
+				if project.IsEmailNotificationEnabled(TakeoffComplete) {
+					// didn't geocode origin airport
+					log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, TakeoffComplete)
+					var airport string
+					if geocodeOK {
+						airport = observation.origin.address
+					}
+					msg, err := email.PrepareTakeoffComplete(t.mailTemplates, project.NotifyEmail, email.TakeoffCompleteParams{
+						Project:      project.Name,
+						Icao:         s.State.Icao,
+						CallSign:     s.State.CallSign,
+						StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+						AirportName:  airport,
+						StartLocation: email.Location{
+							Latitude:  s.State.Latitude,
+							Longitude: s.State.Longitude,
+						},
+					})
+					if err != nil {
+						return err
+					}
+					err = t.opt.Mailer.Queue(*msg)
+					if err != nil {
+						return nil
+					}
+				}
 			}
 		}
 	}
