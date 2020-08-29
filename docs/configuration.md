@@ -100,9 +100,7 @@ apikey: <secret>
 Airtrack can geolocate the takeoff and landing airport based user provided airport 
 files, supporting `aip` and `cup` formats.
 
-[openAIP](http://openaip.net) is a crowd sourced database of aeronautical information,
-and includes a worldwide database of airport locations in both `aip` and `cup` format. 
-Registration is free.
+[Click here for information about airport location files](airport-locations.html)
 
 ```yaml
 # List of directories containing aip files:
