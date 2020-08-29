@@ -190,7 +190,7 @@ func (d *Database) NetworkDatabaseUrl(location *time.Location) (string, error) {
 		d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(location.String())), nil
 }
 func (d *Database) Sqlite3Url(location *time.Location) (string, error) {
-	if (d.Database == "") {
+	if d.Database == "" {
 		return "", errors.New("database filesystem path cannot be empty")
 	}
 	return fmt.Sprintf("file:%s?parseTime=true&loc=%s",

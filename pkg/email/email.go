@@ -10,57 +10,87 @@ import (
 	"time"
 )
 
-type Email string
+var (
+	EmailNotFoundErr = errors.Errorf("email template not found")
+)
 
-func (e Email) String() string {
-	return string(e)
-}
+type (
+	Email string
+
+	Location struct {
+		Latitude  float64
+		Longitude float64
+		Altitude  int64
+	}
+	SpottedInFlightParameters struct {
+		Project       string
+		Icao          string
+		CallSign      string
+		StartTime     time.Time
+		StartTimeFmt  string
+		StartLocation Location
+	}
+	MapProducedParameters struct {
+		Project       string
+		Icao          string
+		CallSign      string
+		StartTime     time.Time
+		EndTime       time.Time
+		DurationFmt   string
+		StartTimeFmt  string
+		StartLocation Location
+		EndTimeFmt    string
+		EndLocation   Location
+		MapUpdated    bool
+	}
+	TakeoffParams struct {
+		Project       string
+		Icao          string
+		CallSign      string
+		AirportName   string
+		StartTimeFmt  string
+		StartLocation Location
+	}
+	TakeoffCompleteParams struct {
+		Project       string
+		Icao          string
+		CallSign      string
+		AirportName   string
+		StartTimeFmt  string
+		StartLocation Location
+	}
+	TakeoffUnknownAirportParams struct {
+		Project       string
+		Icao          string
+		CallSign      string
+		StartTimeFmt  string
+		StartLocation Location
+	}
+	MailTemplates struct {
+		m map[Email]*template.Template
+	}
+)
 
 const (
 	MapProducedEmail      Email = "assets/email/map_produced.tpl"
 	SpottedInFlight       Email = "assets/email/spotted_in_flight.tpl"
 	TakeoffUnknownAirport Email = "assets/email/takeoff_unknown_airport.tpl"
-)
-
-var (
-	EmailNotFoundErr = errors.Errorf("email template not found")
+	TakeoffFromAirport    Email = "assets/email/takeoff_from_airport.tpl"
+	TakeoffComplete       Email = "assets/email/takeoff_complete.tpl"
 )
 
 func GetTemplates() []Email {
 	return []Email{
 		MapProducedEmail,
 		SpottedInFlight,
+		TakeoffUnknownAirport,
+		TakeoffFromAirport,
+		TakeoffComplete,
 	}
 }
 
-type Location struct {
-	Latitude  float64
-	Longitude float64
-	Altitude  int64
-}
-type SpottedInFlightParameters struct {
-	Project       string
-	Icao          string
-	CallSign      string
-	StartTime     time.Time
-	StartTimeFmt  string
-	StartLocation Location
-}
-type MapProducedParameters struct {
-	Project       string
-	Icao          string
-	CallSign      string
-	StartTime     time.Time
-	EndTime       time.Time
-	DurationFmt   string
-	StartTimeFmt  string
-	StartLocation Location
-	EndTimeFmt    string
-	EndLocation   Location
-	MapUpdated    bool
-}
-type MailTemplates struct {
-	m map[Email]*template.Template
+func (e Email) String() string {
+	return string(e)
 }
 
 func (t *MailTemplates) Get(email Email) (*template.Template, error) {
@@ -70,6 +100,7 @@ func (t *MailTemplates) Get(email Email) (*template.Template, error) {
 	}
 	return tpl, nil
 }
+
 func LoadMailTemplates(templates ...Email) (*MailTemplates, error) {
 	m := MailTemplates{
 		m: make(map[Email]*template.Template),
@@ -88,14 +119,28 @@ func LoadMailTemplates(templates ...Email) (*MailTemplates, error) {
 	}
 	return &m, nil
 }
-func PrepareSpottedInFlightEmail(templates *MailTemplates, to string, params SpottedInFlightParameters) (*db.EmailJob, error) {
-	var callsign string
-	if params.CallSign != "" {
-		callsign = " (" + params.CallSign + ")"
+
+func buildEmail(templates *MailTemplates, email Email, to string, subject string, params interface{}) (*db.EmailJob, error) {
+	tpl, err := templates.Get(email)
+	if err != nil {
+		return nil, err
 	}
 
-	subject := fmt.Sprintf("[%s] %s%s: spotted in flight", params.Project, params.Icao, callsign)
-	tpl, err := templates.Get(SpottedInFlight)
+	var buf bytes.Buffer
+	err = tpl.Execute(&buf, params)
+	if err != nil {
+		return nil, err
+	}
+	job := &db.EmailJob{
+		To:      to,
+		Subject: subject,
+		Body:    buf.String(),
+	}
+	return job, nil
+}
+
+func buildEmailWithAttachment(templates *MailTemplates, email Email, to string, subject string, params interface{}, attachments []db.EmailAttachment) (*db.EmailJob, error) {
+	tpl, err := templates.Get(email)
 	if err != nil {
 		return nil, err
 	}
@@ -109,11 +154,21 @@ func PrepareSpottedInFlightEmail(templates *MailTemplates, to string, params Spo
 		To:          to,
 		Subject:     subject,
 		Body:        buf.String(),
-		Attachments: nil,
+		Attachments: attachments,
 	}
-
 	return job, nil
 }
+
+func PrepareSpottedInFlightEmail(templates *MailTemplates, to string, params SpottedInFlightParameters) (*db.EmailJob, error) {
+	var callsign string
+	if params.CallSign != "" {
+		callsign = " (" + params.CallSign + ")"
+	}
+
+	subject := fmt.Sprintf("[%s] %s%s: spotted in flight", params.Project, params.Icao, callsign)
+	return buildEmail(templates, SpottedInFlight, to, subject, params)
+}
+
 func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile string, params MapProducedParameters) (*db.EmailJob, error) {
 	action := "created"
 	var callsign string
@@ -125,39 +180,25 @@ func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile string
 	}
 
 	subject := fmt.Sprintf("[%s] %s%s: flight map %s", params.Project, params.Icao, callsign, action)
-
-	tpl, err := templates.Get(MapProducedEmail)
-	if err != nil {
-		return nil, err
-	}
-
-	var buf bytes.Buffer
-	err = tpl.Execute(&buf, params)
-	if err != nil {
-		return nil, err
-	}
-	job := &db.EmailJob{
-		To:      to,
-		Subject: subject,
-		Body:    buf.String(),
-		Attachments: []db.EmailAttachment{
-			{
-				Contents: kmlFile,
-				FileName: fmt.Sprintf("%s-%s.kml",
-					params.Icao, params.EndTimeFmt),
-				ContentType: "application/vnd.google-earth.kml+xml",
-			},
+	return buildEmailWithAttachment(templates, MapProducedEmail, to, subject, params, []db.EmailAttachment{
+		{
+			Contents: kmlFile,
+			FileName: fmt.Sprintf("%s-%s.kml",
+				params.Icao, params.EndTimeFmt),
+			ContentType: "application/vnd.google-earth.kml+xml",
 		},
-	}
-	return job, nil
+	})
 }
 
-type TakeoffUnknownAirportParams struct {
-	Project       string
-	Icao          string
-	CallSign      string
-	StartTimeFmt  string
-	StartLocation Location
+func PrepareTakeoffFromAirport(templates *MailTemplates, to string, params TakeoffParams) (*db.EmailJob, error) {
+	var callsign string
+	if params.CallSign != "" {
+		callsign = " (" + params.CallSign + ")"
+	}
+
+	subject := fmt.Sprintf("[%s] %s%s: takeoff from %s", params.Project, params.Icao, callsign, params.AirportName)
+
+	return buildEmail(templates, TakeoffFromAirport, to, subject, params)
 }
 
 func PrepareTakeoffUnknownAirport(templates *MailTemplates, to string, params TakeoffUnknownAirportParams) (*db.EmailJob, error) {
@@ -168,20 +209,16 @@ func PrepareTakeoffUnknownAirport(templates *MailTemplates, to string, params Ta
 
 	subject := fmt.Sprintf("[%s] %s%s: takeoff from unknown airport", params.Project, params.Icao, callsign)
 
-	tpl, err := templates.Get(TakeoffUnknownAirport)
-	if err != nil {
-		return nil, err
+	return buildEmail(templates, TakeoffUnknownAirport, to, subject, params)
+}
+
+func PrepareTakeoffComplete(templates *MailTemplates, to string, params TakeoffCompleteParams) (*db.EmailJob, error) {
+	var callsign string
+	if params.CallSign != "" {
+		callsign = " (" + params.CallSign + ")"
 	}
 
-	var buf bytes.Buffer
-	err = tpl.Execute(&buf, params)
-	if err != nil {
-		return nil, err
-	}
-	job := &db.EmailJob{
-		To:      to,
-		Subject: subject,
-		Body:    buf.String(),
-	}
-	return job, nil
+	subject := fmt.Sprintf("[%s] %s%s: takeoff complete", params.Project, params.Icao, callsign)
+
+	return buildEmail(templates, TakeoffComplete, to, subject, params)
 }

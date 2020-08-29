@@ -93,17 +93,18 @@ type Message struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Source       *Source `protobuf:"bytes,1,opt,name=Source,proto3" json:"Source,omitempty"`
-	Icao         string  `protobuf:"bytes,10,opt,name=Icao,proto3" json:"Icao,omitempty"`
-	Squawk       string  `protobuf:"bytes,11,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
-	CallSign     string  `protobuf:"bytes,12,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
-	Altitude     string  `protobuf:"bytes,13,opt,name=Altitude,proto3" json:"Altitude,omitempty"`
-	Latitude     string  `protobuf:"bytes,20,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
-	Longitude    string  `protobuf:"bytes,21,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
-	IsOnGround   bool    `protobuf:"varint,30,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
-	VerticalRate string  `protobuf:"bytes,40,opt,name=VerticalRate,proto3" json:"VerticalRate,omitempty"`
-	Track        string  `protobuf:"bytes,50,opt,name=Track,proto3" json:"Track,omitempty"`
-	GroundSpeed  string  `protobuf:"bytes,90,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
+	Source *Source `protobuf:"bytes,1,opt,name=Source,proto3" json:"Source,omitempty"`
+	// 6 character hex identifier for aircraft
+	Icao         string `protobuf:"bytes,10,opt,name=Icao,proto3" json:"Icao,omitempty"`
+	Squawk       string `protobuf:"bytes,11,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
+	CallSign     string `protobuf:"bytes,12,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
+	Altitude     string `protobuf:"bytes,13,opt,name=Altitude,proto3" json:"Altitude,omitempty"`
+	Latitude     string `protobuf:"bytes,20,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
+	Longitude    string `protobuf:"bytes,21,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
+	IsOnGround   bool   `protobuf:"varint,30,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
+	VerticalRate string `protobuf:"bytes,40,opt,name=VerticalRate,proto3" json:"VerticalRate,omitempty"`
+	Track        string `protobuf:"bytes,50,opt,name=Track,proto3" json:"Track,omitempty"`
+	GroundSpeed  string `protobuf:"bytes,90,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
 }
 
 func (x *Message) Reset() {
@@ -220,26 +221,37 @@ type State struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Icao             string  `protobuf:"bytes,1,opt,name=Icao,proto3" json:"Icao,omitempty"`
-	HaveAltitude     bool    `protobuf:"varint,10,opt,name=HaveAltitude,proto3" json:"HaveAltitude,omitempty"`
-	Altitude         int64   `protobuf:"varint,11,opt,name=Altitude,proto3" json:"Altitude,omitempty"`
-	HaveLocation     bool    `protobuf:"varint,20,opt,name=HaveLocation,proto3" json:"HaveLocation,omitempty"`
-	Latitude         float64 `protobuf:"fixed64,21,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
-	Longitude        float64 `protobuf:"fixed64,22,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
-	HaveCallsign     bool    `protobuf:"varint,30,opt,name=HaveCallsign,proto3" json:"HaveCallsign,omitempty"`
-	CallSign         string  `protobuf:"bytes,31,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
-	HaveSquawk       bool    `protobuf:"varint,40,opt,name=HaveSquawk,proto3" json:"HaveSquawk,omitempty"`
-	Squawk           string  `protobuf:"bytes,41,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
-	HaveCountry      bool    `protobuf:"varint,50,opt,name=HaveCountry,proto3" json:"HaveCountry,omitempty"`
-	CountryCode      string  `protobuf:"bytes,51,opt,name=CountryCode,proto3" json:"CountryCode,omitempty"`
-	Country          string  `protobuf:"bytes,52,opt,name=Country,proto3" json:"Country,omitempty"`
-	IsOnGround       bool    `protobuf:"varint,60,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
-	HaveVerticalRate bool    `protobuf:"varint,70,opt,name=HaveVerticalRate,proto3" json:"HaveVerticalRate,omitempty"`
-	VerticalRate     int64   `protobuf:"varint,71,opt,name=VerticalRate,proto3" json:"VerticalRate,omitempty"`
-	HaveTrack        bool    `protobuf:"varint,80,opt,name=HaveTrack,proto3" json:"HaveTrack,omitempty"`
-	Track            float64 `protobuf:"fixed64,81,opt,name=Track,proto3" json:"Track,omitempty"`
-	HaveGroundSpeed  bool    `protobuf:"varint,90,opt,name=HaveGroundSpeed,proto3" json:"HaveGroundSpeed,omitempty"`
-	GroundSpeed      float64 `protobuf:"fixed64,91,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
+	// 6 character hex identifier for aircraft
+	Icao         string `protobuf:"bytes,1,opt,name=Icao,proto3" json:"Icao,omitempty"`
+	HaveAltitude bool   `protobuf:"varint,10,opt,name=HaveAltitude,proto3" json:"HaveAltitude,omitempty"`
+	// Aircraft altitude in feet
+	Altitude     int64 `protobuf:"varint,11,opt,name=Altitude,proto3" json:"Altitude,omitempty"`
+	HaveLocation bool  `protobuf:"varint,20,opt,name=HaveLocation,proto3" json:"HaveLocation,omitempty"`
+	// Latitude
+	Latitude float64 `protobuf:"fixed64,21,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
+	// Longitude
+	Longitude    float64 `protobuf:"fixed64,22,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
+	HaveCallsign bool    `protobuf:"varint,30,opt,name=HaveCallsign,proto3" json:"HaveCallsign,omitempty"`
+	// Callsign or flight identifier
+	CallSign   string `protobuf:"bytes,31,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
+	HaveSquawk bool   `protobuf:"varint,40,opt,name=HaveSquawk,proto3" json:"HaveSquawk,omitempty"`
+	// 4 digit octal number (as string)
+	Squawk      string `protobuf:"bytes,41,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
+	HaveCountry bool   `protobuf:"varint,50,opt,name=HaveCountry,proto3" json:"HaveCountry,omitempty"`
+	// Aircraft registration country determined by ICAO Country Allocation
+	// CountryCode is ISO3166 2 letter code
+	CountryCode string `protobuf:"bytes,51,opt,name=CountryCode,proto3" json:"CountryCode,omitempty"`
+	// Country is the long country name
+	Country string `protobuf:"bytes,52,opt,name=Country,proto3" json:"Country,omitempty"`
+	// IsOnGround tracks whether the aircraft is on ground or in the air.
+	IsOnGround       bool `protobuf:"varint,60,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
+	HaveVerticalRate bool `protobuf:"varint,70,opt,name=HaveVerticalRate,proto3" json:"HaveVerticalRate,omitempty"`
+	// VerticalRate is the change in vertical rate (+/-) in feet per minute
+	VerticalRate    int64   `protobuf:"varint,71,opt,name=VerticalRate,proto3" json:"VerticalRate,omitempty"`
+	HaveTrack       bool    `protobuf:"varint,80,opt,name=HaveTrack,proto3" json:"HaveTrack,omitempty"`
+	Track           float64 `protobuf:"fixed64,81,opt,name=Track,proto3" json:"Track,omitempty"`
+	HaveGroundSpeed bool    `protobuf:"varint,90,opt,name=HaveGroundSpeed,proto3" json:"HaveGroundSpeed,omitempty"`
+	GroundSpeed     float64 `protobuf:"fixed64,91,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
 }
 
 func (x *State) Reset() {

@@ -66,6 +66,7 @@ table. The KML file is kept in `sighting_kml` and is associated with the `sighti
 notifications to be produced.
 
 ## track_takeoff
+
 monitor for aircraft in the takeoff state (only in logs currently)
 
 ## geocode_endpoints

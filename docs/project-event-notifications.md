@@ -15,6 +15,11 @@ The list of supported events and their description:
 This event is triggered when a takeoff first begins. This signal comes from the aircrafts `State.IsOnGround`
 field changes from `true` to `false`. Internally, this sets the `IsInTakeoff` `SightingTag`.
 
+## takeoff_unknown_airport
+
+This event is triggered when a takeoff first begins, but we failed to determine the nearest airport.
+The trigger and behaviour is the same as `takeoff_start`
+
 ## takeoff_complete
 
 This event is triggered when a takeoff is finished. This event can only be produced if the `takeoff_start`
