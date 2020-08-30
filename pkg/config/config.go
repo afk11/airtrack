@@ -21,6 +21,9 @@ const (
 type (
 	// Airports contains configuration for airport geolocation
 	Airports struct {
+		// DisableBuiltInAirports will prevent airtrack from loading
+		// compiled in airport files if set to `true`
+		DisableBuiltInAirports bool `yaml:"disable_builtin_airports"`
 		// OpenAIPDirectories defined here will be scanned for .aip files
 		OpenAIPDirectories []string `yaml:"openaip"`
 		// CupDirecories defined here will be scanned for .cup files
@@ -149,7 +152,7 @@ type (
 	Config struct {
 		TimeZone      string         `yaml:"timezone"`
 		AdsbxConfig   AdsbxConfig    `yaml:"adsbx"`
-		Airports      Airports       `yaml:"airports"`
+		Airports      *Airports       `yaml:"airports"`
 		EmailSettings *EmailSettings `yaml:"email"`
 		Database      Database       `yaml:"database"`
 		Metrics       *Metrics       `yaml:"metrics"`

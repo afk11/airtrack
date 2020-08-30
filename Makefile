@@ -19,12 +19,21 @@ build-bindata-tar1090: tar1090
 		go-bindata -pkg tar1090 -o ./pkg/tar1090/assets.go tar1090/...
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
-build-airtrack-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
+delete-build-dir:
+		rm -rf build/
+build-dir:
+		mkdir build/
+build-dir-airports: build-dir
+		mkdir build/airports/
+		go run ./contrib/refresh_airports.go ./resources/airports
+build-bindata-openaip: build-dir-airports
+		go-bindata -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
+build-airtrack-linux-amd64: delete-build-dir build-bindata-openaip build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
-build-airtrack-qa-linux-amd64: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
+build-airtrack-qa-linux-amd64: delete-build-dir build-bindata-openaip build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
-test: test-cleanup build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090
+test: build-bindata-openaip test-cleanup build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090
 	go test -coverprofile=./coverage/tests.out ./... \
 	$(TESTARGS)
 
