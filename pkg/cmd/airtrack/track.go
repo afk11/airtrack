@@ -59,9 +59,9 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	signal.Notify(gracefulReload, syscall.SIGHUP)
 
 	cfg := ctx.Config
-	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	loc, err := cfg.GetTimeLocation()
 	if err != nil {
-		return errors.Wrapf(err, "Invalid timezone `%s`", ctx.Config.TimeZone)
+		return err
 	}
 
 	dbUrl, err := cfg.Database.DataSource(loc)

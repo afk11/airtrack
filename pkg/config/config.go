@@ -147,7 +147,7 @@ type (
 	}
 
 	Config struct {
-		TimeZone      string         `yaml:"timezone"`
+		TimeZone      *string        `yaml:"timezone"`
 		AdsbxConfig   AdsbxConfig    `yaml:"adsbx"`
 		Airports      Airports       `yaml:"airports"`
 		EmailSettings *EmailSettings `yaml:"email"`
@@ -165,6 +165,20 @@ type (
 	}
 )
 
+func (c *Config) GetTimeLocation() (*time.Location, error) {
+	// Use provided timezone, or use system timezone
+	if c.TimeZone == nil {
+		return time.Now().Location(), nil
+	}
+
+	tz := *c.TimeZone
+	var err error
+	loc, err := time.LoadLocation(tz)
+	if err != nil {
+		return nil, errors.Wrapf(err, "Invalid timezone `%s`", tz)
+	}
+	return loc, nil
+}
 func (d *Database) DataSource(loc *time.Location) (string, error) {
 	switch d.Driver {
 	case "":

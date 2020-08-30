@@ -33,10 +33,11 @@ type (
 )
 
 func (c *MigrateUpCmd) Run(ctx *Context) error {
-	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	loc, err := ctx.Config.GetTimeLocation()
 	if err != nil {
 		return err
 	}
+
 	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
@@ -57,10 +58,11 @@ func (c *MigrateUpCmd) Run(ctx *Context) error {
 }
 
 func (c *MigrateDownCmd) Run(ctx *Context) error {
-	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	loc, err := ctx.Config.GetTimeLocation()
 	if err != nil {
 		return err
 	}
+
 	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
@@ -84,10 +86,11 @@ func (c *MigrateStepsCmd) Run(ctx *Context) error {
 	if c.N == 0 {
 		return errors.Errorf("cannot set n=0 (stay where we are)")
 	}
-	loc, err := time.LoadLocation(ctx.Config.TimeZone)
+	loc, err := ctx.Config.GetTimeLocation()
 	if err != nil {
 		return err
 	}
+
 	m, err := initMigrations(&ctx.Config.Database, loc)
 	if err != nil {
 		return err
