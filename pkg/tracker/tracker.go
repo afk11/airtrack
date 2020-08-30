@@ -474,10 +474,10 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		} else {
 			ac = sighting.State.Icao
 		}
-		if observation.origin.ok {
+		if observation.origin != nil && observation.origin.ok {
 			source += fmt.Sprintf(": near %s", observation.origin.address)
 		}
-		if observation.destination.ok {
+		if observation.destination != nil && observation.destination.ok {
 			destination += fmt.Sprintf(": near %s", observation.destination.address)
 		}
 		w := kml.NewWriter(kml.WriterOptions{
