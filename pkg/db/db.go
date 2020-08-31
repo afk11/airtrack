@@ -478,7 +478,7 @@ func (d *DatabaseImpl) GetLocationHistory(sighting *Sighting, lastId int64, batc
 		Prepared(true).
 		Where(goqu.Ex{
 			"sighting_id": sighting.Id,
-			"id":          lastId,
+			"id":          goqu.Op{"gt": lastId},
 		}).
 		Limit(uint(batchSize)).
 		ToSQL()
@@ -496,9 +496,7 @@ func (d *DatabaseImpl) GetLocationHistory(sighting *Sighting, lastId int64, batc
 func (d *DatabaseImpl) GetLocationHistoryWalkBatch(sighting *Sighting, batchSize int64, f func([]SightingLocation)) error {
 	lastId := int64(-1)
 	batch := make([]SightingLocation, 0, batchSize)
-	more := true
-	for more {
-		more = false
+	for {
 		// res - needs closing
 		res, err := d.GetLocationHistory(sighting, lastId, batchSize)
 		if err != nil {
@@ -514,16 +512,16 @@ func (d *DatabaseImpl) GetLocationHistoryWalkBatch(sighting *Sighting, batchSize
 			}
 			batch = append(batch, location)
 		}
-		res.Close()
 
-		more = len(batch) > 0
-		if more {
-			f(batch)
-			lastId = int64(batch[len(batch)-1].Id)
-			batch = make([]SightingLocation, 0, batchSize)
+		_ = res.Close()
+		if len(batch) == 0 {
+			return nil
 		}
+
+		f(batch)
+		lastId = int64(batch[len(batch)-1].Id)
+		batch = make([]SightingLocation, 0, batchSize)
 	}
-	return nil
 }
 func (d *DatabaseImpl) GetFullLocationHistory(sighting *Sighting, batchSize int64) ([]SightingLocation, error) {
 	var h []SightingLocation
