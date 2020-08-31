@@ -10,7 +10,7 @@ var cli struct {
 	Config   string   `help:"Configuration file path"`
 	Projects []string `help:"Projects configuration file (may be repeated, and in addition to main configuration file)"`
 
-	Track       airtrack.TrackCmd    `cmd help:"Track aircraft"`
+	Track airtrack.TrackCmd `cmd help:"Track aircraft"`
 
 	Migrate struct {
 		Up    airtrack.MigrateUpCmd    `cmd help:"Migrate to latest database migration"`

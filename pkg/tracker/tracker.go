@@ -504,12 +504,14 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		if err != nil {
 			return err
 		}
+
+		log.Debugf("[session %d] location history for %s had %d points",
+			project.Session.Id, sighting.a.Icao, numPoints)
+
 		kmlStr, err := w.Final()
 		if err != nil {
 			return err
 		}
-		log.Debugf("[session %d] location history for %s had %d points",
-			project.Session.Id, sighting.a.Icao, numPoints)
 
 		var mapUpdated bool
 		sightingKml, err := t.database.LoadSightingKml(observation.sighting)
@@ -539,29 +541,28 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			return err
 		}
 
-		sp := email.MapProducedParameters{
-			Project:      project.Name,
-			Icao:         sighting.a.Icao,
-			StartTimeFmt: startTimeFmt,
-			EndTimeFmt:   endTimeFmt,
-			DurationFmt:  sightingDuration.String(),
-			StartLocation: email.Location{
-				Latitude:  firstPos.Latitude,
-				Longitude: firstPos.Longitude,
-				Altitude:  firstPos.Altitude,
-			},
-			EndLocation: email.Location{
-				Latitude:  lastPos.Latitude,
-				Longitude: lastPos.Longitude,
-				Altitude:  lastPos.Altitude,
-			},
-			MapUpdated: mapUpdated,
-		}
-		if observation.sighting.CallSign != nil {
-			sp.CallSign = *observation.sighting.CallSign
-		}
-
 		if project.IsEmailNotificationEnabled(MapProduced) {
+			sp := email.MapProducedParameters{
+				Project:      project.Name,
+				Icao:         sighting.a.Icao,
+				StartTimeFmt: startTimeFmt,
+				EndTimeFmt:   endTimeFmt,
+				DurationFmt:  sightingDuration.String(),
+				StartLocation: email.Location{
+					Latitude:  firstPos.Latitude,
+					Longitude: firstPos.Longitude,
+					Altitude:  firstPos.Altitude,
+				},
+				EndLocation: email.Location{
+					Latitude:  lastPos.Latitude,
+					Longitude: lastPos.Longitude,
+					Altitude:  lastPos.Altitude,
+				},
+				MapUpdated: mapUpdated,
+			}
+			if observation.sighting.CallSign != nil {
+				sp.CallSign = *observation.sighting.CallSign
+			}
 			log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.a.Icao, MapProduced)
 			msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, kmlStr, sp)
 			if err != nil {
