@@ -91,12 +91,16 @@ files, supporting `aip` and `cup` formats.
 [Click here for information about airport location files](airport-locations.html)
 
 ```yaml
+# DisableBuiltInAirports will prevent airtrack from loading
+# compiled-in airport files if set to `true`
+[ disable_builtin_airports = <boolean> | default = false ]
+
 # List of directories containing aip files:
 openaip: 
-  [ - <dirpath> - default = none ]
+  [ - <dirpath> | default = none ]
 # List of directories containing cup files:
 cup:
-  [ - <dirpath> - default = none ]
+  [ - <dirpath> | default = none ]
 ```
 
 ### `<email_config>`

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/aircraft/ccode"
+	"github.com/afk11/airtrack/pkg/airports"
 	asset "github.com/afk11/airtrack/pkg/assets"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db"
@@ -64,11 +65,10 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	dbUrl, err := cfg.Database.DataSource(loc)
 	if cfg.Database.Driver != config.DatabaseDriverMySQL && cfg.Database.Driver != config.DatabaseDriverSqlite3 {
 		return errors.New("postgresql not yet supported")
 	}
-
+	dbUrl, err := cfg.Database.DataSource(loc)
 	if err != nil {
 		return err
 	}
@@ -132,6 +132,30 @@ func (c *TrackCmd) Run(ctx *Context) error {
 
 	var airportFiles int
 	var airportsFound int
+	useBuiltinAirports := cfg.Airports == nil || cfg.Airports.DisableBuiltInAirports == false
+	if useBuiltinAirports {
+		for _, file := range airports.AssetNames() {
+			d, err := airports.Asset(file)
+			if err != nil {
+				return errors.Wrapf(err, "reading built-in airport file")
+			}
+			openaipFile, err := openaip.Parse(d)
+			if err != nil {
+				return errors.Wrapf(err, "error reading built-in airport file: %s", file)
+			}
+			acRecords, err := openaip.ExtractOpenAIPRecords(openaipFile)
+			if err != nil {
+				return errors.Wrapf(err, "converting aircraft record from built-in %s", file)
+			}
+			err = nearestAirports.Register(acRecords)
+			if err != nil {
+				return errors.Wrapf(err, "registering airports from openaip file: %s", file)
+			}
+			log.Debugf("found %d airports in built-in airport file %s", len(acRecords), file)
+			airportsFound += len(acRecords)
+		}
+	}
+
 	if len(cfg.Airports.OpenAIPDirectories) > 0 {
 		files, err := fs.ScanDirectoriesForFiles("aip", cfg.Airports.OpenAIPDirectories)
 		if err != nil {
