@@ -76,6 +76,9 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
+	if cfg.Database.Driver == config.DatabaseDriverSqlite3 {
+		dbConn.SetMaxOpenConns(1)
+	}
 	dialect := goqu.Dialect(cfg.Database.Driver)
 	database := db.NewDatabase(dbConn, dialect)
 

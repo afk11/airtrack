@@ -236,17 +236,16 @@ func (t *Tracker) Stop() error {
 	t.sighting = make(map[string]*Sighting)
 	err := t.database.CloseSightingBatch(pSightings)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "closing batch of sightings")
 	}
 
 	// Close session
 	t.projectMu.RLock()
 	defer t.projectMu.RUnlock()
 	for _, p := range t.projects {
-		log.Debugf("close session %d", p.Session.Id)
 		res, err := t.database.CloseSession(p.Session)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "closing session")
 		} else if err = db.CheckRowsUpdated(res, 1); err != nil {
 			return errors.Wrap(err, "should have updated 1 session")
 		}
@@ -398,7 +397,7 @@ func (t *Tracker) doLostAircraftCheck() error {
 
 	err := t.database.CloseSightingBatch(lostDbSightings)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "closing sighting batch")
 	}
 	for _, lost := range lostSightings {
 		err := t.handleLostAircraft(lost.project, lost.s)
@@ -502,7 +501,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			numPoints += len(location)
 		})
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "error walking location history")
 		}
 
 		log.Debugf("[session %d] location history for %s had %d points",
@@ -510,7 +509,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 
 		kmlStr, err := w.Final()
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "generating KML file")
 		}
 
 		var mapUpdated bool
@@ -538,7 +537,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		}
 
 		if err != nil {
-			return err
+			return errors.Wrapf(err,"creating/updating sighting KML")
 		}
 
 		if project.IsEmailNotificationEnabled(MapProduced) {
@@ -566,11 +565,11 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.a.Icao, MapProduced)
 			msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, kmlStr, sp)
 			if err != nil {
-				return err
+				return errors.Wrapf(err,"creating MapProduced email")
 			}
 			err = t.opt.Mailer.Queue(*msg)
 			if err != nil {
-				return nil
+				return errors.Wrapf(err,"queueing MapProduced email for delivery")
 			}
 		}
 	}
@@ -750,7 +749,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	if s.a == nil {
 		s.a, err = t.loadAircraft(s.State.Icao)
 		if err != nil {
-			return err
+			return errors.Wrapf(err,"loading aircraft by icao")
 		}
 	}
 
@@ -830,11 +829,11 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 						},
 					})
 					if err != nil {
-						return err
+						return errors.Wrapf(err,"preparing TakeoffFromAirport email")
 					}
 					err = t.opt.Mailer.Queue(*msg)
 					if err != nil {
-						return nil
+						return errors.Wrapf(err,"queueing TakeoffFromAirport email")
 					}
 				} else if !geocodeOK && project.IsEmailNotificationEnabled(TakeoffUnknownAirport) {
 					// didn't geocode origin airport
@@ -850,11 +849,11 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 						},
 					})
 					if err != nil {
-						return err
+						return errors.Wrapf(err, "preparing TakeoffUnknownAirport email")
 					}
 					err = t.opt.Mailer.Queue(*msg)
 					if err != nil {
-						return nil
+						return errors.Wrapf(err, "queueing TakeoffUnknownAirport email")
 					}
 				}
 			} else {
@@ -879,11 +878,11 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 						},
 					})
 					if err != nil {
-						return err
+						return errors.Wrapf(err, "preparing TakeoffComplete email")
 					}
 					err = t.opt.Mailer.Queue(*msg)
 					if err != nil {
-						return nil
+						return errors.Wrapf(err, "queueing TakeoffComplete email")
 					}
 				}
 			}
@@ -900,11 +899,11 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
 		})
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "preparing SpottedInFlight email")
 		}
 		err = t.opt.Mailer.Queue(*msg)
 		if err != nil {
-			return nil
+			return errors.Wrapf(err, "queueing SpottedInFlight email")
 		}
 	}
 
@@ -914,7 +913,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			_, err = t.database.InsertSightingLocation(observation.sighting.Id, now,
 				observation.altitude, observation.latitude, observation.longitude)
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "failed to insert sighting location")
 			}
 			observation.locationCount++
 			log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f)",
@@ -928,13 +927,14 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			if err != nil {
 				return errors.Wrap(err, "updating sighting callsign")
 			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
-				return err
+				return errors.Wrapf(err, "expected 1 updated row")
 			}
 			_, err = t.database.CreateNewSightingCallSignTx(tx, observation.sighting, s.State.CallSign, now)
 			if err != nil {
 				return errors.Wrap(err, "creating callsign record")
 			}
 			return nil
+
 		})
 		if err != nil {
 			return errors.Wrap(err, "saving callsign")
@@ -967,7 +967,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			//}
 			affected, err := res.RowsAffected()
 			if err != nil {
-				return err
+				return errors.Wrapf(err, "getting rows affected")
 			}
 			// work around - don't repeatedly save squawks, til we deal with 'sighting restore'
 			if affected > 0 {
