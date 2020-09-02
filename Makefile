@@ -25,7 +25,7 @@ build-dir:
 		mkdir build/
 build-dir-airports: build-dir
 		mkdir build/airports/
-		go run ./contrib/refresh_airports.go ./resources/airports
+		go run ./contrib/copy_airport_resources/main.go resources/airports
 build-bindata-openaip: build-dir-airports
 		go-bindata -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
 build-airtrack-linux-amd64: delete-build-dir build-bindata-openaip build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
