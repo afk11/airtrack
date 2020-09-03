@@ -61,6 +61,7 @@ type (
 		address string
 	}
 	ProjectObservation struct {
+		db        db.Database
 		project   *Project
 		sighting  *db.Sighting
 		firstSeen time.Time
@@ -126,8 +127,9 @@ type SightingTags struct {
 	IsInTakeoff bool
 }
 
-func NewProjectObservation(p *Project, s *db.Sighting, msgTime time.Time) *ProjectObservation {
+func NewProjectObservation(db db.Database, p *Project, s *db.Sighting, msgTime time.Time) *ProjectObservation {
 	return &ProjectObservation{
+		db:        db,
 		project:   p,
 		sighting:  s,
 		firstSeen: msgTime,
@@ -137,13 +139,106 @@ func NewProjectObservation(p *Project, s *db.Sighting, msgTime time.Time) *Proje
 func (o *ProjectObservation) HasCallSign() bool {
 	return o.sighting.CallSign != nil
 }
-func (o *ProjectObservation) SetCallSign(callsign string) {
+func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
+	if track {
+		err := o.db.Transaction(func(tx *sql.Tx) error {
+			res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, callsign)
+			if err != nil {
+				return errors.Wrap(err, "updating sighting callsign")
+			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
+				return errors.Wrapf(err, "expected 1 updated row")
+			}
+			_, err = o.db.CreateNewSightingCallSignTx(tx, o.sighting, callsign, time.Now())
+			if err != nil {
+				return errors.Wrap(err, "creating callsign record")
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.Wrap(err, "saving callsign")
+		}
+	}
+
 	o.sighting.CallSign = &callsign
+	return nil
 }
 func (o *ProjectObservation) CallSign() *string {
 	return o.sighting.CallSign
 }
+func (o *ProjectObservation) HasSquawk() bool {
+	return o.sighting.Squawk != nil
+}
+func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
+	if track {
+		err := o.db.Transaction(func(tx *sql.Tx) error {
+			res, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, squawk)
+			// todo: add this back in once we have 'sighting restore' added.
+			// reopened sightings trigger update though row count will be zero
+			if err != nil {
+				return errors.Wrap(err, "updating sighting squawk")
+			}
+			//else if err = db.CheckRowsUpdated(res, 1); err != nil {
+			//	return err
+			//}
+			affected, err := res.RowsAffected()
+			if err != nil {
+				return errors.Wrapf(err, "getting rows affected")
+			}
+			// work around - don't repeatedly save squawks, til we deal with 'sighting restore'
+			if affected > 0 {
+				_, err = o.db.CreateNewSightingSquawkTx(tx, o.sighting, squawk, time.Now())
+				if err != nil {
+					return errors.Wrap(err, "creating squawk record")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.Wrap(err, "saving squawk")
+		}
+	}
 
+	o.sighting.Squawk = &squawk
+	return nil
+}
+func (o *ProjectObservation) Squawk() *string {
+	return o.sighting.Squawk
+}
+func (o *ProjectObservation) HaveAltitude() bool {
+	return o.haveAlt
+}
+func (o *ProjectObservation) Altitude() int64 {
+	return o.altitude
+}
+func (o *ProjectObservation) SetAltitude(alt int64) error {
+	o.altitude = alt
+	if !o.haveAlt {
+		o.haveAlt = true
+	}
+	return nil
+}
+func (o *ProjectObservation) HaveLocation() bool {
+	return o.haveLocation
+}
+func (o *ProjectObservation) Location() (float64, float64) {
+	return o.latitude, o.longitude
+}
+func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
+	if track {
+		_, err := o.db.InsertSightingLocation(o.sighting.Id, time.Now(),
+			o.altitude, lat, lon)
+		if err != nil {
+			return errors.Wrapf(err, "failed to insert sighting location")
+		}
+	}
+	o.locationCount++
+	o.latitude = lat
+	o.longitude = lon
+	if !o.haveLocation {
+		o.haveLocation = true
+	}
+	return nil
+}
 func NewSightingWithAircraft(a *db.Aircraft) *Sighting {
 	return &Sighting{
 		State: pb.State{
@@ -561,7 +656,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		}
 
 		if err != nil {
-			return errors.Wrapf(err,"creating/updating sighting KML")
+			return errors.Wrapf(err, "creating/updating sighting KML")
 		}
 
 		if project.IsEmailNotificationEnabled(MapProduced) {
@@ -589,11 +684,11 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.State.Icao, MapProduced)
 			msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, kmlStr, sp)
 			if err != nil {
-				return errors.Wrapf(err,"creating MapProduced email")
+				return errors.Wrapf(err, "creating MapProduced email")
 			}
 			err = t.opt.Mailer.Queue(*msg)
 			if err != nil {
-				return errors.Wrapf(err,"queueing MapProduced email for delivery")
+				return errors.Wrapf(err, "queueing MapProduced email for delivery")
 			}
 		}
 	}
@@ -773,7 +868,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	if s.a == nil {
 		s.a, err = t.loadAircraft(s.State.Icao)
 		if err != nil {
-			return errors.Wrapf(err,"loading aircraft by icao")
+			return errors.Wrapf(err, "loading aircraft by icao")
 		}
 	}
 
@@ -786,7 +881,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			// Cleanup reserved sighting
 			return errors.Wrapf(err, "failed to init project sighting")
 		}
-		observation = NewProjectObservation(project, sighting, now)
+		observation = NewProjectObservation(t.database, project, sighting, now)
 		s.observedBy[project.Session.Id] = observation
 		firstSighting = !isReopened
 	}
@@ -794,41 +889,78 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	// Update Projects information in DB
 	observation.lastSeen = now
 
-	var updatedAlt, updatedLocation, updatedCallSign, updatedSquawk, updatedGS, updatedTrack bool
+	var updatedAlt, updatedLocation, updatedGS, updatedTrack bool
 	if s.State.HaveAltitude {
-		updatedAlt = !observation.haveAlt || (s.State.Altitude != observation.altitude)
+		updatedAlt = !observation.HaveAltitude() || s.State.Altitude != observation.Altitude()
 		if updatedAlt {
-			observation.altitude = s.State.Altitude
-			observation.haveAlt = true
+			err = observation.SetAltitude(s.State.Altitude)
+			if err != nil {
+				return errors.Wrapf(err, "setting altitude")
+			}
 		}
 	}
 	if s.State.HaveTrack {
-		updatedTrack = !observation.haveTrack || (s.State.Track != observation.track)
+		updatedTrack = !observation.haveTrack || s.State.Track != observation.track
 		if updatedTrack {
 			observation.track = s.State.Track
 			observation.haveTrack = true
 		}
 	}
 	if s.State.HaveGroundSpeed {
-		updatedGS = !observation.haveGS || (s.State.GroundSpeed != observation.gs)
+		updatedGS = !observation.haveGS || s.State.GroundSpeed != observation.gs
 		if updatedGS {
 			observation.gs = s.State.GroundSpeed
 			observation.haveGS = true
 		}
 	}
 	if s.State.HaveLocation {
-		updatedLocation = !observation.haveLocation || (s.State.Latitude != observation.latitude || s.State.Longitude != observation.longitude)
+		oldlat, oldlon := observation.Location()
+		updatedLocation = !observation.HaveLocation() || (s.State.Latitude != oldlat || s.State.Longitude != oldlon)
 		if updatedLocation {
-			observation.latitude = s.State.Latitude
-			observation.longitude = s.State.Longitude
-			observation.haveLocation = true
+			err = observation.SetLocation(s.State.Latitude, s.State.Longitude, project.IsFeatureEnabled(TrackKmlLocation))
+			if err != nil {
+				return errors.Wrapf(err, "setting location")
+			}
+		}
+		// We have alt + location, and there's been an update - save the location
+		if (observation.HaveAltitude() && observation.HaveLocation()) &&
+			(updatedAlt || updatedLocation) &&
+			project.IsFeatureEnabled(TrackKmlLocation) {
+			log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f)",
+				project.Session.Id, s.State.Icao, observation.Altitude(), s.State.Latitude, s.State.Longitude)
 		}
 	}
 	if s.State.HaveCallsign {
-		updatedCallSign = !observation.HasCallSign() || (s.State.CallSign != *observation.CallSign())
+		updatedCallSign := !observation.HasCallSign() || (s.State.CallSign != *observation.CallSign())
+		if updatedCallSign {
+			if project.IsFeatureEnabled(TrackCallSigns) {
+				if observation.HasCallSign() {
+					log.Infof("[session %d] %s: updated callsign %s -> %s", project.Session.Id, s.State.Icao, *observation.CallSign(), s.State.CallSign)
+				} else {
+					log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
+				}
+			}
+			err = observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns))
+			if err != nil {
+				return errors.Wrapf(err, "setting callsign")
+			}
+		}
 	}
 	if s.State.HaveSquawk {
-		updatedSquawk = observation.sighting.Squawk == nil || (s.State.Squawk != *observation.sighting.Squawk)
+		updatedSquawk := !observation.HasSquawk() || (s.State.Squawk != *observation.Squawk())
+		if updatedSquawk {
+			if project.IsFeatureEnabled(TrackSquawks) {
+				if observation.HasSquawk() {
+					log.Infof("[session %d] %s: updated squawk %s -> %s", project.Session.Id, s.State.Icao, *observation.Squawk(), s.State.Squawk)
+				} else {
+					log.Infof("[session %d] %s: found squawk %s", project.Session.Id, s.State.Icao, s.State.Squawk)
+				}
+			}
+			err = observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks))
+			if err != nil {
+				return errors.Wrapf(err, "setting squawk")
+			}
+		}
 	}
 
 	if s.Tags.IsInTakeoff != observation.tags.IsInTakeoff {
@@ -853,11 +985,11 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 						},
 					})
 					if err != nil {
-						return errors.Wrapf(err,"preparing TakeoffFromAirport email")
+						return errors.Wrapf(err, "preparing TakeoffFromAirport email")
 					}
 					err = t.opt.Mailer.Queue(*msg)
 					if err != nil {
-						return errors.Wrapf(err,"queueing TakeoffFromAirport email")
+						return errors.Wrapf(err, "queueing TakeoffFromAirport email")
 					}
 				} else if !geocodeOK && project.IsEmailNotificationEnabled(TakeoffUnknownAirport) {
 					// didn't geocode origin airport
@@ -930,85 +1062,6 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			return errors.Wrapf(err, "queueing SpottedInFlight email")
 		}
 	}
-
-	if s.State.HaveAltitude && s.State.HaveLocation && project.IsFeatureEnabled(TrackKmlLocation) {
-		// We have alt + location, and there's been an update - save the location
-		if (observation.haveAlt && observation.haveLocation) && (updatedAlt || updatedLocation) {
-			_, err = t.database.InsertSightingLocation(observation.sighting.Id, now,
-				observation.altitude, observation.latitude, observation.longitude)
-			if err != nil {
-				return errors.Wrapf(err, "failed to insert sighting location")
-			}
-			observation.locationCount++
-			log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f)",
-				project.Session.Id, msg.Icao, observation.altitude, observation.latitude, observation.longitude)
-		}
-	}
-
-	if updatedCallSign && project.IsFeatureEnabled(TrackCallSigns) {
-		// TODO: move this to SQL processor
-		err := t.database.Transaction(func(tx *sql.Tx) error {
-			res, err := t.database.UpdateSightingCallsignTx(tx, observation.sighting, s.State.CallSign)
-			if err != nil {
-				return errors.Wrap(err, "updating sighting callsign")
-			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
-				return errors.Wrapf(err, "expected 1 updated row")
-			}
-			_, err = t.database.CreateNewSightingCallSignTx(tx, observation.sighting, s.State.CallSign, now)
-			if err != nil {
-				return errors.Wrap(err, "creating callsign record")
-			}
-			return nil
-		})
-		if err != nil {
-			return errors.Wrap(err, "saving callsign")
-		}
-		if observation.HasCallSign() {
-			log.Infof("[session %d] %s: updated callsign %s -> %s", project.Session.Id, s.State.Icao, *observation.sighting.CallSign, s.State.CallSign)
-		} else {
-			log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
-		}
-		observation.SetCallSign(msg.CallSign)
-	}
-
-	if updatedSquawk && project.IsFeatureEnabled(TrackSquawks) {
-		if observation.sighting.Squawk == nil {
-			log.Infof("[session %d] %s: found squawk %s", project.Session.Id, s.State.Icao, s.State.Squawk)
-		} else {
-			log.Infof("[session %d] %s: updated squawk %s -> %s", project.Session.Id, s.State.Icao, *observation.sighting.Squawk, s.State.Squawk)
-		}
-
-		// db
-		err := t.database.Transaction(func(tx *sql.Tx) error {
-			res, err := t.database.UpdateSightingSquawkTx(tx, observation.sighting, s.State.Squawk)
-			// todo: add this back in once we have 'sighting restore' added.
-			// reopened sightings trigger update though row count will be zero
-			if err != nil {
-				return errors.Wrap(err, "updating sighting squawk")
-			}
-			//else if err = db.CheckRowsUpdated(res, 1); err != nil {
-			//	return err
-			//}
-			affected, err := res.RowsAffected()
-			if err != nil {
-				return errors.Wrapf(err, "getting rows affected")
-			}
-			// work around - don't repeatedly save squawks, til we deal with 'sighting restore'
-			if affected > 0 {
-				_, err = t.database.CreateNewSightingSquawkTx(tx, observation.sighting, s.State.Squawk, now)
-				if err != nil {
-					return errors.Wrap(err, "creating squawk record")
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return errors.Wrap(err, "saving squawk")
-		}
-		observation.sighting.Squawk = &s.State.Squawk
-		// end of db
-	}
-
 	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.origin == nil && observation.haveLocation {
 		if observation.altitude > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport

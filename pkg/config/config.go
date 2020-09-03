@@ -152,7 +152,7 @@ type (
 	Config struct {
 		TimeZone      *string        `yaml:"timezone"`
 		AdsbxConfig   AdsbxConfig    `yaml:"adsbx"`
-		Airports      *Airports       `yaml:"airports"`
+		Airports      *Airports      `yaml:"airports"`
 		EmailSettings *EmailSettings `yaml:"email"`
 		Database      Database       `yaml:"database"`
 		Metrics       *Metrics       `yaml:"metrics"`
