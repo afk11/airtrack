@@ -134,6 +134,15 @@ func NewProjectObservation(p *Project, s *db.Sighting, msgTime time.Time) *Proje
 		lastSeen:  msgTime,
 	}
 }
+func (o *ProjectObservation) HasCallSign() bool {
+	return o.sighting.CallSign != nil
+}
+func (o *ProjectObservation) SetCallSign(callsign string) {
+	o.sighting.CallSign = &callsign
+}
+func (o *ProjectObservation) CallSign() *string {
+	return o.sighting.CallSign
+}
 
 func NewSightingWithAircraft(a *db.Aircraft) *Sighting {
 	return &Sighting{
@@ -391,7 +400,7 @@ func (t *Tracker) doLostAircraftCheck() error {
 			if !hadError {
 				delete(lost.s.observedBy, lost.session.Id)
 				if len(lost.s.observedBy) == 0 {
-					delete(t.sighting, lost.s.a.Icao)
+					delete(t.sighting, lost.s.State.Icao)
 				}
 			}
 			uniqueSightings[lost.s.State.Icao] = lost.s
@@ -451,13 +460,13 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	}
 
 	log.Infof("[session %d] %s: lost aircraft (firstSeen: %s, duration: %s)",
-		project.Session.Id, sighting.a.Icao, observation.firstSeen.Format(time.RFC822), time.Since(observation.firstSeen))
+		project.Session.Id, sighting.State.Icao, observation.firstSeen.Format(time.RFC822), time.Since(observation.firstSeen))
 
 	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.haveLocation {
 		if observation.altitude > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport
 			log.Debugf("[session %d] %s: too high to determine destination location",
-				project.Session.Id, sighting.a.Icao)
+				project.Session.Id, sighting.State.Icao)
 			observation.destination = &GeocodeLocation{}
 		} else {
 			location, distance, err := t.reverseGeocode(observation.latitude, observation.longitude)
@@ -466,11 +475,11 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			}
 			if location.ok {
 				log.Debugf("[session %d] %s: Destination reverse geocode result: (%f, %f): %s %.1f km",
-					project.Session.Id, sighting.a.Icao, observation.latitude, observation.longitude, location.address,
+					project.Session.Id, sighting.State.Icao, observation.latitude, observation.longitude, location.address,
 					distance/1000)
 			} else {
 				log.Debugf("[session %d] %s: Reverse geocode search for destination (%f, %f) yielded no results",
-					project.Session.Id, sighting.a.Icao, observation.latitude, observation.longitude)
+					project.Session.Id, sighting.State.Icao, observation.latitude, observation.longitude)
 			}
 			observation.destination = location
 		}
@@ -520,7 +529,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		}
 
 		log.Debugf("[session %d] location history for %s had %d points",
-			project.Session.Id, sighting.a.Icao, numPoints)
+			project.Session.Id, sighting.State.Icao, numPoints)
 
 		kmlStr, err := w.Final()
 		if err != nil {
@@ -530,7 +539,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		var mapUpdated bool
 		sightingKml, err := t.database.LoadSightingKml(observation.sighting)
 		if err == sql.ErrNoRows {
-			log.Debugf("[session %d] creating KML for %s", project.Session.Id, sighting.a.Icao)
+			log.Debugf("[session %d] creating KML for %s", project.Session.Id, sighting.State.Icao)
 			// Can be created
 			_, err = t.database.CreateSightingKml(observation.sighting, kmlStr)
 			if err != nil {
@@ -538,7 +547,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			}
 		} else if err == nil {
 			mapUpdated = true
-			log.Debugf("[session %d] updating KML for %s", project.Session.Id, sighting.a.Icao)
+			log.Debugf("[session %d] updating KML for %s", project.Session.Id, sighting.State.Icao)
 			isSameKml := sightingKml.Kml == kmlStr
 			if isSameKml {
 				log.Warnf("sighting %d sighting_kml %d - tried to update kml with same content",
@@ -558,7 +567,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		if project.IsEmailNotificationEnabled(MapProduced) {
 			sp := email.MapProducedParameters{
 				Project:      project.Name,
-				Icao:         sighting.a.Icao,
+				Icao:         sighting.State.Icao,
 				StartTimeFmt: startTimeFmt,
 				EndTimeFmt:   endTimeFmt,
 				DurationFmt:  sightingDuration.String(),
@@ -577,7 +586,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			if observation.sighting.CallSign != nil {
 				sp.CallSign = *observation.sighting.CallSign
 			}
-			log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.a.Icao, MapProduced)
+			log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.State.Icao, MapProduced)
 			msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, kmlStr, sp)
 			if err != nil {
 				return errors.Wrapf(err,"creating MapProduced email")
@@ -816,7 +825,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 		}
 	}
 	if s.State.HaveCallsign {
-		updatedCallSign = observation.sighting.CallSign == nil || (s.State.CallSign != *observation.sighting.CallSign)
+		updatedCallSign = !observation.HasCallSign() || (s.State.CallSign != *observation.CallSign())
 	}
 	if s.State.HaveSquawk {
 		updatedSquawk = observation.sighting.Squawk == nil || (s.State.Squawk != *observation.sighting.Squawk)
@@ -937,6 +946,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	}
 
 	if updatedCallSign && project.IsFeatureEnabled(TrackCallSigns) {
+		// TODO: move this to SQL processor
 		err := t.database.Transaction(func(tx *sql.Tx) error {
 			res, err := t.database.UpdateSightingCallsignTx(tx, observation.sighting, s.State.CallSign)
 			if err != nil {
@@ -949,17 +959,16 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 				return errors.Wrap(err, "creating callsign record")
 			}
 			return nil
-
 		})
 		if err != nil {
 			return errors.Wrap(err, "saving callsign")
 		}
-		if observation.sighting.CallSign == nil {
-			log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
-		} else {
+		if observation.HasCallSign() {
 			log.Infof("[session %d] %s: updated callsign %s -> %s", project.Session.Id, s.State.Icao, *observation.sighting.CallSign, s.State.CallSign)
+		} else {
+			log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
 		}
-		observation.sighting.CallSign = &msg.CallSign
+		observation.SetCallSign(msg.CallSign)
 	}
 
 	if updatedSquawk && project.IsFeatureEnabled(TrackSquawks) {
