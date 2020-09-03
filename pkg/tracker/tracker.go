@@ -60,6 +60,10 @@ type (
 		long    float64
 		address string
 	}
+	callsignLog struct {
+		callsign string
+		time     time.Time
+	}
 	ProjectObservation struct {
 		db        db.Database
 		project   *Project
@@ -70,6 +74,8 @@ type (
 		origin      *GeocodeLocation
 		destination *GeocodeLocation
 
+		dirty    bool
+		csLogs   []callsignLog
 		haveAlt  bool
 		altitude int64
 
@@ -86,6 +92,7 @@ type (
 		longitude          float64
 		lastLocationUpdate *time.Time
 		locationCount      int64
+		mu                 sync.RWMutex
 	}
 	Sighting struct {
 		State           pb.State
@@ -113,6 +120,7 @@ type (
 		projectAcUpdateListeners []ProjectAircraftUpdateListener
 		consumerCanceller        context.CancelFunc
 		lostAcCanceller          context.CancelFunc
+		dbFlushCanceller         context.CancelFunc
 		consumerWG               sync.WaitGroup
 		mailTemplates            *email.MailTemplates
 	}
@@ -134,6 +142,7 @@ func NewProjectObservation(db db.Database, p *Project, s *db.Sighting, msgTime t
 		sighting:  s,
 		firstSeen: msgTime,
 		lastSeen:  msgTime,
+		csLogs:    make([]callsignLog, 0),
 	}
 }
 func (o *ProjectObservation) HasCallSign() bool {
@@ -141,22 +150,8 @@ func (o *ProjectObservation) HasCallSign() bool {
 }
 func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
 	if track {
-		err := o.db.Transaction(func(tx *sql.Tx) error {
-			res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, callsign)
-			if err != nil {
-				return errors.Wrap(err, "updating sighting callsign")
-			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
-				return errors.Wrapf(err, "expected 1 updated row")
-			}
-			_, err = o.db.CreateNewSightingCallSignTx(tx, o.sighting, callsign, time.Now())
-			if err != nil {
-				return errors.Wrap(err, "creating callsign record")
-			}
-			return nil
-		})
-		if err != nil {
-			return errors.Wrap(err, "saving callsign")
-		}
+		o.dirty = true
+		o.csLogs = append(o.csLogs, callsignLog{callsign, time.Now()})
 	}
 
 	o.sighting.CallSign = &callsign
@@ -303,6 +298,10 @@ func (t *Tracker) Start(msgs chan *pb.Message) {
 	lostAcCtx, lostAcCanceller := context.WithCancel(context.Background())
 	t.lostAcCanceller = lostAcCanceller
 	go t.checkForLostAircraft(lostAcCtx)
+
+	dbFlushCtx, dbFlushCanceller := context.WithCancel(context.Background())
+	t.dbFlushCanceller = dbFlushCanceller
+	go t.startDatabaseTask(dbFlushCtx)
 }
 
 func min(a, b int) int {
@@ -318,7 +317,8 @@ func (t *Tracker) Stop() error {
 	t.consumerWG.Wait()
 	log.Debug("cancel lost aircraft handler")
 	t.lostAcCanceller()
-
+	t.dbFlushCanceller()
+	// todo: need to trigger flush here so we don't lose data before every shutdown
 	// Take lock ourselves to cleanup pSightings and delete map
 	t.sightingMu.Lock()
 	defer t.sightingMu.Unlock()
@@ -420,6 +420,89 @@ func (t *Tracker) AddProject(p *Project) error {
 	return nil
 }
 
+func (t *Tracker) startDatabaseTask(ctx context.Context) {
+	waitTime := time.Second * 5
+	for {
+		select {
+		case <-time.After(waitTime):
+			err := t.processDatabaseUpdates()
+			if err != nil {
+				panic(err)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+type csUpdate struct {
+	sighting *db.Sighting
+	csLog    callsignLog
+}
+
+func (t *Tracker) processDatabaseUpdates() error {
+	t.projectMu.Lock()
+	defer t.projectMu.Unlock()
+
+	updated := 0
+	var csUpdates []csUpdate
+	for _, proj := range t.projects {
+		proj.obsMu.Lock()
+		for _, o := range proj.Observations {
+			o.mu.Lock()
+			if !o.dirty {
+				o.mu.Unlock()
+				continue
+			}
+			err := o.db.Transaction(func(tx *sql.Tx) error {
+				if len(o.csLogs) > 0 {
+					for _, csLog := range o.csLogs {
+						csUpdates = append(csUpdates, csUpdate{
+							sighting: o.sighting,
+							csLog:    csLog,
+						})
+					}
+					res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
+					if err != nil {
+						return errors.Wrap(err, "updating sighting callsign")
+					} else if err = db.CheckRowsUpdated(res, 1); err != nil {
+						return errors.Wrapf(err, "expected 1 updated row")
+					}
+					o.csLogs = nil
+				}
+				return nil
+			})
+			if err != nil {
+				return err
+			}
+			updated++
+			o.dirty = false
+			o.mu.Unlock()
+		}
+		proj.obsMu.Unlock()
+	}
+
+	csBatch := 100
+	for i := 0; i < len(csUpdates); i += csBatch {
+		// seems unlikely to encounter too many variables issue here (sqlite)
+		err := t.database.Transaction(func(tx *sql.Tx) error {
+			var err error
+			for _, csUpdate := range csUpdates[i:min(len(csUpdates), i+csBatch)] {
+				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdate.sighting, csUpdate.csLog.callsign, csUpdate.csLog.time)
+				if err != nil {
+					return errors.Wrap(err, "creating callsign record")
+				}
+			}
+
+			return nil
+		})
+		if err != nil {
+			return errors.Wrapf(err, "in transaction")
+		}
+	}
+
+	return nil
+}
 func (t *Tracker) checkForLostAircraft(ctx context.Context) {
 	waitTime := time.Second * 5
 	for {
@@ -890,9 +973,14 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 			return errors.Wrapf(err, "failed to init project sighting")
 		}
 		observation = NewProjectObservation(t.database, project, sighting, now)
+		project.obsMu.Lock()
 		s.observedBy[project.Session.Id] = observation
+		project.Observations[s.State.Icao] = observation
+		project.obsMu.Unlock()
 		firstSighting = !isReopened
 	}
+	observation.mu.Lock()
+	defer observation.mu.Unlock()
 
 	// Update Projects information in DB
 	observation.lastSeen = now

@@ -7,6 +7,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
 	"github.com/pkg/errors"
+	"sync"
 	"time"
 )
 
@@ -28,6 +29,9 @@ type (
 		ReopenSightings         bool
 		ReopenSightingsInterval time.Duration
 		OnGroundUpdateThreshold int64
+
+		obsMu        sync.RWMutex
+		Observations map[string]*ProjectObservation
 	}
 )
 
@@ -110,6 +114,7 @@ func InitProject(cfg config.Project) (*Project, error) {
 		ReopenSightingsInterval: DefaultSightingReopenInterval,
 		OnGroundUpdateThreshold: DefaultOnGroundUpdateThreshold,
 		ShouldMap:               true,
+		Observations:            make(map[string]*ProjectObservation),
 	}
 	if cfg.Map != nil {
 		p.ShouldMap = cfg.Map.Disabled == false
