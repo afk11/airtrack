@@ -707,12 +707,19 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 		inflightMsgVec.WithLabelValues().Inc()
 		t.projectMu.RLock()
 		now := time.Now()
+		s := t.getSighting(msg.Icao)
+		err := t.UpdateStateFromMessage(s, msg, now)
+		if err != nil {
+			s.mu.Unlock()
+			panic(err)
+		}
 		for _, proj := range t.projects {
-			err := t.ProcessMessage(proj, now, msg)
+			err = t.ProcessMessage(proj, s, now, msg)
 			if err != nil {
-				t.projectMu.RUnlock()
+				s.mu.Unlock()
 				panic(err)
 			}
+			s.mu.Unlock()
 		}
 		t.projectMu.RUnlock()
 		aircraftCountVec.WithLabelValues().Set(float64(len(t.sighting)))
@@ -739,15 +746,7 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 	return s
 }
 
-func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Message) error {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
-		us := v * 1000000 // make microseconds
-		msgDurations.Observe(us)
-	}))
-	defer timer.ObserveDuration()
-
-	s := t.getSighting(msg.Icao)
-	defer s.mu.Unlock()
+func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
 
 	s.lastSeen = now
 
@@ -851,6 +850,14 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			log.Tracef("icao %s country determined: %s %s", s.State.Icao, code.String(), country.Name())
 		}
 	}
+	return nil
+}
+func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, msg *pb.Message) error {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
+		us := v * 1000000 // make microseconds
+		msgDurations.Observe(us)
+	}))
+	defer timer.ObserveDuration()
 
 	// Evaluate filter, see if we wish to continue
 	if project.Program != nil {
@@ -866,6 +873,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 
 	// Create if missing, and assign to sighting
 	if s.a == nil {
+		var err error
 		s.a, err = t.loadAircraft(s.State.Icao)
 		if err != nil {
 			return errors.Wrapf(err, "loading aircraft by icao")
@@ -893,7 +901,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	if s.State.HaveAltitude {
 		updatedAlt = !observation.HaveAltitude() || s.State.Altitude != observation.Altitude()
 		if updatedAlt {
-			err = observation.SetAltitude(s.State.Altitude)
+			err := observation.SetAltitude(s.State.Altitude)
 			if err != nil {
 				return errors.Wrapf(err, "setting altitude")
 			}
@@ -915,9 +923,9 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 	}
 	if s.State.HaveLocation {
 		oldlat, oldlon := observation.Location()
-		updatedLocation = !observation.HaveLocation() || (s.State.Latitude != oldlat || s.State.Longitude != oldlon)
+		updatedLocation = !observation.HaveLocation() || s.State.Latitude != oldlat || s.State.Longitude != oldlon
 		if updatedLocation {
-			err = observation.SetLocation(s.State.Latitude, s.State.Longitude, project.IsFeatureEnabled(TrackKmlLocation))
+			err := observation.SetLocation(s.State.Latitude, s.State.Longitude, project.IsFeatureEnabled(TrackKmlLocation))
 			if err != nil {
 				return errors.Wrapf(err, "setting location")
 			}
@@ -931,7 +939,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 		}
 	}
 	if s.State.HaveCallsign {
-		updatedCallSign := !observation.HasCallSign() || (s.State.CallSign != *observation.CallSign())
+		updatedCallSign := !observation.HasCallSign() || s.State.CallSign != *observation.CallSign()
 		if updatedCallSign {
 			if project.IsFeatureEnabled(TrackCallSigns) {
 				if observation.HasCallSign() {
@@ -940,7 +948,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 					log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
 				}
 			}
-			err = observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns))
+			err := observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns))
 			if err != nil {
 				return errors.Wrapf(err, "setting callsign")
 			}
@@ -956,7 +964,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 					log.Infof("[session %d] %s: found squawk %s", project.Session.Id, s.State.Icao, s.State.Squawk)
 				}
 			}
-			err = observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks))
+			err := observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks))
 			if err != nil {
 				return errors.Wrapf(err, "setting squawk")
 			}

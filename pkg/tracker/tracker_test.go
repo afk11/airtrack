@@ -81,7 +81,9 @@ func TestTracker(t *testing.T) {
 		err = doTest(opt, proj, func(tr *Tracker) error {
 			p := pb.Message{Source: sbs1Source, Icao: "444444"}
 			now := time.Now()
-			err := tr.ProcessMessage(proj, now, &p)
+			s := tr.getSighting(p.Icao)
+			defer s.mu.Unlock()
+			err := tr.ProcessMessage(proj, s, now, &p)
 			if err != nil {
 				return errors.Wrap(err, "process message")
 			}
