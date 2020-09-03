@@ -201,6 +201,12 @@ func (t *Tracker) Start(msgs chan *pb.Message) {
 	go t.checkForLostAircraft(lostAcCtx)
 }
 
+func min(a, b int) int {
+	if a <= b {
+		return a
+	}
+	return b
+}
 func (t *Tracker) Stop() error {
 	log.Info("shutting down tracker")
 	log.Debug("await consumers to finish")
@@ -234,9 +240,13 @@ func (t *Tracker) Stop() error {
 	log.Infof("closed with %d aircraft being monitored", pAircraft)
 
 	t.sighting = make(map[string]*Sighting)
-	err := t.database.CloseSightingBatch(pSightings)
-	if err != nil {
-		return errors.Wrapf(err, "closing batch of sightings")
+	// Split this into batches, full list can cause too many variables sqlite error
+	limit := 100
+	for i := 0; i < len(pSightings); i += limit {
+		err := t.database.CloseSightingBatch(pSightings[i:min(i+limit, len(pSightings))])
+		if err != nil {
+			return errors.Wrapf(err, "closing batch of sightings")
+		}
 	}
 
 	// Close session
@@ -395,10 +405,15 @@ func (t *Tracker) doLostAircraftCheck() error {
 		aircraftCountVec.WithLabelValues().Set(float64(len(t.sighting)))
 	}()
 
-	err := t.database.CloseSightingBatch(lostDbSightings)
-	if err != nil {
-		return errors.Wrapf(err, "closing sighting batch")
+	// Do this in batches, ensure we don't get too many variables error from sqlite
+	limit := 100
+	for i := 0; i < len(lostDbSightings); i += limit {
+		err := t.database.CloseSightingBatch(lostDbSightings[i:min(i+limit, len(lostDbSightings))])
+		if err != nil {
+			return errors.Wrapf(err, "closing batch of sightings")
+		}
 	}
+
 	for _, lost := range lostSightings {
 		err := t.handleLostAircraft(lost.project, lost.s)
 		if err != nil {
