@@ -1,1 +1,1 @@
-alter table `sighting` drop index `sighting_collection_site_id_aircraft_id_callsign_index`;
+drop index `sighting_collection_site_id_aircraft_id_callsign_index`;

@@ -8,6 +8,7 @@ import (
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/airtrack/pkg/zlib"
 	"github.com/afk11/mail"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"strings"
@@ -63,7 +64,7 @@ func decodeJob(compressed []byte) (db.EmailJob, error) {
 	return job, nil
 }
 func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
-	return m.database.Transaction(func(tx *sql.Tx) error {
+	return m.database.Transaction(func(tx *sqlx.Tx) error {
 		for _, job := range queued {
 			ciphertext, err := encodeJob(&job)
 			if err != nil {
@@ -159,7 +160,7 @@ func (m *Mailer) processMails() error {
 		}
 
 		if len(finished) > 0 {
-			err = m.database.Transaction(func(tx *sql.Tx) error {
+			err = m.database.Transaction(func(tx *sqlx.Tx) error {
 				for _, email := range finished {
 					_, err = m.database.DeleteCompletedEmail(tx, email)
 					if err != nil {
@@ -174,7 +175,7 @@ func (m *Mailer) processMails() error {
 		}
 
 		if len(failed) > 0 {
-			err = m.database.Transaction(func(tx *sql.Tx) error {
+			err = m.database.Transaction(func(tx *sqlx.Tx) error {
 				for _, email := range failed {
 					if email.Retries == 4 {
 						_, err = m.database.MarkEmailFailedTx(tx, email)
