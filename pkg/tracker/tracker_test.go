@@ -81,7 +81,9 @@ func TestTracker(t *testing.T) {
 		err = doTest(opt, proj, func(tr *Tracker) error {
 			p := pb.Message{Source: sbs1Source, Icao: "444444"}
 			now := time.Now()
-			err := tr.ProcessMessage(proj, now, &p)
+			s := tr.getSighting(p.Icao)
+			defer s.mu.Unlock()
+			err := tr.ProcessMessage(proj, s, now, &p)
 			if err != nil {
 				return errors.Wrap(err, "process message")
 			}
@@ -101,16 +103,16 @@ func TestTracker(t *testing.T) {
 			assert.Equal(t, p.Icao, ac.Icao)
 			assert.Equal(t, s.a.Id, ac.Id)
 
-			// can load sighting for our project
+			// no sighting yet (until db processing takes place)
 			ourSighting, err := tr.database.LoadLastSighting(proj.Session, ac)
 			assert.NoError(t, err, "expected last sighting, not error")
-			assert.NotNil(t, ourSighting)
+			assert.Nil(t, ourSighting, "last sighting should be nil")
 
 			ob, ok := s.observedBy[proj.Session.Id]
 			assert.True(t, ok, "should find observation by our project on Sighting")
 			assert.Equal(t, *proj, *ob.project, "observation project should match our project")
-			assert.NotNil(t, ob.sighting)
-			assert.Equal(t, ourSighting.Id, ob.sighting.Id)
+			assert.Nil(t, ob.sighting, "sigthing db.Sighting should be nil on init")
+			//assert.Equal(t, ourSighting.Id, ob.sighting.Id)
 
 			return nil
 		})

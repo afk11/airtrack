@@ -14,6 +14,7 @@ type Store struct {
 	alpha2    map[AlphaTwoCountryCode]*Country
 	alpha3    map[AlphaThreeCountryCode]*Country
 }
+
 func (s *Store) GetAlphaTwoCodes() []AlphaTwoCountryCode {
 	codes := make([]AlphaTwoCountryCode, 0, len(s.alpha2))
 	for code := range s.alpha2 {

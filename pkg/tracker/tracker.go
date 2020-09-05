@@ -15,6 +15,7 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/uuid"
+	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -60,17 +61,43 @@ type (
 		long    float64
 		address string
 	}
+	callsignLog struct {
+		callsign string
+		time     time.Time
+	}
+	squawkLog struct {
+		squawk string
+		time   time.Time
+	}
+	locationLog struct {
+		alt int64
+		lat float64
+		lon float64
+		time.Time
+	}
 	ProjectObservation struct {
-		project   *Project
-		sighting  *db.Sighting
-		firstSeen time.Time
-		lastSeen  time.Time
+		db      db.Database
+		project *Project
+
+		mem          *Sighting
+		sighting     *db.Sighting
+		firstSeen    time.Time
+		lastSeen     time.Time
+		haveCallsign bool
+		callsign     string
+
+		haveSquawk bool
+		squawk     string
 
 		origin      *GeocodeLocation
 		destination *GeocodeLocation
 
-		haveAlt  bool
-		altitude int64
+		dirty        bool
+		csLogs       []callsignLog
+		squawkLogs   []squawkLog
+		locationLogs []locationLog
+		haveAlt      bool
+		altitude     int64
 
 		haveGS bool
 		gs     float64
@@ -85,6 +112,7 @@ type (
 		longitude          float64
 		lastLocationUpdate *time.Time
 		locationCount      int64
+		mu                 sync.RWMutex
 	}
 	Sighting struct {
 		State           pb.State
@@ -112,6 +140,7 @@ type (
 		projectAcUpdateListeners []ProjectAircraftUpdateListener
 		consumerCanceller        context.CancelFunc
 		lostAcCanceller          context.CancelFunc
+		dbFlushCanceller         context.CancelFunc
 		consumerWG               sync.WaitGroup
 		mailTemplates            *email.MailTemplates
 	}
@@ -126,15 +155,100 @@ type SightingTags struct {
 	IsInTakeoff bool
 }
 
-func NewProjectObservation(p *Project, s *db.Sighting, msgTime time.Time) *ProjectObservation {
+func NewProjectObservation(db db.Database, p *Project, s *Sighting, msgTime time.Time) *ProjectObservation {
 	return &ProjectObservation{
-		project:   p,
-		sighting:  s,
-		firstSeen: msgTime,
-		lastSeen:  msgTime,
+		db:         db,
+		mem:        s,
+		project:    p,
+		firstSeen:  msgTime,
+		lastSeen:   msgTime,
+		dirty:      true,
+		csLogs:     make([]callsignLog, 0),
+		squawkLogs: make([]squawkLog, 0),
 	}
 }
-
+func (o *ProjectObservation) HasCallSign() bool {
+	return o.haveCallsign
+	//return o.sighting != nil && o.sighting.CallSign != nil
+}
+func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
+	if track {
+		o.dirty = true
+		o.csLogs = append(o.csLogs, callsignLog{callsign, time.Now()})
+	}
+	//o.sighting.CallSign = &callsign
+	o.callsign = callsign
+	if !o.haveCallsign {
+		o.haveCallsign = true
+	}
+	return nil
+}
+func (o *ProjectObservation) CallSign() *string {
+	return &o.callsign
+	//if o.sighting == nil {
+	//	cs := ""
+	//	return &cs
+	//}
+	//return o.sighting.CallSign
+}
+func (o *ProjectObservation) HasSquawk() bool {
+	return o.haveSquawk
+	//return o.sighting != nil && o.sighting.Squawk != nil
+}
+func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
+	if track {
+		o.dirty = true
+		o.squawkLogs = append(o.squawkLogs, squawkLog{squawk, time.Now()})
+	}
+	o.squawk = squawk
+	//o.sighting.Squawk = &squawk
+	if !o.haveSquawk {
+		o.haveSquawk = true
+	}
+	return nil
+}
+func (o *ProjectObservation) Squawk() *string {
+	return &o.squawk
+	//if o.sighting == nil {
+	//	s := ""
+	//	return &s
+	//}
+	//return o.sighting.Squawk
+}
+func (o *ProjectObservation) HaveAltitude() bool {
+	return o.haveAlt
+}
+func (o *ProjectObservation) Altitude() int64 {
+	return o.altitude
+}
+func (o *ProjectObservation) SetAltitude(alt int64) error {
+	o.altitude = alt
+	if !o.haveAlt {
+		o.haveAlt = true
+	}
+	return nil
+}
+func (o *ProjectObservation) HaveLocation() bool {
+	return o.haveLocation
+}
+func (o *ProjectObservation) Location() (float64, float64) {
+	return o.latitude, o.longitude
+}
+func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
+	if track && o.HaveAltitude() {
+		o.dirty = true
+		o.locationCount++
+		o.locationLogs = append(o.locationLogs, locationLog{
+			o.Altitude(), lat, lon, time.Now(),
+		})
+	}
+	o.latitude = lat
+	o.longitude = lon
+	if !o.haveLocation {
+		o.haveLocation = true
+	}
+	return nil
+}
 func NewSightingWithAircraft(a *db.Aircraft) *Sighting {
 	return &Sighting{
 		State: pb.State{
@@ -199,6 +313,10 @@ func (t *Tracker) Start(msgs chan *pb.Message) {
 	lostAcCtx, lostAcCanceller := context.WithCancel(context.Background())
 	t.lostAcCanceller = lostAcCanceller
 	go t.checkForLostAircraft(lostAcCtx)
+
+	dbFlushCtx, dbFlushCanceller := context.WithCancel(context.Background())
+	t.dbFlushCanceller = dbFlushCanceller
+	go t.startDatabaseTask(dbFlushCtx)
 }
 
 func min(a, b int) int {
@@ -214,7 +332,15 @@ func (t *Tracker) Stop() error {
 	t.consumerWG.Wait()
 	log.Debug("cancel lost aircraft handler")
 	t.lostAcCanceller()
+	log.Debug("cancel background database updates")
+	t.dbFlushCanceller()
+	log.Debug("flush database updates")
+	err := t.processDatabaseUpdates()
+	if err != nil {
+		return errors.Wrapf(err, "flushing database updates")
+	}
 
+	// todo: need to trigger flush here so we don't lose data before every shutdown
 	// Take lock ourselves to cleanup pSightings and delete map
 	t.sightingMu.Lock()
 	defer t.sightingMu.Unlock()
@@ -228,10 +354,12 @@ func (t *Tracker) Stop() error {
 		if len(sighting.observedBy) > 0 {
 			pAircraft++
 			for _, observation := range sighting.observedBy {
-				pSightings = append(pSightings, observation.sighting)
 				err := t.handleLostAircraft(observation.project, sighting)
 				if err != nil {
 					log.Warnf("error encountered processing lost aircraft: %s", err.Error())
+				}
+				if observation.sighting != nil {
+					pSightings = append(pSightings, observation.sighting)
 				}
 			}
 		}
@@ -316,6 +444,182 @@ func (t *Tracker) AddProject(p *Project) error {
 	return nil
 }
 
+func (t *Tracker) startDatabaseTask(ctx context.Context) {
+	waitTime := time.Second * 5
+	for {
+		select {
+		case <-time.After(waitTime):
+			err := t.processDatabaseUpdates()
+			if err != nil {
+				panic(err)
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+type csUpdate struct {
+	sighting *db.Sighting
+	csLog    callsignLog
+}
+type squawkUpdate struct {
+	sighting  *db.Sighting
+	squawkLog squawkLog
+}
+type locationUpdate struct {
+	sighting    *db.Sighting
+	locationLog locationLog
+}
+
+func (t *Tracker) processDatabaseUpdates() error {
+	t.projectMu.Lock()
+	defer t.projectMu.Unlock()
+	begin := time.Now()
+	updated := 0
+	var csUpdates []csUpdate
+	var squawkUpdates []squawkUpdate
+	var locationUpdates []locationUpdate
+	for _, proj := range t.projects {
+		proj.obsMu.Lock()
+		for _, o := range proj.Observations {
+			o.mu.Lock()
+			if !o.dirty {
+				o.mu.Unlock()
+				continue
+			}
+			hasNoSighting := o.sighting == nil
+			hasCsLogs := len(o.csLogs) > 0
+			hasSquawkLogs := len(o.squawkLogs) > 0
+			hasLocations := len(o.locationLogs) > 0
+
+			if hasLocations {
+				for _, locationLog := range o.locationLogs {
+					locationUpdates = append(locationUpdates, locationUpdate{
+						sighting:    o.sighting,
+						locationLog: locationLog,
+					})
+				}
+				o.locationLogs = nil
+			}
+
+			if !(hasNoSighting || hasCsLogs || hasSquawkLogs) {
+				continue
+			}
+			err := o.db.Transaction(func(tx *sqlx.Tx) error {
+				var err error
+				if o.sighting == nil {
+					o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a)
+					if err != nil {
+						// Cleanup reserved sighting
+						return errors.Wrapf(err, "failed to init project sighting")
+					}
+				}
+				if len(o.csLogs) > 0 {
+					for _, csLog := range o.csLogs {
+						csUpdates = append(csUpdates, csUpdate{
+							sighting: o.sighting,
+							csLog:    csLog,
+						})
+					}
+					res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
+					if err != nil {
+						return errors.Wrap(err, "updating sighting callsign")
+					} else if err = db.CheckRowsUpdated(res, 1); err != nil {
+						return errors.Wrapf(err, "expected 1 updated row")
+					}
+					o.csLogs = nil
+				}
+				if len(o.squawkLogs) > 0 {
+					for _, squawkLog := range o.squawkLogs {
+						squawkUpdates = append(squawkUpdates, squawkUpdate{
+							sighting:  o.sighting,
+							squawkLog: squawkLog,
+						})
+					}
+
+					_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
+					// todo: add this back in once we have 'sighting restore' added.
+					// reopened sightings trigger update though row count will be zero
+					if err != nil {
+						return errors.Wrap(err, "updating sighting squawk")
+					}
+					o.squawkLogs = nil
+				}
+
+				return nil
+			})
+			if err != nil {
+				o.mu.Unlock()
+				proj.obsMu.Unlock()
+				return err
+			}
+			updated++
+			o.dirty = false
+			o.mu.Unlock()
+		}
+		proj.obsMu.Unlock()
+	}
+
+	csBatch := 100
+	numCsUpdates := len(csUpdates)
+	numSquawkUpdates := len(squawkUpdates)
+	numLocationUpdates := len(locationUpdates)
+
+	for i := 0; i < numCsUpdates; i += csBatch {
+		err := t.database.Transaction(func(tx *sqlx.Tx) error {
+			var err error
+			for _, csUpdate := range csUpdates[i:min(numCsUpdates, i+csBatch)] {
+				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdate.sighting, csUpdate.csLog.callsign, csUpdate.csLog.time)
+				if err != nil {
+					return errors.Wrap(err, "creating callsign record")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.Wrapf(err, "in transaction")
+		}
+	}
+
+	for i := 0; i < numSquawkUpdates; i += csBatch {
+		err := t.database.Transaction(func(tx *sqlx.Tx) error {
+			var err error
+			for _, squawkUpdate := range squawkUpdates[i:min(numSquawkUpdates, i+csBatch)] {
+				_, err = t.database.CreateNewSightingSquawkTx(tx, squawkUpdate.sighting, squawkUpdate.squawkLog.squawk, squawkUpdate.squawkLog.time)
+				if err != nil {
+					return errors.Wrap(err, "creating squawk record")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.Wrapf(err, "in transaction")
+		}
+	}
+
+	for i := 0; i < numLocationUpdates; i += csBatch {
+		err := t.database.Transaction(func(tx *sqlx.Tx) error {
+			for _, locationUpdate := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
+				_, err := t.database.InsertSightingLocationTx(tx, locationUpdate.sighting.Id, time.Now(),
+					locationUpdate.locationLog.alt, locationUpdate.locationLog.lat, locationUpdate.locationLog.lon)
+				if err != nil {
+					return errors.Wrapf(err, "failed to insert sighting location")
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			return errors.Wrapf(err, "in transaction")
+		}
+	}
+
+	timeTaken := time.Since(begin)
+	log.Debugf("flushing updates (took %s)  sightings:%d  callsigns:%d  squawks:%d  locations:%d",
+		timeTaken, updated, numCsUpdates, numSquawkUpdates, numLocationUpdates)
+
+	return nil
+}
 func (t *Tracker) checkForLostAircraft(ctx context.Context) {
 	waitTime := time.Second * 5
 	for {
@@ -356,7 +660,9 @@ func (t *Tracker) doLostAircraftCheck() error {
 						s:       sighting,
 						session: observation.project.Session,
 					})
-					lostDbSightings = append(lostDbSightings, observation.sighting)
+					if observation.sighting != nil {
+						lostDbSightings = append(lostDbSightings, observation.sighting)
+					}
 					lostForProject = true
 				}
 			}
@@ -391,7 +697,7 @@ func (t *Tracker) doLostAircraftCheck() error {
 			if !hadError {
 				delete(lost.s.observedBy, lost.session.Id)
 				if len(lost.s.observedBy) == 0 {
-					delete(t.sighting, lost.s.a.Icao)
+					delete(t.sighting, lost.s.State.Icao)
 				}
 			}
 			uniqueSightings[lost.s.State.Icao] = lost.s
@@ -451,13 +757,13 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	}
 
 	log.Infof("[session %d] %s: lost aircraft (firstSeen: %s, duration: %s)",
-		project.Session.Id, sighting.a.Icao, observation.firstSeen.Format(time.RFC822), time.Since(observation.firstSeen))
+		project.Session.Id, sighting.State.Icao, observation.firstSeen.Format(time.RFC822), time.Since(observation.firstSeen))
 
 	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.haveLocation {
 		if observation.altitude > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport
 			log.Debugf("[session %d] %s: too high to determine destination location",
-				project.Session.Id, sighting.a.Icao)
+				project.Session.Id, sighting.State.Icao)
 			observation.destination = &GeocodeLocation{}
 		} else {
 			location, distance, err := t.reverseGeocode(observation.latitude, observation.longitude)
@@ -466,126 +772,20 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			}
 			if location.ok {
 				log.Debugf("[session %d] %s: Destination reverse geocode result: (%f, %f): %s %.1f km",
-					project.Session.Id, sighting.a.Icao, observation.latitude, observation.longitude, location.address,
+					project.Session.Id, sighting.State.Icao, observation.latitude, observation.longitude, location.address,
 					distance/1000)
 			} else {
 				log.Debugf("[session %d] %s: Reverse geocode search for destination (%f, %f) yielded no results",
-					project.Session.Id, sighting.a.Icao, observation.latitude, observation.longitude)
+					project.Session.Id, sighting.State.Icao, observation.latitude, observation.longitude)
 			}
 			observation.destination = location
 		}
 	}
 
 	if project.IsFeatureEnabled(TrackKmlLocation) && observation.locationCount > 1 {
-		var ac string
-		var source = "Source"
-		var destination = "Destination"
-		startTimeFmt := observation.firstSeen.Format(time.RFC822)
-		endTimeFmt := observation.lastSeen.Format(time.RFC822)
-		sightingDuration := observation.lastSeen.Sub(observation.firstSeen)
-		if observation.sighting.CallSign != nil {
-			ac = *observation.sighting.CallSign
-		} else {
-			ac = sighting.State.Icao
-		}
-		if observation.origin != nil && observation.origin.ok {
-			source += fmt.Sprintf(": near %s", observation.origin.address)
-		}
-		if observation.destination != nil && observation.destination.ok {
-			destination += fmt.Sprintf(": near %s", observation.destination.address)
-		}
-		w := kml.NewWriter(kml.WriterOptions{
-			RouteName:        fmt.Sprintf("%s flight", ac),
-			RouteDescription: fmt.Sprintf("Departure: %s<br />Arrival: %s<br />Flight duration: %s<br />", startTimeFmt, endTimeFmt, sightingDuration),
-
-			SourceName:        source,
-			SourceDescription: fmt.Sprintf("Departed at %s", startTimeFmt),
-
-			DestinationName:        destination,
-			DestinationDescription: fmt.Sprintf("Arrived at %s", endTimeFmt),
-		})
-
-		var numPoints int
-		var firstPos, lastPos *db.SightingLocation
-		err := t.database.GetLocationHistoryWalkBatch(observation.sighting, LocationFetchBatchSize, func(location []db.SightingLocation) {
-			if firstPos == nil {
-				firstPos = &location[0]
-			}
-			lastPos = &location[len(location)-1]
-			w.Write(location)
-			numPoints += len(location)
-		})
+		err := t.processLostAircraftMap(sighting, observation)
 		if err != nil {
-			return errors.Wrapf(err, "error walking location history")
-		}
-
-		log.Debugf("[session %d] location history for %s had %d points",
-			project.Session.Id, sighting.a.Icao, numPoints)
-
-		kmlStr, err := w.Final()
-		if err != nil {
-			return errors.Wrapf(err, "generating KML file")
-		}
-
-		var mapUpdated bool
-		sightingKml, err := t.database.LoadSightingKml(observation.sighting)
-		if err == sql.ErrNoRows {
-			log.Debugf("[session %d] creating KML for %s", project.Session.Id, sighting.a.Icao)
-			// Can be created
-			_, err = t.database.CreateSightingKml(observation.sighting, kmlStr)
-			if err != nil {
-				err = errors.Wrap(err, "create sighting kml")
-			}
-		} else if err == nil {
-			mapUpdated = true
-			log.Debugf("[session %d] updating KML for %s", project.Session.Id, sighting.a.Icao)
-			isSameKml := sightingKml.Kml == kmlStr
-			if isSameKml {
-				log.Warnf("sighting %d sighting_kml %d - tried to update kml with same content",
-					sightingKml.SightingId, sightingKml.Id)
-			}
-
-			_, err = t.database.UpdateSightingKml(sightingKml, kmlStr)
-			if err != nil {
-				err = errors.Wrap(err, "update sighting kml")
-			}
-		}
-
-		if err != nil {
-			return errors.Wrapf(err,"creating/updating sighting KML")
-		}
-
-		if project.IsEmailNotificationEnabled(MapProduced) {
-			sp := email.MapProducedParameters{
-				Project:      project.Name,
-				Icao:         sighting.a.Icao,
-				StartTimeFmt: startTimeFmt,
-				EndTimeFmt:   endTimeFmt,
-				DurationFmt:  sightingDuration.String(),
-				StartLocation: email.Location{
-					Latitude:  firstPos.Latitude,
-					Longitude: firstPos.Longitude,
-					Altitude:  firstPos.Altitude,
-				},
-				EndLocation: email.Location{
-					Latitude:  lastPos.Latitude,
-					Longitude: lastPos.Longitude,
-					Altitude:  lastPos.Altitude,
-				},
-				MapUpdated: mapUpdated,
-			}
-			if observation.sighting.CallSign != nil {
-				sp.CallSign = *observation.sighting.CallSign
-			}
-			log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.a.Icao, MapProduced)
-			msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, kmlStr, sp)
-			if err != nil {
-				return errors.Wrapf(err,"creating MapProduced email")
-			}
-			err = t.opt.Mailer.Queue(*msg)
-			if err != nil {
-				return errors.Wrapf(err,"queueing MapProduced email for delivery")
-			}
+			return errors.Wrapf(err, "processLostAircraftMap")
 		}
 	}
 
@@ -595,7 +795,123 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	}
 	return nil
 }
+func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *ProjectObservation) error {
+	if observation.sighting == nil {
+		return nil
+	}
+	var ac string
+	var source = "Source"
+	var destination = "Destination"
+	project := observation.project
+	startTimeFmt := observation.firstSeen.Format(time.RFC822)
+	endTimeFmt := observation.lastSeen.Format(time.RFC822)
+	sightingDuration := observation.lastSeen.Sub(observation.firstSeen)
+	if observation.HasCallSign() {
+		ac = *observation.CallSign()
+	} else {
+		ac = sighting.State.Icao
+	}
+	if observation.origin != nil && observation.origin.ok {
+		source += fmt.Sprintf(": near %s", observation.origin.address)
+	}
+	if observation.destination != nil && observation.destination.ok {
+		destination += fmt.Sprintf(": near %s", observation.destination.address)
+	}
+	w := kml.NewWriter(kml.WriterOptions{
+		RouteName:        fmt.Sprintf("%s flight", ac),
+		RouteDescription: fmt.Sprintf("Departure: %s<br />Arrival: %s<br />Flight duration: %s<br />", startTimeFmt, endTimeFmt, sightingDuration),
 
+		SourceName:        source,
+		SourceDescription: fmt.Sprintf("Departed at %s", startTimeFmt),
+
+		DestinationName:        destination,
+		DestinationDescription: fmt.Sprintf("Arrived at %s", endTimeFmt),
+	})
+
+	var numPoints int
+	var firstPos, lastPos *db.SightingLocation
+	err := t.database.GetLocationHistoryWalkBatch(observation.sighting, LocationFetchBatchSize, func(location []db.SightingLocation) {
+		if firstPos == nil {
+			firstPos = &location[0]
+		}
+		lastPos = &location[len(location)-1]
+		w.Write(location)
+		numPoints += len(location)
+	})
+	if err != nil {
+		return errors.Wrapf(err, "error walking location history")
+	}
+
+	log.Debugf("[session %d] location history for %s had %d points",
+		project.Session.Id, sighting.State.Icao, numPoints)
+
+	kmlStr, err := w.Final()
+	if err != nil {
+		return errors.Wrapf(err, "generating KML file")
+	}
+
+	var mapUpdated bool
+	sightingKml, err := t.database.LoadSightingKml(observation.sighting)
+	if err == sql.ErrNoRows {
+		log.Debugf("[session %d] creating KML for %s", project.Session.Id, sighting.State.Icao)
+		// Can be created
+		_, err = t.database.CreateSightingKml(observation.sighting, kmlStr)
+		if err != nil {
+			err = errors.Wrap(err, "create sighting kml")
+		}
+	} else if err == nil {
+		mapUpdated = true
+		log.Debugf("[session %d] updating KML for %s", project.Session.Id, sighting.State.Icao)
+		isSameKml := sightingKml.Kml == kmlStr
+		if isSameKml {
+			log.Warnf("sighting %d sighting_kml %d - tried to update kml with same content",
+				sightingKml.SightingId, sightingKml.Id)
+		}
+
+		_, err = t.database.UpdateSightingKml(sightingKml, kmlStr)
+		if err != nil {
+			err = errors.Wrap(err, "update sighting kml")
+		}
+	}
+
+	if err != nil {
+		return errors.Wrapf(err, "creating/updating sighting KML")
+	}
+
+	if project.IsEmailNotificationEnabled(MapProduced) {
+		sp := email.MapProducedParameters{
+			Project:      project.Name,
+			Icao:         sighting.State.Icao,
+			StartTimeFmt: startTimeFmt,
+			EndTimeFmt:   endTimeFmt,
+			DurationFmt:  sightingDuration.String(),
+			StartLocation: email.Location{
+				Latitude:  firstPos.Latitude,
+				Longitude: firstPos.Longitude,
+				Altitude:  firstPos.Altitude,
+			},
+			EndLocation: email.Location{
+				Latitude:  lastPos.Latitude,
+				Longitude: lastPos.Longitude,
+				Altitude:  lastPos.Altitude,
+			},
+			MapUpdated: mapUpdated,
+		}
+		if observation.HasCallSign() {
+			sp.CallSign = *observation.CallSign()
+		}
+		log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.State.Icao, MapProduced)
+		msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, kmlStr, sp)
+		if err != nil {
+			return errors.Wrapf(err, "creating MapProduced email")
+		}
+		err = t.opt.Mailer.Queue(*msg)
+		if err != nil {
+			return errors.Wrapf(err, "queueing MapProduced email for delivery")
+		}
+	}
+	return nil
+}
 func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 	defer t.consumerWG.Done()
 
@@ -603,13 +919,20 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 		inflightMsgVec.WithLabelValues().Inc()
 		t.projectMu.RLock()
 		now := time.Now()
+		s := t.getSighting(msg.Icao)
+		err := t.UpdateStateFromMessage(s, msg, now)
+		if err != nil {
+			s.mu.Unlock()
+			panic(err)
+		}
 		for _, proj := range t.projects {
-			err := t.ProcessMessage(proj, now, msg)
+			err = t.ProcessMessage(proj, s, now, msg)
 			if err != nil {
-				t.projectMu.RUnlock()
+				s.mu.Unlock()
 				panic(err)
 			}
 		}
+		s.mu.Unlock()
 		t.projectMu.RUnlock()
 		aircraftCountVec.WithLabelValues().Set(float64(len(t.sighting)))
 		inflightMsgVec.WithLabelValues().Dec()
@@ -635,15 +958,7 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 	return s
 }
 
-func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Message) error {
-	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
-		us := v * 1000000 // make microseconds
-		msgDurations.Observe(us)
-	}))
-	defer timer.ObserveDuration()
-
-	s := t.getSighting(msg.Icao)
-	defer s.mu.Unlock()
+func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
 
 	s.lastSeen = now
 
@@ -747,6 +1062,14 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			log.Tracef("icao %s country determined: %s %s", s.State.Icao, code.String(), country.Name())
 		}
 	}
+	return nil
+}
+func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, msg *pb.Message) error {
+	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
+		us := v * 1000000 // make microseconds
+		msgDurations.Observe(us)
+	}))
+	defer timer.ObserveDuration()
 
 	// Evaluate filter, see if we wish to continue
 	if project.Program != nil {
@@ -762,64 +1085,108 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 
 	// Create if missing, and assign to sighting
 	if s.a == nil {
+		var err error
 		s.a, err = t.loadAircraft(s.State.Icao)
 		if err != nil {
-			return errors.Wrapf(err,"loading aircraft by icao")
+			return errors.Wrapf(err, "loading aircraft by icao")
 		}
 	}
 
 	// initialize project sighting, if not already done
 	observation, ok := s.observedBy[project.Session.Id]
-	var firstSighting bool
+	var sightingOpened bool
 	if !ok {
-		sighting, isReopened, err := t.initProjectSighting(project, s.a)
-		if err != nil {
-			// Cleanup reserved sighting
-			return errors.Wrapf(err, "failed to init project sighting")
-		}
-		observation = NewProjectObservation(project, sighting, now)
+		//sighting, _, err := t.initProjectSighting(project, s.a)
+		//if err != nil {
+		//	// Cleanup reserved sighting
+		//	return errors.Wrapf(err, "failed to init project sighting")
+		//}
+		observation = NewProjectObservation(t.database, project, s, now)
+		//observation.sighting = sighting
+		project.obsMu.Lock()
 		s.observedBy[project.Session.Id] = observation
-		firstSighting = !isReopened
+		project.Observations[s.State.Icao] = observation
+		project.obsMu.Unlock()
+		sightingOpened = true
 	}
+	observation.mu.Lock()
+	defer observation.mu.Unlock()
 
 	// Update Projects information in DB
 	observation.lastSeen = now
 
-	var updatedAlt, updatedLocation, updatedCallSign, updatedSquawk, updatedGS, updatedTrack bool
+	var updatedAlt, updatedLocation, updatedGS, updatedTrack bool
 	if s.State.HaveAltitude {
-		updatedAlt = !observation.haveAlt || (s.State.Altitude != observation.altitude)
+		updatedAlt = !observation.HaveAltitude() || s.State.Altitude != observation.Altitude()
 		if updatedAlt {
-			observation.altitude = s.State.Altitude
-			observation.haveAlt = true
+			err := observation.SetAltitude(s.State.Altitude)
+			if err != nil {
+				return errors.Wrapf(err, "setting altitude")
+			}
 		}
 	}
 	if s.State.HaveTrack {
-		updatedTrack = !observation.haveTrack || (s.State.Track != observation.track)
+		updatedTrack = !observation.haveTrack || s.State.Track != observation.track
 		if updatedTrack {
 			observation.track = s.State.Track
 			observation.haveTrack = true
 		}
 	}
 	if s.State.HaveGroundSpeed {
-		updatedGS = !observation.haveGS || (s.State.GroundSpeed != observation.gs)
+		updatedGS = !observation.haveGS || s.State.GroundSpeed != observation.gs
 		if updatedGS {
 			observation.gs = s.State.GroundSpeed
 			observation.haveGS = true
 		}
 	}
 	if s.State.HaveLocation {
-		updatedLocation = !observation.haveLocation || (s.State.Latitude != observation.latitude || s.State.Longitude != observation.longitude)
+		oldlat, oldlon := observation.Location()
+		updatedLocation = !observation.HaveLocation() || s.State.Latitude != oldlat || s.State.Longitude != oldlon
 		if updatedLocation {
-			observation.latitude = s.State.Latitude
-			observation.longitude = s.State.Longitude
-			observation.haveLocation = true
+			err := observation.SetLocation(s.State.Latitude, s.State.Longitude, project.IsFeatureEnabled(TrackKmlLocation))
+			if err != nil {
+				return errors.Wrapf(err, "setting location")
+			}
+		}
+		// We have alt + location, and there's been an update - save the location
+		if (observation.HaveAltitude() && observation.HaveLocation()) &&
+			(updatedAlt || updatedLocation) &&
+			project.IsFeatureEnabled(TrackKmlLocation) {
+			log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f)",
+				project.Session.Id, s.State.Icao, observation.Altitude(), s.State.Latitude, s.State.Longitude)
 		}
 	}
 	if s.State.HaveCallsign {
-		updatedCallSign = observation.sighting.CallSign == nil || (s.State.CallSign != *observation.sighting.CallSign)
+		updatedCallSign := !observation.HasCallSign() || s.State.CallSign != *observation.CallSign()
+		if updatedCallSign {
+			if project.IsFeatureEnabled(TrackCallSigns) {
+				if observation.HasCallSign() {
+					log.Infof("[session %d] %s: updated callsign %s -> %s", project.Session.Id, s.State.Icao, *observation.CallSign(), s.State.CallSign)
+				} else {
+					log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
+				}
+			}
+			err := observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns))
+			if err != nil {
+				return errors.Wrapf(err, "setting callsign")
+			}
+		}
 	}
 	if s.State.HaveSquawk {
-		updatedSquawk = observation.sighting.Squawk == nil || (s.State.Squawk != *observation.sighting.Squawk)
+		updatedSquawk := !observation.HasSquawk() || (s.State.Squawk != *observation.Squawk())
+		if updatedSquawk {
+			if project.IsFeatureEnabled(TrackSquawks) {
+				if observation.HasSquawk() {
+					log.Infof("[session %d] %s: updated squawk %s -> %s", project.Session.Id, s.State.Icao, *observation.Squawk(), s.State.Squawk)
+				} else {
+					log.Infof("[session %d] %s: found squawk %s", project.Session.Id, s.State.Icao, s.State.Squawk)
+				}
+			}
+			err := observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks))
+			if err != nil {
+				return errors.Wrapf(err, "setting squawk")
+			}
+		}
 	}
 
 	if s.Tags.IsInTakeoff != observation.tags.IsInTakeoff {
@@ -844,11 +1211,11 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 						},
 					})
 					if err != nil {
-						return errors.Wrapf(err,"preparing TakeoffFromAirport email")
+						return errors.Wrapf(err, "preparing TakeoffFromAirport email")
 					}
 					err = t.opt.Mailer.Queue(*msg)
 					if err != nil {
-						return errors.Wrapf(err,"queueing TakeoffFromAirport email")
+						return errors.Wrapf(err, "queueing TakeoffFromAirport email")
 					}
 				} else if !geocodeOK && project.IsEmailNotificationEnabled(TakeoffUnknownAirport) {
 					// didn't geocode origin airport
@@ -904,7 +1271,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 		}
 	}
 
-	if firstSighting && project.IsEmailNotificationEnabled(SpottedInFlight) {
+	if sightingOpened && project.IsEmailNotificationEnabled(SpottedInFlight) {
 		log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, SpottedInFlight)
 		msg, err := email.PrepareSpottedInFlightEmail(t.mailTemplates, project.NotifyEmail, email.SpottedInFlightParameters{
 			Project:      project.Name,
@@ -921,103 +1288,25 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 			return errors.Wrapf(err, "queueing SpottedInFlight email")
 		}
 	}
-
-	if s.State.HaveAltitude && s.State.HaveLocation && project.IsFeatureEnabled(TrackKmlLocation) {
-		// We have alt + location, and there's been an update - save the location
-		if (observation.haveAlt && observation.haveLocation) && (updatedAlt || updatedLocation) {
-			_, err = t.database.InsertSightingLocation(observation.sighting.Id, now,
-				observation.altitude, observation.latitude, observation.longitude)
-			if err != nil {
-				return errors.Wrapf(err, "failed to insert sighting location")
-			}
-			observation.locationCount++
-			log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f)",
-				project.Session.Id, msg.Icao, observation.altitude, observation.latitude, observation.longitude)
-		}
-	}
-
-	if updatedCallSign && project.IsFeatureEnabled(TrackCallSigns) {
-		err := t.database.Transaction(func(tx *sql.Tx) error {
-			res, err := t.database.UpdateSightingCallsignTx(tx, observation.sighting, s.State.CallSign)
-			if err != nil {
-				return errors.Wrap(err, "updating sighting callsign")
-			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
-				return errors.Wrapf(err, "expected 1 updated row")
-			}
-			_, err = t.database.CreateNewSightingCallSignTx(tx, observation.sighting, s.State.CallSign, now)
-			if err != nil {
-				return errors.Wrap(err, "creating callsign record")
-			}
-			return nil
-
-		})
-		if err != nil {
-			return errors.Wrap(err, "saving callsign")
-		}
-		if observation.sighting.CallSign == nil {
-			log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
-		} else {
-			log.Infof("[session %d] %s: updated callsign %s -> %s", project.Session.Id, s.State.Icao, *observation.sighting.CallSign, s.State.CallSign)
-		}
-		observation.sighting.CallSign = &msg.CallSign
-	}
-
-	if updatedSquawk && project.IsFeatureEnabled(TrackSquawks) {
-		if observation.sighting.Squawk == nil {
-			log.Infof("[session %d] %s: found squawk %s", project.Session.Id, s.State.Icao, s.State.Squawk)
-		} else {
-			log.Infof("[session %d] %s: updated squawk %s -> %s", project.Session.Id, s.State.Icao, *observation.sighting.Squawk, s.State.Squawk)
-		}
-
-		// db
-		err := t.database.Transaction(func(tx *sql.Tx) error {
-			res, err := t.database.UpdateSightingSquawkTx(tx, observation.sighting, s.State.Squawk)
-			// todo: add this back in once we have 'sighting restore' added.
-			// reopened sightings trigger update though row count will be zero
-			if err != nil {
-				return errors.Wrap(err, "updating sighting squawk")
-			}
-			//else if err = db.CheckRowsUpdated(res, 1); err != nil {
-			//	return err
-			//}
-			affected, err := res.RowsAffected()
-			if err != nil {
-				return errors.Wrapf(err, "getting rows affected")
-			}
-			// work around - don't repeatedly save squawks, til we deal with 'sighting restore'
-			if affected > 0 {
-				_, err = t.database.CreateNewSightingSquawkTx(tx, observation.sighting, s.State.Squawk, now)
-				if err != nil {
-					return errors.Wrap(err, "creating squawk record")
-				}
-			}
-			return nil
-		})
-		if err != nil {
-			return errors.Wrap(err, "saving squawk")
-		}
-		observation.sighting.Squawk = &s.State.Squawk
-		// end of db
-	}
-
-	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.origin == nil && observation.haveLocation {
+	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.origin == nil && observation.HaveLocation() {
 		if observation.altitude > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport
 			log.Debugf("[session %d] %s: too high to determine origin location (%d over max %d)",
 				project.Session.Id, s.State.Icao, observation.altitude, t.opt.NearestAirportMaxAltitude)
 			observation.origin = &GeocodeLocation{}
 		} else {
-			location, distance, err := t.reverseGeocode(observation.latitude, observation.longitude)
+			lat, lon := observation.Location()
+			location, distance, err := t.reverseGeocode(lat, lon)
 			if err != nil {
 				return errors.Wrap(err, "searching origin")
 			}
 			if location.ok {
 				log.Debugf("[session %d] %s: Origin reverse geocode result: (%f, %f): %s %.1f km",
-					project.Session.Id, s.State.Icao, observation.latitude, observation.longitude, location.address,
+					project.Session.Id, s.State.Icao, lat, lon, location.address,
 					distance/1000)
 			} else {
 				log.Debugf("[session %d] %s: Reverse geocode search for origin (%f, %f) yielded no results",
-					project.Session.Id, s.State.Icao, observation.latitude, observation.longitude)
+					project.Session.Id, s.State.Icao, lat, lon)
 			}
 			observation.origin = location
 		}
@@ -1025,7 +1314,7 @@ func (t *Tracker) ProcessMessage(project *Project, now time.Time, msg *pb.Messag
 
 	numListeners := len(t.projectAcUpdateListeners)
 	for i := 0; i < numListeners; i++ {
-		if firstSighting {
+		if sightingOpened {
 			t.projectAcUpdateListeners[i].NewAircraft(project, s)
 		} else {
 			t.projectAcUpdateListeners[i].UpdatedAircraft(project, s)
@@ -1057,8 +1346,8 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 	return a, nil
 }
 
-func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting, bool, error) {
-	s, err := t.database.LoadLastSighting(p.Session, ac)
+func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) (*db.Sighting, bool, error) {
+	s, err := t.database.LoadLastSightingTx(tx, p.Session, ac)
 	if err != nil {
 		return nil, false, err
 	}
@@ -1072,7 +1361,7 @@ func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting
 		// todo: maybe other checks here, like, finished_on_ground or something to avoid rapid stops, so
 		// we break up legs of the journey
 		if timeSinceClosed < p.ReopenSightingsInterval {
-			res, err := t.database.ReopenSighting(s)
+			res, err := t.database.ReopenSightingTx(tx, s)
 			if err != nil {
 				return nil, false, errors.Wrap(err, "reopening sighting")
 			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
@@ -1085,7 +1374,7 @@ func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting
 	}
 
 	// A new sighting is needed
-	res, err := t.database.CreateSighting(p.Session, ac)
+	res, err := t.database.CreateSightingTx(tx, p.Session, ac)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "creating sighting record failed")
 	}
@@ -1093,7 +1382,7 @@ func (t *Tracker) initProjectSighting(p *Project, ac *db.Aircraft) (*db.Sighting
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "fetching sighting id failed")
 	}
-	s, err = t.database.LoadSightingById(sightingId)
+	s, err = t.database.LoadSightingByIdTx(tx, sightingId)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "load sighting by id failed")
 	}

@@ -2,8 +2,6 @@ package tracker
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -17,44 +15,6 @@ import (
 const (
 	DefaultAdsbxEndpoint = "https://adsbexchange.com/api/aircraft/json/"
 )
-
-type AdsbxAircraftResponse struct {
-	Aircraft []AdsbxAircraft `json:"ac"`
-	Msg      string          `json:"msg"`
-	Total    int64           `json:"total"`
-	CTime    int64           `json:"ctime"`
-	PTime    int64           `json:"ptime"`
-}
-
-type AdsbxAircraft struct {
-	PosTime      string `json:"postime"`
-	Icao         string `json:"icao"`
-	Registration string `json:"reg"`
-	Type         string `json:"type"`
-	Wtc          string `json:"wtc"`
-	Spd          string `json:"spd"`
-	Altt         string `json:"altt"`
-	Alt          string `json:"alt"`
-	Galt         string `json:"galt"`
-	Talt         string `json:"talt"`
-	Lat          string `json:"lat"`
-	Lon          string `json:"lon"`
-	Vsit         string `json:"vsit"`
-	Vsi          string `json:"vsi"`
-	Trkh         string `json:"trkh"`
-	Ttrk         string `json:"ttrk"`
-	Trak         string `json:"trak"`
-	Sqk          string `json:"sqk"`
-	Call         string `json:"call"`
-	Ground       string `json:"gnd"`
-	Trt          string `json:"trt"`
-	Pos          string `json:"pos"`
-	Mlat         string `json:"mlat"`
-	Tisb         string `json:"tisb"`
-	Sat          string `json:"sat"`
-	Opicao       string `json:"opicao"`
-	Country      string `json:"cou"`
-}
 
 type jsonDecodeError struct {
 	err      error
@@ -97,14 +57,17 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 
 	go func() {
 		select {
-		case <-time.After(time.Minute):
-			panic(fmt.Errorf("running after 1 minute, on request %d", p.numReqs))
+		//case <-time.After(time.Minute):
+		//	panic(fmt.Errorf("running after 1 minute, on request %d", p.numReqs))
 		case <-cancelled:
 			log.Debugf("adsbx http request terminated normally after %s", time.Since(start))
 			break
 		}
 	}()
 
+	msg := &AdsbxAircraftResponse{}
+	var body []byte
+	var err error
 	req, err := http.NewRequest("GET", p.url, nil)
 	if err != nil {
 		return err
@@ -123,7 +86,7 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 	}
 
 	// check status
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
@@ -138,8 +101,7 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 	//}
 	//counter++
 
-	msg := &AdsbxAircraftResponse{}
-	err = json.Unmarshal(body, msg)
+	err = msg.UnmarshalJSON(body)
 	if err != nil {
 		return &jsonDecodeError{err, body}
 	}

@@ -125,7 +125,7 @@ func CheckRowsUpdated(res sql.Result, expectAffected int64) error {
 }
 
 type Database interface {
-	Transaction(f func(tx *sql.Tx) error) error
+	Transaction(f func(tx *sqlx.Tx) error) error
 	NewCollectionSite(siteName string, now time.Time) (sql.Result, error)
 	LoadCollectionSite(siteName string) (*CollectionSite, error)
 	NewCollectionSession(site *CollectionSite, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
@@ -135,26 +135,31 @@ type Database interface {
 	LoadAircraftById(id int64) (*Aircraft, error)
 	CreateAircraft(icao string) (sql.Result, error)
 	CreateSighting(session *CollectionSession, ac *Aircraft) (sql.Result, error)
+	CreateSightingTx(tx *sqlx.Tx, session *CollectionSession, ac *Aircraft) (sql.Result, error)
 	ReopenSighting(sighting *Sighting) (sql.Result, error)
+	ReopenSightingTx(tx *sqlx.Tx, sighting *Sighting) (sql.Result, error)
 	LoadLastSighting(session *CollectionSession, ac *Aircraft) (*Sighting, error)
-	UpdateSightingCallsignTx(tx *sql.Tx, sighting *Sighting, callsign string) (sql.Result, error)
-	UpdateSightingSquawkTx(tx *sql.Tx, sighting *Sighting, squawk string) (sql.Result, error)
+	LoadLastSightingTx(tx *sqlx.Tx, session *CollectionSession, ac *Aircraft) (*Sighting, error)
+	UpdateSightingCallsignTx(tx *sqlx.Tx, sighting *Sighting, callsign string) (sql.Result, error)
+	UpdateSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, squawk string) (sql.Result, error)
 	CloseSightingBatch(sightings []*Sighting) error
 	LoadSightingById(sightingId int64) (*Sighting, error)
-	CreateNewSightingCallSignTx(tx *sql.Tx, sighting *Sighting, callsign string, observedAt time.Time) (sql.Result, error)
+	LoadSightingByIdTx(tx *sqlx.Tx, sightingId int64) (*Sighting, error)
+	CreateNewSightingCallSignTx(tx *sqlx.Tx, sighting *Sighting, callsign string, observedAt time.Time) (sql.Result, error)
 	InsertSightingLocation(sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
+	InsertSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
 	GetLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error)
 	GetLocationHistoryWalkBatch(sighting *Sighting, batchSize int64, f func([]SightingLocation)) error
 	GetFullLocationHistory(sighting *Sighting, batchSize int64) ([]SightingLocation, error)
-	CreateNewSightingSquawkTx(tx *sql.Tx, sighting *Sighting, squawk string, observedAt time.Time) (sql.Result, error)
+	CreateNewSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, squawk string, observedAt time.Time) (sql.Result, error)
 	LoadSightingKml(sighting *Sighting) (*SightingKml, error)
 	UpdateSightingKml(sightingKml *SightingKml, kmlStr string) (sql.Result, error)
 	CreateSightingKml(sighting *Sighting, kmlData string) (sql.Result, error)
-	CreateEmailJobTx(tx *sql.Tx, createdAt time.Time, content []byte) (sql.Result, error)
+	CreateEmailJobTx(tx *sqlx.Tx, createdAt time.Time, content []byte) (sql.Result, error)
 	GetPendingEmailJobs(now time.Time) ([]Email, error)
-	DeleteCompletedEmail(tx *sql.Tx, job Email) (sql.Result, error)
-	MarkEmailFailedTx(tx *sql.Tx, job Email) (sql.Result, error)
-	RetryEmailAfter(tx *sql.Tx, job Email, retryAfter time.Time) (sql.Result, error)
+	DeleteCompletedEmail(tx *sqlx.Tx, job Email) (sql.Result, error)
+	MarkEmailFailedTx(tx *sqlx.Tx, job Email) (sql.Result, error)
+	RetryEmailAfter(tx *sqlx.Tx, job Email, retryAfter time.Time) (sql.Result, error)
 }
 type DatabaseImpl struct {
 	db      *sqlx.DB
@@ -164,8 +169,8 @@ type DatabaseImpl struct {
 func NewDatabase(db *sqlx.DB, dialect goqu.DialectWrapper) *DatabaseImpl {
 	return &DatabaseImpl{db: db, dialect: dialect}
 }
-func (d *DatabaseImpl) Transaction(f func(tx *sql.Tx) error) error {
-	return NewTxExecer(d.db.DB, f).Exec()
+func (d *DatabaseImpl) Transaction(f func(tx *sqlx.Tx) error) error {
+	return NewTxExecer(d.db, f).Exec()
 }
 func (d *DatabaseImpl) NewCollectionSite(siteName string, now time.Time) (sql.Result, error) {
 	q := d.dialect.
@@ -317,6 +322,19 @@ func (d *DatabaseImpl) CreateSighting(session *CollectionSession, ac *Aircraft) 
 	}
 	return d.db.Exec(s, p...)
 }
+func (d *DatabaseImpl) CreateSightingTx(tx *sqlx.Tx, session *CollectionSession, ac *Aircraft) (sql.Result, error) {
+	now := time.Now()
+	s, p, err := d.dialect.
+		Insert("sighting").
+		Prepared(true).
+		Cols("collection_site_id", "collection_session_id", "aircraft_id", "created_at", "updated_at").
+		Vals(goqu.Vals{session.CollectionSiteId, session.Id, ac.Id, &now, &now}).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+	return tx.Exec(s, p...)
+}
 func (d *DatabaseImpl) ReopenSighting(sighting *Sighting) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Update("collection_session").
@@ -330,6 +348,25 @@ func (d *DatabaseImpl) ReopenSighting(sighting *Sighting) (sql.Result, error) {
 		return nil, err
 	}
 	res, err := d.db.Exec(s, p...)
+	if err != nil {
+		return nil, err
+	}
+	sighting.ClosedAt = nil
+	return res, nil
+}
+func (d *DatabaseImpl) ReopenSightingTx(tx *sqlx.Tx, sighting *Sighting) (sql.Result, error) {
+	s, p, err := d.dialect.
+		Update("collection_session").
+		Prepared(true).
+		Set(goqu.Ex{
+			"closed_at": nil,
+		}).
+		Where(goqu.C("id").Eq(sighting.Id)).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+	res, err := tx.Exec(s, p...)
 	if err != nil {
 		return nil, err
 	}
@@ -360,7 +397,32 @@ func (d *DatabaseImpl) LoadLastSighting(session *CollectionSession, ac *Aircraft
 	}
 	return sighting, nil
 }
-func (d *DatabaseImpl) UpdateSightingCallsignTx(tx *sql.Tx, sighting *Sighting, callsign string) (sql.Result, error) {
+
+func (d *DatabaseImpl) LoadLastSightingTx(tx *sqlx.Tx, session *CollectionSession, ac *Aircraft) (*Sighting, error) {
+	s, p, err := d.dialect.
+		From("sighting").
+		Prepared(true).
+		Where(goqu.Ex{
+			"collection_session_id": session.Id,
+			"aircraft_id":           ac.Id,
+		}).
+		Order(goqu.C("id").Desc()).
+		Limit(1).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+	row := tx.QueryRowx(s, p...)
+	sighting := &Sighting{}
+	err = row.StructScan(sighting)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
+	}
+	return sighting, nil
+}
+func (d *DatabaseImpl) UpdateSightingCallsignTx(tx *sqlx.Tx, sighting *Sighting, callsign string) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Update("sighting").
 		Prepared(true).
@@ -374,7 +436,7 @@ func (d *DatabaseImpl) UpdateSightingCallsignTx(tx *sql.Tx, sighting *Sighting, 
 	}
 	return tx.Exec(s, p...)
 }
-func (d *DatabaseImpl) UpdateSightingSquawkTx(tx *sql.Tx, sighting *Sighting, squawk string) (sql.Result, error) {
+func (d *DatabaseImpl) UpdateSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, squawk string) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Update("sighting").
 		Prepared(true).
@@ -394,7 +456,7 @@ func (d *DatabaseImpl) CloseSightingBatch(sightings []*Sighting) error {
 	}
 	n := len(sightings)
 	closedAt := time.Now()
-	err := d.Transaction(func(tx *sql.Tx) error {
+	err := d.Transaction(func(tx *sqlx.Tx) error {
 		var ids []uint64
 		for i := 0; i < n; i++ {
 			ids = append(ids, sightings[i].Id)
@@ -444,8 +506,27 @@ func (d *DatabaseImpl) LoadSightingById(sightingId int64) (*Sighting, error) {
 	}
 	return sighting, nil
 }
+func (d *DatabaseImpl) LoadSightingByIdTx(tx *sqlx.Tx, sightingId int64) (*Sighting, error) {
+	s, p, err := d.dialect.
+		From("sighting").
+		Prepared(true).
+		Where(goqu.C("id").Eq(sightingId)).
+		Limit(1).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+	// index: aircraft_id, collection_session_id
+	row := tx.QueryRowx(s, p...)
+	sighting := &Sighting{}
+	err = row.StructScan(sighting)
+	if err != nil {
+		return nil, err
+	}
+	return sighting, nil
+}
 
-func (d *DatabaseImpl) CreateNewSightingCallSignTx(tx *sql.Tx, sighting *Sighting, callsign string, observedAt time.Time) (sql.Result, error) {
+func (d *DatabaseImpl) CreateNewSightingCallSignTx(tx *sqlx.Tx, sighting *Sighting, callsign string, observedAt time.Time) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert("sighting_callsign").
 		Prepared(true).
@@ -472,6 +553,19 @@ func (d *DatabaseImpl) InsertSightingLocation(sightingId uint64, t time.Time, al
 	return d.db.Exec(s, p...)
 }
 
+func (d *DatabaseImpl) InsertSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
+	s, p, err := d.dialect.
+		Insert("sighting_location").
+		Prepared(true).
+		Cols("sighting_id", "timestamp", "altitude", "latitude", "longitude").
+		Vals(goqu.Vals{sightingId, t, altitude, lat, long}).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+	// index: aircraft_id, collection_session_id
+	return tx.Exec(s, p...)
+}
 func (d *DatabaseImpl) GetLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error) {
 	s, p, err := d.dialect.
 		From("sighting_location").
@@ -533,7 +627,7 @@ func (d *DatabaseImpl) GetFullLocationHistory(sighting *Sighting, batchSize int6
 	}
 	return h, nil
 }
-func (d *DatabaseImpl) CreateNewSightingSquawkTx(tx *sql.Tx, sighting *Sighting, squawk string, observedAt time.Time) (sql.Result, error) {
+func (d *DatabaseImpl) CreateNewSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, squawk string, observedAt time.Time) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert("sighting_squawk").
 		Prepared(true).
@@ -602,7 +696,7 @@ func (d *DatabaseImpl) CreateSightingKml(sighting *Sighting, kmlData string) (sq
 	return d.db.Exec(s, p...)
 }
 
-func (d *DatabaseImpl) CreateEmailJobTx(tx *sql.Tx, createdAt time.Time, content []byte) (sql.Result, error) {
+func (d *DatabaseImpl) CreateEmailJobTx(tx *sqlx.Tx, createdAt time.Time, content []byte) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert("email_v2").
 		Prepared(true).
@@ -646,12 +740,12 @@ func (d *DatabaseImpl) GetPendingEmailJobs(now time.Time) ([]Email, error) {
 	return jobs, nil
 }
 
-func (d *DatabaseImpl) DeleteCompletedEmail(tx *sql.Tx, job Email) (sql.Result, error) {
+func (d *DatabaseImpl) DeleteCompletedEmail(tx *sqlx.Tx, job Email) (sql.Result, error) {
 	return tx.Exec("DELETE FROM email_v2 WHERE id = ?", job.Id)
 }
-func (d *DatabaseImpl) MarkEmailFailedTx(tx *sql.Tx, job Email) (sql.Result, error) {
+func (d *DatabaseImpl) MarkEmailFailedTx(tx *sqlx.Tx, job Email) (sql.Result, error) {
 	return tx.Exec("UPDATE email_v2 SET retry_after = 0, status = ? WHERE id = ?", EmailFailed, job.Id)
 }
-func (d *DatabaseImpl) RetryEmailAfter(tx *sql.Tx, job Email, retryAfter time.Time) (sql.Result, error) {
+func (d *DatabaseImpl) RetryEmailAfter(tx *sqlx.Tx, job Email, retryAfter time.Time) (sql.Result, error) {
 	return tx.Exec("UPDATE email_v2 SET retry_after = ?, retries = ? WHERE id = ?", retryAfter, job.Retries+1, job.Id)
 }

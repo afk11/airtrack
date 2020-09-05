@@ -16,6 +16,7 @@ import (
 	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 	"github.com/pkg/errors"
 	"os"
+	"strings"
 	"time"
 )
 
@@ -127,6 +128,11 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 		if err != nil {
 			return nil, err
 		}
+		sep := "?"
+		if strings.Contains(u, "?") {
+			sep = "&"
+		}
+		u = u + sep + "multiStatements=true"
 		db, err = sql.Open("mysql", u)
 		if err != nil {
 			return nil, err

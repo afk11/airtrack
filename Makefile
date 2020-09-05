@@ -7,6 +7,8 @@ TAR1090_VERSION=a0491945db41aaa7d49df2951ce1019968048046
 
 install-go-bindata:
 		go get -u github.com/jteeuwen/go-bindata/...
+install-easyjson:
+		go get -u github.com/mailru/easyjson/...
 build-bindata-assets:
 		go-bindata -pkg asset -o ./pkg/assets/asset.go assets/...
 build-bindata-migrations:
@@ -17,6 +19,12 @@ build-bindata-dump1090: dump1090
 		go-bindata -pkg acmap -o ./pkg/dump1090/acmap/assets.go dump1090/...
 build-bindata-tar1090: tar1090
 		go-bindata -pkg tar1090 -o ./pkg/tar1090/assets.go tar1090/...
+build-bindata-openaip: build-dir-airports
+		go-bindata -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
+build-bindata: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip
+build-easyjson-adsbx:
+		easyjson -all ./pkg/tracker/adsbx_http.go
+build-easyjson: build-easyjson-adsbx
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
 delete-build-dir:
@@ -26,14 +34,12 @@ build-dir:
 build-dir-airports: build-dir
 		mkdir build/airports/
 		go run ./contrib/copy_airport_resources/main.go resources/airports
-build-bindata-openaip: build-dir-airports
-		go-bindata -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
-build-airtrack-linux-amd64: delete-build-dir build-bindata-openaip build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
+build-airtrack-linux-amd64: delete-build-dir build-bindata build-easyjson build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
-build-airtrack-qa-linux-amd64: delete-build-dir build-bindata-openaip build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090 build-protobuf
+build-airtrack-qa-linux-amd64: delete-build-dir build-bindata build-easyjson build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
-test: build-bindata-openaip test-cleanup build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-dump1090 build-bindata-tar1090
+test: delete-build-dir build-bindata build-easyjson test-cleanup
 	go test -coverprofile=./coverage/tests.out ./... \
 	$(TESTARGS)
 

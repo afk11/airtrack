@@ -1,0 +1,1 @@
+drop index `sighting_aircraft_session`;
