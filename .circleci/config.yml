@@ -29,8 +29,8 @@ jobs: # basic units of work in a run
             - go-mod-v4-{{ checksum "go.sum" }}
 
       - run:
-          name: Install go-bindata
-          command: make install-go-bindata
+          name: Install go-bindata and easyjson
+          command: make install-go-bindata install-easyjson
 
       - run:
           name: Run unit tests
