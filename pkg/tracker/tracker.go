@@ -162,6 +162,7 @@ func NewProjectObservation(db db.Database, p *Project, s *Sighting, msgTime time
 		project:    p,
 		firstSeen:  msgTime,
 		lastSeen:   msgTime,
+		dirty:      true,
 		csLogs:     make([]callsignLog, 0),
 		squawkLogs: make([]squawkLog, 0),
 	}
@@ -331,7 +332,14 @@ func (t *Tracker) Stop() error {
 	t.consumerWG.Wait()
 	log.Debug("cancel lost aircraft handler")
 	t.lostAcCanceller()
+	log.Debug("cancel background database updates")
 	t.dbFlushCanceller()
+	log.Debug("flush database updates")
+	err := t.processDatabaseUpdates()
+	if err != nil {
+		return errors.Wrapf(err, "flushing database updates")
+	}
+
 	// todo: need to trigger flush here so we don't lose data before every shutdown
 	// Take lock ourselves to cleanup pSightings and delete map
 	t.sightingMu.Lock()
@@ -467,7 +475,7 @@ type locationUpdate struct {
 func (t *Tracker) processDatabaseUpdates() error {
 	t.projectMu.Lock()
 	defer t.projectMu.Unlock()
-
+	begin := time.Now()
 	updated := 0
 	var csUpdates []csUpdate
 	var squawkUpdates []squawkUpdate
@@ -478,6 +486,24 @@ func (t *Tracker) processDatabaseUpdates() error {
 			o.mu.Lock()
 			if !o.dirty {
 				o.mu.Unlock()
+				continue
+			}
+			hasNoSighting := o.sighting == nil
+			hasCsLogs := len(o.csLogs) > 0
+			hasSquawkLogs := len(o.squawkLogs) > 0
+			hasLocations := len(o.locationLogs) > 0
+
+			if hasLocations {
+				for _, locationLog := range o.locationLogs {
+					locationUpdates = append(locationUpdates, locationUpdate{
+						sighting:    o.sighting,
+						locationLog: locationLog,
+					})
+				}
+				o.locationLogs = nil
+			}
+
+			if !(hasNoSighting || hasCsLogs || hasSquawkLogs) {
 				continue
 			}
 			err := o.db.Transaction(func(tx *sqlx.Tx) error {
@@ -520,15 +546,7 @@ func (t *Tracker) processDatabaseUpdates() error {
 					}
 					o.squawkLogs = nil
 				}
-				if len(o.locationLogs) > 0 {
-					for _, locationLog := range o.locationLogs {
-						locationUpdates = append(locationUpdates, locationUpdate{
-							sighting:    o.sighting,
-							locationLog: locationLog,
-						})
-					}
-					o.locationLogs = nil
-				}
+
 				return nil
 			})
 			if err != nil {
@@ -595,6 +613,10 @@ func (t *Tracker) processDatabaseUpdates() error {
 			return errors.Wrapf(err, "in transaction")
 		}
 	}
+
+	timeTaken := time.Since(begin)
+	log.Debugf("flushing updates (took %s)  sightings:%d  callsigns:%d  squawks:%d  locations:%d",
+		timeTaken, updated, numCsUpdates, numSquawkUpdates, numLocationUpdates)
 
 	return nil
 }
