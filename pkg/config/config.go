@@ -14,7 +14,7 @@ const (
 	// MailDriverSmtp - the only support SMTP driver
 	MailDriverSmtp           = "smtp"
 	DatabaseDriverMySQL      = "mysql"
-	DatabaseDriverPostgresql = "postgresql"
+	DatabaseDriverPostgresql = "postgres"
 	DatabaseDriverSqlite3    = "sqlite3"
 )
 
@@ -197,9 +197,16 @@ func (d *Database) DataSource(loc *time.Location) (string, error) {
 func (d *Database) NetworkDatabaseUrl(location *time.Location) (string, error) {
 	if d.Database == "" {
 		return "", errors.New("database cannot be empty")
+	} else if d.Driver == DatabaseDriverMySQL {
+		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
+			d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(location.String())), nil
+	} else if d.Driver == DatabaseDriverPostgresql {
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s ",
+			d.Host, d.Port, d.Username, d.Password, d.Database), nil
+	} else {
+		return "", errors.New("error creating database connection string - wrong driver type for NetworkDatabaseUrl")
 	}
-	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
-		d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(location.String())), nil
+
 }
 func (d *Database) Sqlite3Url(location *time.Location) (string, error) {
 	if d.Database == "" {

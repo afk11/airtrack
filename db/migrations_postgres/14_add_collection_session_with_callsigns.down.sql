@@ -1,0 +1,1 @@
+alter table collection_session drop column with_callsigns;

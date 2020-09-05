@@ -1,0 +1,1 @@
+alter table sighting drop column transmission_types;

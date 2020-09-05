@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db/migrations"
+	"github.com/afk11/airtrack/pkg/db/migrations_postgres"
 	"github.com/afk11/airtrack/pkg/db/migrations_sqlite3"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database"
 	"github.com/golang-migrate/migrate/database/mysql"
+	"github.com/golang-migrate/migrate/database/postgres"
 	"github.com/golang-migrate/migrate/database/sqlite3"
 	"github.com/golang-migrate/migrate/source"
 	bindata "github.com/golang-migrate/migrate/source/go_bindata"
@@ -123,28 +125,40 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 	var src source.Driver
 	var err error
 	switch dbConf.Driver {
-	case config.DatabaseDriverMySQL:
+	case config.DatabaseDriverMySQL, config.DatabaseDriverPostgresql:
 		u, err := dbConf.NetworkDatabaseUrl(loc)
 		if err != nil {
 			return nil, err
 		}
-		sep := "?"
-		if strings.Contains(u, "?") {
-			sep = "&"
+		if dbConf.Driver == config.DatabaseDriverMySQL {
+			sep := "?"
+			if strings.Contains(u, "?") {
+				sep = "&"
+			}
+			u = u + sep + "multiStatements=true"
 		}
-		u = u + sep + "multiStatements=true"
-		db, err = sql.Open("mysql", u)
+
+		db, err = sql.Open(dbConf.Driver, u)
 		if err != nil {
 			return nil, err
 		}
-		driver, err = mysql.WithInstance(db, &mysql.Config{})
+		var s *bindata.AssetSource
+		if dbConf.Driver == config.DatabaseDriverPostgresql {
+			s = bindata.Resource(migrations_postgres.AssetNames(),
+				func(name string) ([]byte, error) {
+					return migrations_postgres.Asset(name)
+				})
+			driver, err = postgres.WithInstance(db, &postgres.Config{})
+		} else {
+			s = bindata.Resource(migrations.AssetNames(),
+				func(name string) ([]byte, error) {
+					return migrations.Asset(name)
+				})
+			driver, err = mysql.WithInstance(db, &mysql.Config{})
+		}
 		if err != nil {
 			return nil, err
 		}
-		s := bindata.Resource(migrations.AssetNames(),
-			func(name string) ([]byte, error) {
-				return migrations.Asset(name)
-			})
 		src, err = bindata.WithInstance(s)
 		if err != nil {
 			return nil, err

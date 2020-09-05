@@ -1,0 +1,3 @@
+migrations/*.go
+migrations_sqlite3/*.go
+migrations_postgres/*.go
