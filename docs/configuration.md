@@ -244,7 +244,7 @@ PostgreSQL is a database server that is connected to over the network.
 A config file extract of PostgreSQL configuration:
 ```yaml
 # ...
-driver: postgresql
+driver: postgres
 host: server.local
 port: 3306
 username: airtrack

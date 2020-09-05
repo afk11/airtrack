@@ -493,6 +493,56 @@ func (t *Tracker) processDatabaseUpdates() error {
 			hasSquawkLogs := len(o.squawkLogs) > 0
 			hasLocations := len(o.locationLogs) > 0
 
+			if hasNoSighting || hasCsLogs || hasSquawkLogs {
+				err := o.db.Transaction(func(tx *sqlx.Tx) error {
+					var err error
+					if hasNoSighting {
+						o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a)
+						if err != nil {
+							// Cleanup reserved sighting
+							return errors.Wrapf(err, "failed to init project sighting")
+						}
+					}
+					if hasCsLogs {
+						for _, csLog := range o.csLogs {
+							csUpdates = append(csUpdates, csUpdate{
+								sighting: o.sighting,
+								csLog:    csLog,
+							})
+						}
+						res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
+						if err != nil {
+							return errors.Wrap(err, "updating sighting callsign")
+						} else if err = db.CheckRowsUpdated(res, 1); err != nil {
+							return errors.Wrapf(err, "expected 1 updated row")
+						}
+						o.csLogs = nil
+					}
+					if hasSquawkLogs {
+						for _, squawkLog := range o.squawkLogs {
+							squawkUpdates = append(squawkUpdates, squawkUpdate{
+								sighting:  o.sighting,
+								squawkLog: squawkLog,
+							})
+						}
+
+						_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
+						// todo: add this back in once we have 'sighting restore' added.
+						// reopened sightings trigger update though row count will be zero
+						if err != nil {
+							return errors.Wrap(err, "updating sighting squawk")
+						}
+						o.squawkLogs = nil
+					}
+
+					return nil
+				})
+				if err != nil {
+					o.mu.Unlock()
+					proj.obsMu.Unlock()
+					return err
+				}
+			}
 			if hasLocations {
 				for _, locationLog := range o.locationLogs {
 					locationUpdates = append(locationUpdates, locationUpdate{
@@ -503,57 +553,6 @@ func (t *Tracker) processDatabaseUpdates() error {
 				o.locationLogs = nil
 			}
 
-			if !(hasNoSighting || hasCsLogs || hasSquawkLogs) {
-				continue
-			}
-			err := o.db.Transaction(func(tx *sqlx.Tx) error {
-				var err error
-				if o.sighting == nil {
-					o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a)
-					if err != nil {
-						// Cleanup reserved sighting
-						return errors.Wrapf(err, "failed to init project sighting")
-					}
-				}
-				if len(o.csLogs) > 0 {
-					for _, csLog := range o.csLogs {
-						csUpdates = append(csUpdates, csUpdate{
-							sighting: o.sighting,
-							csLog:    csLog,
-						})
-					}
-					res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
-					if err != nil {
-						return errors.Wrap(err, "updating sighting callsign")
-					} else if err = db.CheckRowsUpdated(res, 1); err != nil {
-						return errors.Wrapf(err, "expected 1 updated row")
-					}
-					o.csLogs = nil
-				}
-				if len(o.squawkLogs) > 0 {
-					for _, squawkLog := range o.squawkLogs {
-						squawkUpdates = append(squawkUpdates, squawkUpdate{
-							sighting:  o.sighting,
-							squawkLog: squawkLog,
-						})
-					}
-
-					_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
-					// todo: add this back in once we have 'sighting restore' added.
-					// reopened sightings trigger update though row count will be zero
-					if err != nil {
-						return errors.Wrap(err, "updating sighting squawk")
-					}
-					o.squawkLogs = nil
-				}
-
-				return nil
-			})
-			if err != nil {
-				o.mu.Unlock()
-				proj.obsMu.Unlock()
-				return err
-			}
 			updated++
 			o.dirty = false
 			o.mu.Unlock()
@@ -1327,15 +1326,11 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 	// create sighting
 	a, err := t.database.LoadAircraftByIcao(icao)
 	if err == sql.ErrNoRows {
-		acRes, err := t.database.CreateAircraft(icao)
+		_, err := t.database.CreateAircraft(icao)
 		if err != nil {
 			return nil, err
 		}
-		acId, err := acRes.LastInsertId()
-		if err != nil {
-			return nil, err
-		}
-		a, err = t.database.LoadAircraftById(acId)
+		a, err = t.database.LoadAircraftByIcao(icao)
 		if err != nil {
 			return nil, err
 		}
@@ -1374,17 +1369,13 @@ func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) 
 	}
 
 	// A new sighting is needed
-	res, err := t.database.CreateSightingTx(tx, p.Session, ac)
+	_, err = t.database.CreateSightingTx(tx, p.Session, ac)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "creating sighting record failed")
 	}
-	sightingId, err := res.LastInsertId()
+	s, err = t.database.LoadLastSightingTx(tx, p.Session, ac)
 	if err != nil {
-		return nil, false, errors.Wrapf(err, "fetching sighting id failed")
-	}
-	s, err = t.database.LoadSightingByIdTx(tx, sightingId)
-	if err != nil {
-		return nil, false, errors.Wrapf(err, "load sighting by id failed")
+		return nil, false, errors.Wrapf(err, "load new sighting failed")
 	}
 
 	if s != nil && s.ClosedAt != nil {

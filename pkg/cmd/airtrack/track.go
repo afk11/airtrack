@@ -65,9 +65,6 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	if cfg.Database.Driver != config.DatabaseDriverMySQL && cfg.Database.Driver != config.DatabaseDriverSqlite3 {
-		return errors.New("postgresql not yet supported")
-	}
 	dbUrl, err := cfg.Database.DataSource(loc)
 	if err != nil {
 		return err
