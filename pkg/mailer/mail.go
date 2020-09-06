@@ -1,6 +1,7 @@
 package mailer
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	"encoding/json"
@@ -11,7 +12,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
-	"strings"
 	"sync"
 	"time"
 )
@@ -143,7 +143,7 @@ func (m *Mailer) processMails() error {
 			msg.SetHeader("Subject", job.Subject)
 			msg.SetBody("text/html", job.Body)
 			for _, attach := range job.Attachments {
-				msg.AttachReader(attach.ContentType, strings.NewReader(attach.Contents), mail.Rename(attach.FileName))
+				msg.AttachReader(attach.ContentType, bytes.NewBuffer(attach.Contents), mail.Rename(attach.FileName))
 			}
 			err := mail.Send(sendCloser, msg)
 			if err != nil {

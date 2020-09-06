@@ -169,7 +169,7 @@ func PrepareSpottedInFlightEmail(templates *MailTemplates, to string, params Spo
 	return buildEmail(templates, SpottedInFlight, to, subject, params)
 }
 
-func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile string, params MapProducedParameters) (*db.EmailJob, error) {
+func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile []byte, params MapProducedParameters) (*db.EmailJob, error) {
 	action := "created"
 	var callsign string
 	if params.MapUpdated {
