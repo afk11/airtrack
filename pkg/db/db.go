@@ -1,11 +1,14 @@
 package db
 
 import (
+	"bytes"
+	"compress/gzip"
 	"database/sql"
 	"github.com/doug-martin/goqu/v9"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
+	"io/ioutil"
 	"time"
 )
 
@@ -13,6 +16,7 @@ const (
 	EmailPending            = 1
 	EmailFailed             = 0
 	KmlPlainTextContentType = 0
+	KmlGzipContentType      = 1
 )
 
 type (
@@ -71,7 +75,7 @@ type (
 		Id          uint64 `db:"id"`
 		SightingId  uint64 `db:"sighting_id"`
 		ContentType int32  `db:"content_type"`
-		Kml         string `db:"kml"`
+		Kml         []byte `db:"kml"`
 	}
 
 	SightingLocation struct {
@@ -103,7 +107,7 @@ type (
 	EmailAttachment struct {
 		ContentType string `json:"content_type"`
 		FileName    string `json:"filename"`
-		Contents    string `json:"contents"`
+		Contents    []byte `json:"contents"`
 	}
 
 	EmailJob struct {
@@ -114,6 +118,32 @@ type (
 	}
 )
 
+func (k *SightingKml) UpdateKml(kml []byte) error {
+	var b bytes.Buffer
+	w := gzip.NewWriter(&b)
+	_, err := w.Write(kml)
+	if err != nil {
+		return err
+	}
+	k.ContentType = KmlGzipContentType
+	k.Kml = b.Bytes()
+	return nil
+}
+
+func (k *SightingKml) DecodedKml() ([]byte, error) {
+	if k.ContentType == KmlGzipContentType {
+		r, err := gzip.NewReader(bytes.NewBuffer(k.Kml))
+		if err != nil {
+			return nil, errors.Wrapf(err, "creating gzip reader for kml")
+		}
+		decomp, err := ioutil.ReadAll(r)
+		if err != nil {
+			return nil, errors.Wrapf(err, "decompressing gzipped kml")
+		}
+		return decomp, nil
+	}
+	return k.Kml, nil
+}
 func CheckRowsUpdated(res sql.Result, expectAffected int64) error {
 	affected, err := res.RowsAffected()
 	if err != nil {
@@ -153,8 +183,8 @@ type Database interface {
 	GetFullLocationHistory(sighting *Sighting, batchSize int64) ([]SightingLocation, error)
 	CreateNewSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, squawk string, observedAt time.Time) (sql.Result, error)
 	LoadSightingKml(sighting *Sighting) (*SightingKml, error)
-	UpdateSightingKml(sightingKml *SightingKml, kmlStr string) (sql.Result, error)
-	CreateSightingKml(sighting *Sighting, kmlData string) (sql.Result, error)
+	UpdateSightingKml(sightingKml *SightingKml) (sql.Result, error)
+	CreateSightingKml(sighting *Sighting, kmlData []byte) (sql.Result, error)
 	CreateEmailJobTx(tx *sqlx.Tx, createdAt time.Time, content []byte) (sql.Result, error)
 	GetPendingEmailJobs(now time.Time) ([]Email, error)
 	DeleteCompletedEmail(tx *sqlx.Tx, job Email) (sql.Result, error)
@@ -658,15 +688,16 @@ func (d *DatabaseImpl) LoadSightingKml(sighting *Sighting) (*SightingKml, error)
 	}
 	return sightingKml, nil
 }
-func (d *DatabaseImpl) UpdateSightingKml(sightingKml *SightingKml, kmlStr string) (sql.Result, error) {
-	isSameKml := sightingKml.Kml == kmlStr
+
+func (d *DatabaseImpl) UpdateSightingKml(sightingKml *SightingKml) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Update("sighting_kml").
 		Prepared(true).
 		Set(goqu.Ex{
-			"kml": kmlStr,
+			"kml":          sightingKml.Kml,
+			"content_type": sightingKml.ContentType,
 		}).
-		Where(goqu.C("id").In(sightingKml.Id)).
+		Where(goqu.C("id").Eq(sightingKml.Id)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -675,20 +706,27 @@ func (d *DatabaseImpl) UpdateSightingKml(sightingKml *SightingKml, kmlStr string
 	if err != nil {
 		return nil, err
 	} else if err = CheckRowsUpdated(res, 1); err != nil {
-		if isSameKml {
-			panic("rows wrong, and isSameKml!")
-		}
 		return nil, err
 	}
-	sightingKml.Kml = kmlStr
 	return res, nil
 }
-func (d *DatabaseImpl) CreateSightingKml(sighting *Sighting, kmlData string) (sql.Result, error) {
+func (d *DatabaseImpl) CreateSightingKml(sighting *Sighting, kmlData []byte) (sql.Result, error) {
+	var b bytes.Buffer
+	w := gzip.NewWriter(&b)
+	_, err := w.Write(kmlData)
+	if err != nil {
+		return nil, err
+	}
+	err = w.Flush()
+	if err != nil {
+		return nil, err
+	}
+
 	s, p, err := d.dialect.
 		Insert("sighting_kml").
 		Prepared(true).
 		Cols("sighting_id", "content_type", "kml").
-		Vals(goqu.Vals{sighting.Id, KmlPlainTextContentType, kmlData}).
+		Vals(goqu.Vals{sighting.Id, KmlGzipContentType, b.Bytes()}).
 		ToSQL()
 	if err != nil {
 		return nil, err

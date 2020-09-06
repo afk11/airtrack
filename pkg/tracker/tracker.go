@@ -849,25 +849,25 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 		return errors.Wrapf(err, "generating KML file")
 	}
 
+	plainTextKml := []byte(kmlStr)
+
 	var mapUpdated bool
 	sightingKml, err := t.database.LoadSightingKml(observation.sighting)
 	if err == sql.ErrNoRows {
 		log.Debugf("[session %d] creating KML for %s", project.Session.Id, sighting.State.Icao)
 		// Can be created
-		_, err = t.database.CreateSightingKml(observation.sighting, kmlStr)
+		_, err = t.database.CreateSightingKml(observation.sighting, plainTextKml)
 		if err != nil {
 			err = errors.Wrap(err, "create sighting kml")
 		}
 	} else if err == nil {
 		mapUpdated = true
 		log.Debugf("[session %d] updating KML for %s", project.Session.Id, sighting.State.Icao)
-		isSameKml := sightingKml.Kml == kmlStr
-		if isSameKml {
-			log.Warnf("sighting %d sighting_kml %d - tried to update kml with same content",
-				sightingKml.SightingId, sightingKml.Id)
+		err := sightingKml.UpdateKml(plainTextKml)
+		if err != nil {
+			return errors.Wrapf(err, "updating kml")
 		}
-
-		_, err = t.database.UpdateSightingKml(sightingKml, kmlStr)
+		_, err = t.database.UpdateSightingKml(sightingKml)
 		if err != nil {
 			err = errors.Wrap(err, "update sighting kml")
 		}
@@ -900,7 +900,7 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 			sp.CallSign = *observation.CallSign()
 		}
 		log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, sighting.State.Icao, MapProduced)
-		msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, kmlStr, sp)
+		msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, plainTextKml, sp)
 		if err != nil {
 			return errors.Wrapf(err, "creating MapProduced email")
 		}

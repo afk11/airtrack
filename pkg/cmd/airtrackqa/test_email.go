@@ -102,12 +102,13 @@ func (e *TestEmail) Run(ctx *Context) error {
 		if err != nil {
 			return err
 		}
+		kmlBytes := []byte(kmlStr)
 		firstSeen := sighting.CreatedAt
 		lastSeen := time.Now()
 		if sighting.ClosedAt != nil {
 			lastSeen = *sighting.ClosedAt
 		}
-		job, err = email.PrepareMapProducedEmail(tpls, e.To, kmlStr, email.MapProducedParameters{
+		job, err = email.PrepareMapProducedEmail(tpls, e.To, kmlBytes, email.MapProducedParameters{
 			Project:      "TESTEMAIL",
 			Icao:         ac.Icao,
 			CallSign:     *sighting.CallSign,
