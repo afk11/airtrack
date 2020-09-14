@@ -21,7 +21,7 @@ int modesmessage_is_track_valid(struct modesMessage *mm) {
 int modesmessage_is_track_rate_valid(struct modesMessage *mm) {
     return mm->track_rate_valid;
 }
-int modesmessage_is_heading_type_valid(struct modesMessage *mm) {
+int modesmessage_is_heading_valid(struct modesMessage *mm) {
     return mm->heading_valid;
 }
 int modesmessage_is_roll_valid(struct modesMessage *mm) {
@@ -213,7 +213,6 @@ int modesmessage_is_opstatus_cc_lw_valid(struct modesMessage *mm) {
 import "C"
 
 import (
-	"bytes"
 	"encoding/hex"
 	"fmt"
 	"github.com/pkg/errors"
@@ -246,6 +245,9 @@ const (
 func IcaoFilterInit() {
 	C.icaoFilterInit()
 }
+func IcaoFilterExpire() {
+	C.icaoFilterExpire()
+}
 func ModeACInit() {
 	C.modeACInit()
 }
@@ -255,32 +257,116 @@ func ModesChecksumInit(numbits int) {
 func DfToString(df uint) string {
 	return C.GoString(C.df_to_string(C.uint(df)))
 }
-func ParseMessage(b []byte) ([]*C.struct_modesMessage, int, error) {
-	var buf [512]byte
-	var ret []*C.struct_modesMessage
 
-	for i := 0; i < len(b); i++ {
-		buf[i] = b[i]
+type ModesMessage struct {
+	msg *C.struct_modesMessage
+}
+
+func (m *ModesMessage) GetIcaoHex() string {
+	icao := [3]byte{}
+	icao[0] = byte(m.msg.addr >> 16)
+	icao[1] = byte(m.msg.addr >> 8)
+	icao[2] = byte(m.msg.addr >> 0)
+	return hex.EncodeToString(icao[:])
+}
+
+var ErrNoData = errors.New("no data for field")
+
+func (m *ModesMessage) GetSquawk() (string, error) {
+	if C.modesmessage_is_squawk_valid(m.msg) != 1 {
+		return "", ErrNoData
 	}
+	return fmt.Sprintf("%04x", uint(m.msg.squawk)), nil
+}
+func (m *ModesMessage) GetCallsign() (string, error) {
+	if C.modesmessage_is_callsign_valid(m.msg) != 1 {
+		return "", ErrNoData
+	}
+	return C.GoString((*C.char)(unsafe.Pointer(&m.msg.callsign[0]))), nil
+}
+func (m *ModesMessage) GetAltitudeBaro() (int64, error) {
+	if C.modesmessage_is_altitude_baro_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+
+	// todo: wtf units are we returning - convert?
+	return int64(m.msg.altitude_baro), nil
+}
+func (m *ModesMessage) GetAltitudeGeom() (int64, error) {
+	if C.modesmessage_is_altitude_geom_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+
+	// todo: wtf units are we returning - convert?
+	return int64(m.msg.altitude_geom), nil
+}
+func (m *ModesMessage) GetRateBaro() (int, error) {
+	if C.modesmessage_is_baro_rate_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+
+	// todo: wtf units are we returning - convert?
+	return int(m.msg.baro_rate), nil
+}
+func (m *ModesMessage) GetRateGeom() (int64, error) {
+	if C.modesmessage_is_geom_rate_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+
+	// todo: wtf units are we returning - convert?
+	return int64(m.msg.geom_rate), nil
+}
+
+// GetGroundSpeed returns the ground speed in knots, or ErrNoData
+// if the data is not set.
+func (m *ModesMessage) GetGroundSpeed() (float64, error) {
+	if C.modesmessage_is_gs_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+
+	return float64(m.msg.gs.selected), nil
+}
+func (m *ModesMessage) GetDecodeLocation() (float64, float64, error) {
+	if C.modesmessage_is_cpr_valid(m.msg) != 1 ||
+		C.modesmessage_is_cpr_decoded(m.msg) != 1 {
+		return 0, 0, ErrNoData
+	}
+	lat := float64(m.msg.decoded_lat)
+	lon := float64(m.msg.decoded_lon)
+	return lat, lon, nil
+}
+func (m *ModesMessage) IsOnGround() (bool, error) {
+	if m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_INVALID ||
+		m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_UNCERTAIN {
+		return false, ErrNoData
+	}
+	return m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_GROUND, nil
+}
+func (m *ModesMessage) GetHeading() (float64, error) {
+	if C.modesmessage_is_heading_valid(m.msg) != 1 {
+		return 0.0, ErrNoData
+	}
+	return float64(m.msg.heading), nil
+}
+func ParseMessage(b []byte) ([]*ModesMessage, int, error) {
+	var ret []*ModesMessage
+
 	n := len(b)
-	fmt.Println(hex.EncodeToString(buf[:]))
-	fmt.Printf("read %d bytes\n", n)
 	som := 0
-	eod := n
+	eod := n - 1
 	var eom int
 	for som < eod {
-		for som < eod && buf[som] != 0x1a {
-			fmt.Printf("first char not 0x1a (%c)\n", buf[som])
+		for som < eod && b[som] != 0x1a {
 			som++
 		}
-		if buf[som] != 0x1a {
-			panic("invalid message, no start found")
+		if b[som] != 0x1a {
+			break
 		}
 		p := som + 1
 		if p >= eod {
-			panic("incomplete message in buffer, retry later")
+			break
 		}
-		switch buf[p] {
+		switch b[p] {
 		case AsciiIntZero + 1:
 			eom = p + ModeACMsgBytes + 8
 		case AsciiIntZero + 2:
@@ -292,37 +378,32 @@ func ParseMessage(b []byte) ([]*C.struct_modesMessage, int, error) {
 		case AsciiIntZero + 5:
 			eom = p + ModeSLongMsgBytes + 8
 		default:
-			fmt.Printf("unknown  (%c)- loop\n", buf[p])
 			som = som + 1
 			continue
 		}
 		for p = som + 1; p < eod && p < eom; p++ {
-			if 0x1a == buf[p] {
+			if 0x1a == b[p] {
 				p++
 				eom++
 			}
 		}
 
 		if eom > eod {
-			fmt.Printf("ood - loop (%d > %d ?)\n", eom, eod)
 			// incomplete message in buffer, retry later
 			break
 		}
 
-		mm, err := DecodeBeastMessage(buf[:], som+1, true)
-		if err != nil {
-			panic(err)
-		}
-		ret = append(ret, mm)
-		// go to next message
+		mm, err := DecodeBinMessage(b[:], som+1, true)
 		som = eom
-		var b bytes.Buffer
-		DebugModesMessage(&b, mm)
-		fmt.Println(b.String())
+		// this ignores errors from messages, some are just CRC decode
+		// errors and so on
+		if err == nil {
+			ret = append(ret, &ModesMessage{msg: mm})
+		}
 	}
 	return ret, som, nil
 }
-func DecodeBeastMessage(m []byte, p int, withModeAC bool) (*C.struct_modesMessage, error) {
+func DecodeBinMessage(m []byte, p int, withModeAC bool) (*C.struct_modesMessage, error) {
 	var msgLen = 0
 	var ch byte
 	var j int
@@ -355,9 +436,7 @@ func DecodeBeastMessage(m []byte, p int, withModeAC bool) (*C.struct_modesMessag
 		return nil, nil
 	}
 
-	fmt.Println("process")
 	if msgLen > 0 {
-		fmt.Println(hex.EncodeToString(m[p : p+msgLen]))
 		mm.remote = 1
 		mm.timestampMsg = 0
 		var t uint64
@@ -395,13 +474,12 @@ func DecodeBeastMessage(m []byte, p int, withModeAC bool) (*C.struct_modesMessag
 		if msgLen == ModeACMsgBytes {
 			mm := C.struct_modesMessage{}
 			// is a void function
-			C.decodeModeAMessage((*C.struct_modesMessage)(unsafe.Pointer(&mm)), C.int((msg[0] << 8) | msg[1]))
+			C.decodeModeAMessage((*C.struct_modesMessage)(unsafe.Pointer(&mm)), C.int((C.int(msg[0])<<8)|C.int(msg[1])))
 			return &mm, nil
 		} else {
 			mm := C.struct_modesMessage{}
 			var modes *C.struct__Modes = nil
 			ret := int(C.decodeModesMessage(modes, (*C.struct_modesMessage)(unsafe.Pointer(&mm)), (*C.uchar)(unsafe.Pointer(&msg[0]))))
-			fmt.Printf("decode code %d\n", ret)
 			if ret < 0 {
 				if ret == -1 {
 					return nil, errors.New("couldn't validate CRC against known ICAO")
@@ -659,7 +737,7 @@ func DebugModesMessage(w io.Writer, mm *C.struct_modesMessage) error {
 		}
 	}
 
-	if C.modesmessage_is_heading_type_valid(mm) == 1 {
+	if C.modesmessage_is_heading_valid(mm) == 1 {
 		_, err = fmt.Fprintf(w, "  %-13s  %.1f\n", C.GoString(C.heading_type_to_string(mm.heading_type)), mm.heading)
 		if err != nil {
 			return err

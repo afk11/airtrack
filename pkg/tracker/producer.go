@@ -28,6 +28,11 @@ func (e *jsonDecodeError) Error() string {
 	return e.err.Error()
 }
 
+type Producer interface {
+	Name() string
+	Start()
+	Stop()
+}
 type AdsbxProducer struct {
 	url                 string
 	apikey              string
@@ -188,6 +193,9 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 		}
 	}
 }
+func (p *AdsbxProducer) Name() string {
+	return "adsbx"
+}
 func (p *AdsbxProducer) Start() {
 	p.wg.Add(1)
 	ctx, canceller := context.WithCancel(context.Background())
@@ -200,5 +208,4 @@ func (p *AdsbxProducer) Stop() {
 	println("producer wait")
 	p.wg.Wait()
 	println("producer close messages")
-	close(p.messages)
 }

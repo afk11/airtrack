@@ -31,7 +31,6 @@ func main() {
 	//mm := C.struct_modesMessage{}
 	//var modes *C.struct__Modes = nil
 	//ret := int(C.decodeModesMessage(modes, (*C.struct_modesMessage)(unsafe.Pointer(&mm)), (*C.uchar)(unsafe.Pointer(&b[0]))))
-	//fmt.Printf("decode code %d\n", ret)
 
 	_, _, err 	= readsb.ParseMessage(b)
 	if err != nil {

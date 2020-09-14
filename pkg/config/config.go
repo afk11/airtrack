@@ -149,9 +149,17 @@ type (
 		ApiKey string `yaml:"apikey"`
 	}
 
+	BeastConfig struct {
+		// IP or hostname for beast server
+		Host string `yaml:"host"`
+		// Port for beast services (port 30005)
+		Port uint16 `yaml:"port"`
+	}
+
 	Config struct {
 		TimeZone      *string        `yaml:"timezone"`
-		AdsbxConfig   AdsbxConfig    `yaml:"adsbx"`
+		AdsbxConfig   *AdsbxConfig   `yaml:"adsbx"`
+		Beast         []BeastConfig  `yaml:"beast"`
 		Airports      *Airports      `yaml:"airports"`
 		EmailSettings *EmailSettings `yaml:"email"`
 		Database      Database       `yaml:"database"`
