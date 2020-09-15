@@ -1,9 +1,10 @@
 package readsb
 
 // #cgo CFLAGS: -I${SRCDIR}/../../readsb-src/
-// #cgo LDFLAGS: -lm ${SRCDIR}/../../readsb-src/readsb.o ${SRCDIR}/../../readsb-src/mode_s.o ${SRCDIR}/../../readsb-src/mode_ac.o ${SRCDIR}/../../readsb-src/ais_charset.o ${SRCDIR}/../../readsb-src/icao_filter.o ${SRCDIR}/../../readsb-src/crc.o ${SRCDIR}/../../readsb-src/comm_b.o ${SRCDIR}/../../readsb-src/util.o
+// #cgo LDFLAGS: -lm -lprotobuf-c ${SRCDIR}/../../readsb-src/readsb.o ${SRCDIR}/../../readsb-src/mode_s.o ${SRCDIR}/../../readsb-src/mode_ac.o ${SRCDIR}/../../readsb-src/ais_charset.o ${SRCDIR}/../../readsb-src/icao_filter.o ${SRCDIR}/../../readsb-src/crc.o ${SRCDIR}/../../readsb-src/comm_b.o ${SRCDIR}/../../readsb-src/util.o ${SRCDIR}/../../readsb-src/cpr.o ${SRCDIR}/../../readsb-src/track.o ${SRCDIR}/../../readsb-src/readsb.pb-c.o ${SRCDIR}/../../readsb-src/geomag.o
 // #include <readsb.h>
 // #include <station.h>
+// #include <track.h>
 // #include <mode_s.h>
 // #include <mode_ac.h>
 // #include <icao_filter.h>
@@ -222,7 +223,23 @@ import (
 	"unsafe"
 )
 
-type AirGround C.AircraftMeta__AirGround
+type (
+	Aircraft struct {
+		a *C.struct_aircraft
+	}
+
+	Decoder struct {
+		modes *C.struct__Modes
+	}
+
+	ModesMessage struct {
+		msg *C.struct_modesMessage
+	}
+)
+
+var (
+	ErrNoData = errors.New("no data for field")
+)
 
 const (
 	ModeACMsgBytes = int(C.MODEAC_MSG_BYTES)
@@ -258,8 +275,19 @@ func DfToString(df uint) string {
 	return C.GoString(C.df_to_string(C.uint(df)))
 }
 
-type ModesMessage struct {
-	msg *C.struct_modesMessage
+// TrackPeriodicUpdate - Update aircraft state with message info, and update
+// message information with supplemental info
+func TrackUpdateFromMessage(d *Decoder, mm *ModesMessage) *Aircraft {
+	ac := C.trackUpdateFromMessage(d.modes, mm.msg)
+	if ac == nil {
+		return nil
+	}
+	return &Aircraft{a: ac}
+}
+
+// TrackPeriodicUpdate - Call periodically to remove aircraft who haven't been seen for some TTL
+func TrackPeriodicUpdate(d *Decoder) {
+	C.trackPeriodicUpdate(d.modes)
 }
 
 func (m *ModesMessage) GetIcaoHex() string {
@@ -269,9 +297,6 @@ func (m *ModesMessage) GetIcaoHex() string {
 	icao[2] = byte(m.msg.addr >> 0)
 	return hex.EncodeToString(icao[:])
 }
-
-var ErrNoData = errors.New("no data for field")
-
 func (m *ModesMessage) GetSquawk() (string, error) {
 	if C.modesmessage_is_squawk_valid(m.msg) != 1 {
 		return "", ErrNoData
@@ -308,13 +333,13 @@ func (m *ModesMessage) GetRateBaro() (int, error) {
 	// todo: wtf units are we returning - convert?
 	return int(m.msg.baro_rate), nil
 }
-func (m *ModesMessage) GetRateGeom() (int64, error) {
+func (m *ModesMessage) GetRateGeom() (int, error) {
 	if C.modesmessage_is_geom_rate_valid(m.msg) != 1 {
 		return 0, ErrNoData
 	}
 
 	// todo: wtf units are we returning - convert?
-	return int64(m.msg.geom_rate), nil
+	return int(m.msg.geom_rate), nil
 }
 
 // GetGroundSpeed returns the ground speed in knots, or ErrNoData
@@ -348,7 +373,8 @@ func (m *ModesMessage) GetHeading() (float64, error) {
 	}
 	return float64(m.msg.heading), nil
 }
-func ParseMessage(b []byte) ([]*ModesMessage, int, error) {
+
+func ParseMessage(d *Decoder, b []byte) ([]*ModesMessage, int, error) {
 	var ret []*ModesMessage
 
 	n := len(b)
@@ -393,7 +419,7 @@ func ParseMessage(b []byte) ([]*ModesMessage, int, error) {
 			break
 		}
 
-		mm, err := DecodeBinMessage(b[:], som+1, true)
+		mm, err := DecodeBinMessage(d, b[:], som+1, true)
 		som = eom
 		// this ignores errors from messages, some are just CRC decode
 		// errors and so on
@@ -403,7 +429,7 @@ func ParseMessage(b []byte) ([]*ModesMessage, int, error) {
 	}
 	return ret, som, nil
 }
-func DecodeBinMessage(m []byte, p int, withModeAC bool) (*C.struct_modesMessage, error) {
+func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.struct_modesMessage, error) {
 	var msgLen = 0
 	var ch byte
 	var j int
@@ -478,8 +504,7 @@ func DecodeBinMessage(m []byte, p int, withModeAC bool) (*C.struct_modesMessage,
 			return &mm, nil
 		} else {
 			mm := C.struct_modesMessage{}
-			var modes *C.struct__Modes = nil
-			ret := int(C.decodeModesMessage(modes, (*C.struct_modesMessage)(unsafe.Pointer(&mm)), (*C.uchar)(unsafe.Pointer(&msg[0]))))
+			ret := int(C.decodeModesMessage(decoder.modes, (*C.struct_modesMessage)(unsafe.Pointer(&mm)), (*C.uchar)(unsafe.Pointer(&msg[0]))))
 			if ret < 0 {
 				if ret == -1 {
 					return nil, errors.New("couldn't validate CRC against known ICAO")
@@ -494,6 +519,12 @@ func DecodeBinMessage(m []byte, p int, withModeAC bool) (*C.struct_modesMessage,
 	}
 
 	return nil, nil
+}
+
+func NewDecoder() *Decoder {
+	return &Decoder{
+		modes: &C.struct__Modes{},
+	}
 }
 
 func DebugModesMessage(w io.Writer, mm *C.struct_modesMessage) error {

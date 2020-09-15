@@ -15,6 +15,7 @@ import (
 type BeastProducer struct {
 	host      string
 	port      uint16
+	decoder   *readsb.Decoder
 	messages  chan *pb.Message
 	wg        sync.WaitGroup
 	canceller func()
@@ -25,6 +26,7 @@ func NewBeastProducer(msgs chan *pb.Message, host string, port uint16) *BeastPro
 		messages: msgs,
 		host:     host,
 		port:     port,
+		decoder:  readsb.NewDecoder(),
 	}
 }
 func (p *BeastProducer) Name() string {
@@ -34,7 +36,18 @@ func (p *BeastProducer) Start() {
 	p.wg.Add(1)
 	ctx, canceller := context.WithCancel(context.Background())
 	p.canceller = canceller
+	go p.trackPeriodicUpdate(ctx)
 	go p.producer(ctx)
+}
+func (p *BeastProducer) trackPeriodicUpdate(ctx context.Context) {
+	for {
+		select {
+		case <-time.After(time.Second * 30):
+			readsb.TrackPeriodicUpdate(p.decoder)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 func (p *BeastProducer) producer(ctx context.Context) {
@@ -101,14 +114,14 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				}
 			}
 			connBuf = append(connBuf, recvBuf...)
+			msgs, som, err := readsb.ParseMessage(p.decoder, connBuf)
 			if err != nil {
 				panic(err)
 			}
-			msgs, som, err := readsb.ParseMessage(connBuf)
-			if err != nil {
-				panic(err)
-			}
+
 			for _, msg := range msgs {
+				readsb.TrackUpdateFromMessage(p.decoder, msg)
+
 				proto := &pb.Message{
 					Icao: msg.GetIcaoHex(),
 				}
@@ -120,8 +133,12 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				}
 				if altitude, err := msg.GetAltitudeGeom(); err == nil {
 					proto.Altitude = strconv.FormatInt(altitude, 10)
+				} else if altitude, err := msg.GetAltitudeBaro(); err == nil {
+					proto.Altitude = strconv.FormatInt(altitude, 10)
 				}
-				if rate, err := msg.GetRateBaro(); err == nil {
+				if rate, err := msg.GetRateGeom(); err == nil {
+					proto.VerticalRate = strconv.Itoa(rate)
+				} else if rate, err := msg.GetRateBaro(); err == nil {
 					proto.VerticalRate = strconv.Itoa(rate)
 				}
 				if heading, err := msg.GetHeading(); err == nil {
