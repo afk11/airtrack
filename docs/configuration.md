@@ -38,7 +38,11 @@ The `--config` command line option specifies the main configuration file.
 timezone: <string>
 
 # Configuration for ADSBExchange API
-adsbx: <adsbexchange_config>
+[ adsbx: <adsbexchange_config> | default = none ]
+
+# Configuration for beast servers
+beast:
+  [ - <beast_config> | default = none ]
 
 # Database configuration
 database: <database_config>
@@ -81,6 +85,16 @@ apikey: <secret>
 # URL for ADS-B Exchange. Not required unless you have
 # a local cache of the API
 [ url: <http_url> | default = "https://adsbexchange.com/api/aircraft/json/" ]
+```
+
+### `<beast_config>`
+BEAST format messages are produced by dump1090 on port 30005 by default.
+
+```yaml
+# Hostname or IP for server
+host: <host>
+# Port for connection (probably 30005)
+port: <port>
 ```
 
 ### `<airports_config>`

@@ -16,6 +16,7 @@ import (
 	"github.com/afk11/airtrack/pkg/iso3166"
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/readsb"
 	"github.com/afk11/airtrack/pkg/tar1090"
 	"github.com/afk11/airtrack/pkg/tracker"
 	smtp "github.com/afk11/mail"
@@ -234,15 +235,33 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	opt.Allocations = icaoAllocations
 
 	msgs := make(chan *pb.Message)
-	adsbxEndpoint := tracker.DefaultAdsbxEndpoint
-	var adsbxApiKey string
-	if cfg.AdsbxConfig.ApiUrl != "" {
-		adsbxEndpoint = cfg.AdsbxConfig.ApiUrl
+	var producers []tracker.Producer
+	if cfg.AdsbxConfig != nil {
+		var adsbxEndpoint = tracker.DefaultAdsbxEndpoint
+		var adsbxApiKey string
+		if cfg.AdsbxConfig.ApiUrl != "" {
+			adsbxEndpoint = cfg.AdsbxConfig.ApiUrl
+		}
+		if cfg.AdsbxConfig.ApiKey != "" {
+			adsbxApiKey = cfg.AdsbxConfig.ApiKey
+		}
+		producers = append(producers, tracker.NewAdsbxProducer(msgs, adsbxEndpoint, adsbxApiKey))
 	}
-	if cfg.AdsbxConfig.ApiKey != "" {
-		adsbxApiKey = cfg.AdsbxConfig.ApiKey
+	if len(cfg.Beast) > 0 {
+		// readsb library housekeeping
+		readsb.IcaoFilterInit()
+		readsb.ModeACInit()
+		readsb.ModesChecksumInit(1)
+		go func() {
+			for {
+				<-time.After(time.Minute)
+				readsb.IcaoFilterExpire()
+			}
+		}()
+		for _, bcfg := range cfg.Beast {
+			producers = append(producers, tracker.NewBeastProducer(msgs, bcfg.Host, bcfg.Port))
+		}
 	}
-	p := tracker.NewAdsbxProducer(msgs, adsbxEndpoint, adsbxApiKey)
 
 	t, err := tracker.New(database, opt)
 	if err != nil {
@@ -333,11 +352,20 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		}
 		defer pprof.StopCPUProfile()
 	}
-	p.Start()
+
+	for _, producer := range producers {
+		log.Infof("starting %s producer..", producer.Name())
+		producer.Start()
+	}
 
 	select {
 	case <-gracefulStop:
-		p.Stop()
+		fmt.Println("graceful stop received")
+		for _, producer := range producers {
+			log.Infof("stopping %s producer..", producer.Name())
+			producer.Stop()
+		}
+		close(msgs)
 		err = t.Stop()
 		if err != nil {
 			return err

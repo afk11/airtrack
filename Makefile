@@ -4,11 +4,20 @@ TESTARGS=$(TESTOPTIONS)
 COVERAGEARGS=$(COVERAGEOPTIONS)
 DUMP1090_VERSION=v3.8.1
 TAR1090_VERSION=a0491945db41aaa7d49df2951ce1019968048046
+READSB_VERSION=4815cbe7441ae045890b9adfac3426b93b7b8d75
+READSB_REPO=https://github.com/afk11/readsb-protobuf
+PROTOBUF_C_VERSION=v1.3.3
 
+readsb-src:
+		git clone $(READSB_REPO) readsb-src
+		cd readsb-src && git checkout $(READSB_VERSION) && make
 install-go-bindata:
 		go get -u github.com/jteeuwen/go-bindata/...
 install-easyjson:
 		go get -u github.com/mailru/easyjson/...
+install-protobuf-c:
+		git clone https://github.com/protobuf-c/protobuf-c protobuf-c
+		cd protobuf-c && git checkout $(PROTOBUF_C_VERSION) && ./autogen.sh && ./configure && make && sudo make install && sudo ldconfig
 build-bindata-assets:
 		go-bindata -pkg asset -o ./pkg/assets/asset.go assets/...
 build-bindata-migrations:
@@ -36,12 +45,12 @@ build-dir:
 build-dir-airports: build-dir
 		mkdir build/airports/
 		go run ./contrib/copy_airport_resources/main.go resources/airports
-build-airtrack-linux-amd64: delete-build-dir build-bindata build-easyjson build-protobuf
+build-airtrack-linux-amd64: delete-build-dir readsb-src build-bindata build-easyjson build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
-build-airtrack-qa-linux-amd64: delete-build-dir build-bindata build-easyjson build-protobuf
+build-airtrack-qa-linux-amd64: delete-build-dir readsb-src build-bindata build-easyjson build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
-test: delete-build-dir build-bindata build-easyjson test-cleanup
+test: delete-build-dir readsb-src build-bindata build-easyjson test-cleanup
 	go test -coverprofile=./coverage/tests.out ./... \
 	$(TESTARGS)
 
