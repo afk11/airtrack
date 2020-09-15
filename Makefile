@@ -4,7 +4,7 @@ TESTARGS=$(TESTOPTIONS)
 COVERAGEARGS=$(COVERAGEOPTIONS)
 DUMP1090_VERSION=v3.8.1
 TAR1090_VERSION=a0491945db41aaa7d49df2951ce1019968048046
-READSB_VERSION=e689c9f088321858cb837ae8439975985fecd43a
+READSB_VERSION=4815cbe7441ae045890b9adfac3426b93b7b8d75
 READSB_REPO=https://github.com/afk11/readsb-protobuf
 PROTOBUF_C_VERSION=v1.3.3
 
@@ -17,7 +17,7 @@ install-easyjson:
 		go get -u github.com/mailru/easyjson/...
 install-protobuf-c:
 		git clone https://github.com/protobuf-c/protobuf-c protobuf-c
-		cd protobuf-c && git checkout $(PROTOBUF_C_VERSION) && ./autogen.sh && ./configure && make && sudo make install
+		cd protobuf-c && git checkout $(PROTOBUF_C_VERSION) && ./autogen.sh && ./configure && make && sudo make install && sudo ldconfig
 build-bindata-assets:
 		go-bindata -pkg asset -o ./pkg/assets/asset.go assets/...
 build-bindata-migrations:
