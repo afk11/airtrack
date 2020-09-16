@@ -75,6 +75,18 @@ type (
 		lon float64
 		time.Time
 	}
+	csUpdate struct {
+		sighting *db.Sighting
+		csLog    callsignLog
+	}
+	squawkUpdate struct {
+		sighting  *db.Sighting
+		squawkLog squawkLog
+	}
+	locationUpdate struct {
+		sighting    *db.Sighting
+		locationLog locationLog
+	}
 	ProjectObservation struct {
 		db      db.Database
 		project *Project
@@ -149,11 +161,10 @@ type (
 		project *Project
 		session *db.CollectionSession
 	}
+	SightingTags struct {
+		IsInTakeoff bool
+	}
 )
-
-type SightingTags struct {
-	IsInTakeoff bool
-}
 
 func NewProjectObservation(db db.Database, p *Project, s *Sighting, msgTime time.Time) *ProjectObservation {
 	return &ProjectObservation{
@@ -459,19 +470,6 @@ func (t *Tracker) startDatabaseTask(ctx context.Context) {
 	}
 }
 
-type csUpdate struct {
-	sighting *db.Sighting
-	csLog    callsignLog
-}
-type squawkUpdate struct {
-	sighting  *db.Sighting
-	squawkLog squawkLog
-}
-type locationUpdate struct {
-	sighting    *db.Sighting
-	locationLog locationLog
-}
-
 // processDatabaseUpdates is called periodically to persist
 // recently received data to disk
 func (t *Tracker) processDatabaseUpdates() error {
@@ -743,6 +741,9 @@ func (t *Tracker) doLostAircraftCheck() error {
 	return nil
 }
 
+// reverseGeocode attempts to determine the nearest airport for the provided
+// latitude and longitude. The nearest airport is only accepted if we are
+// within 'NearestAirportMaxDistance' in range
 func (t *Tracker) reverseGeocode(lat float64, lon float64) (*GeocodeLocation, float64, error) {
 	location := &GeocodeLocation{}
 	addr, distance, err := t.opt.AirportGeocoder.ReverseGeocode(lat, lon)
@@ -809,7 +810,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	return nil
 }
 
-// processLostAircraftMap performs map processing when the sighting closes
+// processLostAircraftMap performs KML processing when the sighting closes
 func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *ProjectObservation) error {
 	if observation.sighting == nil {
 		return nil
@@ -1339,6 +1340,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	return nil
 }
 
+// loadAircraft finds or creates an aircraft record for the provided icao.
 func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 	// create sighting
 	a, err := t.database.LoadAircraftByIcao(icao)
@@ -1358,6 +1360,7 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 	return a, nil
 }
 
+// initProjectSighting creates or reopens a sighting for the aircraft in the provided project
 func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) (*db.Sighting, bool, error) {
 	s, err := t.database.LoadLastSightingTx(tx, p.Session, ac)
 	if err != nil {
@@ -1404,6 +1407,8 @@ func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) 
 	return s, false, nil
 }
 
+// checkIfPassesFilter evaluates the CEL program and passes it's inputs.
+// The returned boolean result is only valid if no error is returned.
 func checkIfPassesFilter(prg cel.Program, msg *pb.Message, state *pb.State) (bool, error) {
 	filterTimer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
 		us := v * 1000000 // make microseconds

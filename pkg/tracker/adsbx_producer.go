@@ -2,6 +2,7 @@ package tracker
 
 import (
 	"context"
+	"fmt"
 	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -13,21 +14,32 @@ import (
 )
 
 const (
+	// DefaultAdsbxEndpoint - the default URL to use
 	DefaultAdsbxEndpoint = "https://adsbexchange.com/api/aircraft/json/"
 )
 
+// jsonDecodeError is a custom error type used to indicate
+// that json parsing failed. It contains the decoding error,
+// and the response data which lead to the error.
 type jsonDecodeError struct {
 	err      error
 	response []byte
 }
 
+// Returns the response data.
 func (e *jsonDecodeError) Response() []byte {
 	return e.response
 }
+
+// Return the internal error message.
 func (e *jsonDecodeError) Error() string {
 	return e.err.Error()
 }
 
+// AdsbxProducer. See Producer.
+// This type is responsible for polling the ADSB Exchange API using
+// the provided url and apikey. The JSON result is parsed and into messages
+// which are written to the messages channel.
 type AdsbxProducer struct {
 	url                 string
 	apikey              string
@@ -38,6 +50,7 @@ type AdsbxProducer struct {
 	canceller           func()
 }
 
+// NewAdsbxProducer returns an AdsbxProducer.
 func NewAdsbxProducer(msgs chan *pb.Message, url string, apikey string) *AdsbxProducer {
 	return &AdsbxProducer{
 		messages:            msgs,
@@ -47,6 +60,8 @@ func NewAdsbxProducer(msgs chan *pb.Message, url string, apikey string) *AdsbxPr
 	}
 }
 
+// GetAdsbx performs a HTTP request to ADSB Exchange and sends
+// messages over the msgs channel.
 func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs chan *pb.Message, source *pb.Source) error {
 	start := time.Now()
 	cancelled := make(chan bool)
@@ -57,8 +72,8 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 
 	go func() {
 		select {
-		//case <-time.After(time.Minute):
-		//	panic(fmt.Errorf("running after 1 minute, on request %d", p.numReqs))
+		case <-time.After(time.Minute):
+			panic(fmt.Errorf("running after 1 minute, on request %d", p.numReqs))
 		case <-cancelled:
 			log.Debugf("adsbx http request terminated normally after %s", time.Since(start))
 			break
@@ -91,16 +106,6 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 		return err
 	}
 
-	//if counter == 0 {
-	//	firstTime = time.Now()
-	//}
-	//if counter == 1 {
-	//	if time.Since(firstTime) < 3*time.Minute {
-	//		return errors.New("some error")
-	//	}
-	//}
-	//counter++
-
 	err = msg.UnmarshalJSON(body)
 	if err != nil {
 		return &jsonDecodeError{err, body}
@@ -126,6 +131,9 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 	return nil
 }
 
+// producer is a goroutine which periodically calls GetAdsbx to
+// receive messages from ADSB Exchange. It terminates if the
+// stop signal is received from the provided context.
 func (p *AdsbxProducer) producer(ctx context.Context) {
 	defer p.wg.Done()
 
@@ -188,19 +196,24 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 		}
 	}
 }
+
+// Name - returns the name for this producer. See Producer.Name()
 func (p *AdsbxProducer) Name() string {
 	return "adsbx"
 }
+
+// Start starts the producer goroutine, and the readsb
+// periodic update goroutine. See Producer.Start()
 func (p *AdsbxProducer) Start() {
 	p.wg.Add(1)
 	ctx, canceller := context.WithCancel(context.Background())
 	p.canceller = canceller
 	go p.producer(ctx)
 }
+
+// Stop sends the cancel signal to the producer goroutine
+// and blocks until it finishes. See Producer.Stop()
 func (p *AdsbxProducer) Stop() {
-	println("producer issue canceller")
 	p.canceller()
-	println("producer wait")
 	p.wg.Wait()
-	println("producer close messages")
 }
