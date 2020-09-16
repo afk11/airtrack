@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/afk11/airtrack/pkg/readsb"
-	log "github.com/sirupsen/logrus"
 	"net"
 	"strconv"
 	"sync"
@@ -96,7 +95,6 @@ func (p *BeastProducer) producer(ctx context.Context) {
 			// Set a read deadline for the next read.
 			err = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			if err != nil {
-				log.Println("SetReadDeadline failed:", err)
 				_ = conn.Close()
 				// Sleep for 30 seconds and attempt to reconnect, or quit
 				// if we received the quit signal.

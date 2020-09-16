@@ -91,6 +91,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		opt.SightingTimeout = time.Second * time.Duration(*cfg.Sighting.Timeout)
 	}
 
+	var mailSender *mailer.Mailer
 	if cfg.EmailSettings != nil {
 		switch cfg.EmailSettings.Driver {
 		case config.MailDriverSmtp:
@@ -114,13 +115,8 @@ func (c *TrackCmd) Run(ctx *Context) error {
 				dialer.StartTLSPolicy = smtp.OpportunisticStartTLS
 			}
 			dialer.Timeout = time.Second * 30
-			m := mailer.NewMailer(database, settings.Sender, dialer)
-			m.Start()
-			opt.Mailer = m
-			defer func() {
-				m.Stop()
-				log.Info("stopped mailer")
-			}()
+			mailSender = mailer.NewMailer(database, settings.Sender, dialer)
+			opt.Mailer = mailSender
 		default:
 			return errors.New("unknown email driver")
 		}
@@ -268,13 +264,13 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		return err
 	}
 
-	var m *tracker.AircraftMap
+	var mapServer *tracker.AircraftMap
 	if cfg.MapSettings != nil && cfg.MapSettings.Disabled == false {
 		historyFiles := tracker.DefaultHistoryFileCount
 		if cfg.MapSettings.HistoryCount != 0 {
 			historyFiles = cfg.MapSettings.HistoryCount
 		}
-		m, err = tracker.NewAircraftMap(cfg.MapSettings)
+		mapServer, err = tracker.NewAircraftMap(cfg.MapSettings)
 		if err != nil {
 			return err
 		}
@@ -285,9 +281,9 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		for _, mapService := range mapsToUse {
 			switch mapService {
 			case tracker.Dump1090MapService:
-				err = m.RegisterMapService(dump1090.NewDump1090Map(m))
+				err = mapServer.RegisterMapService(dump1090.NewDump1090Map(mapServer))
 			case tracker.Tar1090MapService:
-				err = m.RegisterMapService(tar1090.NewTar1090Map(m, historyFiles))
+				err = mapServer.RegisterMapService(tar1090.NewTar1090Map(mapServer, historyFiles))
 			default:
 				return errors.New("unsupported map service: " + mapService)
 			}
@@ -295,15 +291,15 @@ func (c *TrackCmd) Run(ctx *Context) error {
 				return errors.Wrapf(err, "registering map service (%s)", mapService)
 			}
 		}
-		err = t.RegisterProjectStatusListener(tracker.NewMapProjectStatusListener(m))
+		err = t.RegisterProjectStatusListener(tracker.NewMapProjectStatusListener(mapServer))
 		if err != nil {
 			return err
 		}
-		err = t.RegisterProjectAircraftUpdateListener(tracker.NewMapProjectAircraftUpdateListener(m))
+		err = t.RegisterProjectAircraftUpdateListener(tracker.NewMapProjectAircraftUpdateListener(mapServer))
 		if err != nil {
 			return err
 		}
-		m.Serve()
+		mapServer.Serve()
 	}
 
 	var ignored int32
@@ -327,7 +323,9 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	}
 
 	t.Start(msgs)
-
+	if mailSender != nil {
+		mailSender.Start()
+	}
 	if cfg.Metrics != nil && cfg.Metrics.Enabled {
 		var prometheusPort = 9206
 		if cfg.Metrics.Port != 0 {
@@ -367,13 +365,19 @@ func (c *TrackCmd) Run(ctx *Context) error {
 			producer.Stop()
 		}
 		close(msgs)
+		log.Info("stopping tracker")
 		err = t.Stop()
 		if err != nil {
 			return err
 		}
 
-		if m != nil {
-			m.Stop()
+		if mapServer != nil {
+			log.Info("stopping map server")
+			mapServer.Stop()
+		}
+		if mailSender != nil {
+			log.Info("stopping mailer")
+			mailSender.Stop()
 		}
 		return nil
 	}
