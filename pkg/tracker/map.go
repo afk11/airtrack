@@ -2,6 +2,7 @@ package tracker
 
 import "C"
 import (
+	"context"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/pb"
@@ -246,6 +247,8 @@ type AircraftMap struct {
 	projMu          sync.RWMutex
 	projects        map[string]*projectState
 	services        []MapService
+	wg              sync.WaitGroup
+	canceller       func()
 	messages        int64
 }
 
@@ -467,38 +470,62 @@ func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*Js
 // - aircraft Seen / SeenPos updates each second
 // - triggers history updates on registered MapServices every m.historyInterval
 func (m *AircraftMap) Serve() {
-	go func() {
-		lastHistoryUpdate := time.Now()
-		firstRun := true
-		for {
-			<-time.After(time.Second)
-			m.acMu.RLock()
-			for _, ac := range m.ac {
-				ac.Lock()
-				ac.Seen = int64(time.Since(ac.lastMsgTime).Seconds())
-				ac.SeenPos = time.Since(ac.lastMsgTime).Seconds()
-				ac.Unlock()
-			}
-			m.acMu.RUnlock()
-			if firstRun || time.Since(lastHistoryUpdate) > m.historyInterval {
-				if firstRun {
-					firstRun = false
-				}
-
-				m.projMu.RLock()
-				projects := make([]string, 0, len(m.projects))
-				for _, project := range m.projects {
-					projects = append(projects, project.name)
-				}
-				for _, service := range m.services {
-					service.UpdateScheduler().UpdateHistory(projects)
-				}
-				m.projMu.RUnlock()
-				lastHistoryUpdate = time.Now()
-			}
-		}
-	}()
+	m.wg.Add(1)
+	ctx, canceller := context.WithCancel(context.Background())
+	m.canceller = canceller
+	go m.updateJson(ctx)
 	go func() {
 		m.s.ListenAndServe()
 	}()
+}
+
+// updateJson does time based functions - every second it
+// adjusts Seen and SeenPos to the corrent number of seconds
+// since the last message/position. Every `m.historyInterval`
+// it writes a new history file.
+func (m *AircraftMap) updateJson(ctx context.Context) {
+	defer m.wg.Done()
+	lastHistoryUpdate := time.Now()
+	firstRun := true
+	for {
+		// Stop if stop signal received
+		select {
+		default:
+		case <-ctx.Done():
+			return
+		}
+
+		<-time.After(time.Second)
+		m.acMu.RLock()
+		for _, ac := range m.ac {
+			ac.Lock()
+			ac.Seen = int64(time.Since(ac.lastMsgTime).Seconds())
+			ac.SeenPos = time.Since(ac.lastMsgTime).Seconds()
+			ac.Unlock()
+		}
+		m.acMu.RUnlock()
+		if firstRun || time.Since(lastHistoryUpdate) > m.historyInterval {
+			if firstRun {
+				firstRun = false
+			}
+
+			m.projMu.RLock()
+			projects := make([]string, 0, len(m.projects))
+			for _, project := range m.projects {
+				projects = append(projects, project.name)
+			}
+			for _, service := range m.services {
+				service.UpdateScheduler().UpdateHistory(projects)
+			}
+			m.projMu.RUnlock()
+			lastHistoryUpdate = time.Now()
+		}
+	}
+}
+
+// Stop sends the stop signal to coroutines and waits for them
+// to finish
+func (m *AircraftMap) Stop() {
+	m.canceller()
+	m.wg.Wait()
 }

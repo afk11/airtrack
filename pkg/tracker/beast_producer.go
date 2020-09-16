@@ -32,10 +32,12 @@ func NewBeastProducer(msgs chan *pb.Message, host string, port uint16) *BeastPro
 		decoder:  readsb.NewDecoder(),
 	}
 }
+
 // Name - see Producer.Name()
 func (p *BeastProducer) Name() string {
 	return fmt.Sprintf("beast(%s:%d)", p.host, p.port)
 }
+
 // Start - see Producer.Start()
 // This function starts the producer goroutine, and the readsb
 // periodic update goroutine.
@@ -46,6 +48,7 @@ func (p *BeastProducer) Start() {
 	go p.trackPeriodicUpdate(ctx)
 	go p.producer(ctx)
 }
+
 // trackPeriodicUpdate is a goroutine that triggers readsb
 // to check for missing aircraft. It terminates when the provided
 // context signals done.
@@ -60,6 +63,7 @@ func (p *BeastProducer) trackPeriodicUpdate(ctx context.Context) {
 		}
 	}
 }
+
 // producer is a goroutine that connects to the beast server
 // and reads it's contents. The decoded stream of messages is
 // converted and sent over the messages channel.
@@ -180,6 +184,7 @@ func (p *BeastProducer) producer(ctx context.Context) {
 		}
 	}
 }
+
 // Stop sends the cancel signal to the producer + trackPeriodicUpdate goroutines
 // and blocks until they finish processing
 func (p *BeastProducer) Stop() {

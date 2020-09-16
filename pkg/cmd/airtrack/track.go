@@ -268,12 +268,13 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		return err
 	}
 
+	var m *tracker.AircraftMap
 	if cfg.MapSettings != nil && cfg.MapSettings.Disabled == false {
 		historyFiles := tracker.DefaultHistoryFileCount
 		if cfg.MapSettings.HistoryCount != 0 {
 			historyFiles = cfg.MapSettings.HistoryCount
 		}
-		m, err := tracker.NewAircraftMap(cfg.MapSettings)
+		m, err = tracker.NewAircraftMap(cfg.MapSettings)
 		if err != nil {
 			return err
 		}
@@ -302,7 +303,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		if err != nil {
 			return err
 		}
-		go m.Serve()
+		m.Serve()
 	}
 
 	var ignored int32
@@ -360,7 +361,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 
 	select {
 	case <-gracefulStop:
-		fmt.Println("graceful stop received")
+		log.Infof("graceful stop received")
 		for _, producer := range producers {
 			log.Infof("stopping %s producer..", producer.Name())
 			producer.Stop()
@@ -369,6 +370,10 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		err = t.Stop()
 		if err != nil {
 			return err
+		}
+
+		if m != nil {
+			m.Stop()
 		}
 		return nil
 	}
