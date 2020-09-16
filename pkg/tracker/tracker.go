@@ -86,7 +86,7 @@ type (
 		alt int64
 		lat float64
 		lon float64
-		time.Time
+		time time.Time
 		// sighting is only set in the database processing routine, as it's
 		// not necessarily available if the sighting is new
 		sighting *db.Sighting
@@ -515,7 +515,7 @@ func (t *Tracker) processDatabaseUpdates() error {
 	t.projectMu.Lock()
 	defer t.projectMu.Unlock()
 	begin := time.Now()
-	updatedSigthings := 0
+	updatedSightings := 0
 	var csUpdates []callsignLog
 	var squawkUpdates []squawkLog
 	var locationUpdates []locationLog
@@ -535,7 +535,7 @@ func (t *Tracker) processDatabaseUpdates() error {
 			hasLocations := len(o.locationLogs) > 0
 
 			if hasNoSighting || hasCsLogs || hasSquawkLogs {
-				updatedSigthings++
+				updatedSightings++
 				// Updates regarding the sighting record (also to gather build up inserts for batching)
 				err := o.db.Transaction(func(tx *sqlx.Tx) error {
 					var err error
@@ -547,31 +547,31 @@ func (t *Tracker) processDatabaseUpdates() error {
 						}
 					}
 					if hasCsLogs {
-						// set sighting as it's available now
-						for i := 0; i < len(o.csLogs); i++ {
-							(&o.csLogs[i]).sighting = o.sighting
-						}
-						csUpdates = append(csUpdates, o.csLogs...)
 						res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
 						if err != nil {
 							return errors.Wrap(err, "updating sighting callsign")
 						} else if err = db.CheckRowsUpdated(res, 1); err != nil {
 							return errors.Wrapf(err, "expected 1 updated row")
 						}
+
+						for i := 0; i < len(o.csLogs); i++ {
+							(&o.csLogs[i]).sighting = o.sighting
+						}
+						csUpdates = append(csUpdates, o.csLogs...)
 						o.csLogs = nil
 					}
 					if hasSquawkLogs {
-						// set sighting as it's available now
-						for i := 0; i < len(o.squawkLogs); i++ {
-							(&o.squawkLogs[i]).sighting = o.sighting
-						}
-						squawkUpdates = append(squawkUpdates, o.squawkLogs...)
 						_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
 						// todo: add this back in once we have 'sighting restore' added.
 						// reopened sightings trigger update though row count will be zero
 						if err != nil {
 							return errors.Wrap(err, "updating sighting squawk")
 						}
+
+						for i := 0; i < len(o.squawkLogs); i++ {
+							(&o.squawkLogs[i]).sighting = o.sighting
+						}
+						squawkUpdates = append(squawkUpdates, o.squawkLogs...)
 						o.squawkLogs = nil
 					}
 
@@ -587,7 +587,6 @@ func (t *Tracker) processDatabaseUpdates() error {
 			// Locations is processed separately - if we only have locations, we avoid
 			// the above transaction
 			if hasLocations {
-				// set sighting as it's available now
 				for i := 0; i < len(o.locationLogs); i++ {
 					(&o.locationLogs[i]).sighting = o.sighting
 				}
@@ -611,8 +610,8 @@ func (t *Tracker) processDatabaseUpdates() error {
 	for i := 0; i < numCsUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
-			for _, csUpdate := range csUpdates[i:min(numCsUpdates, i+csBatch)] {
-				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdate.sighting, csUpdate.callsign, csUpdate.time)
+			for j := range csUpdates[i:min(numCsUpdates, i+csBatch)] {
+				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdates[j].sighting, csUpdates[j].callsign, csUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating callsign record")
 				}
@@ -627,8 +626,8 @@ func (t *Tracker) processDatabaseUpdates() error {
 	for i := 0; i < numSquawkUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
-			for _, squawkUpdate := range squawkUpdates[i:min(numSquawkUpdates, i+csBatch)] {
-				_, err = t.database.CreateNewSightingSquawkTx(tx, squawkUpdate.sighting, squawkUpdate.squawk, squawkUpdate.time)
+			for j := range squawkUpdates[i:min(numSquawkUpdates, i+csBatch)] {
+				_, err = t.database.CreateNewSightingSquawkTx(tx, squawkUpdates[j].sighting, squawkUpdates[j].squawk, squawkUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating squawk record")
 				}
@@ -642,9 +641,9 @@ func (t *Tracker) processDatabaseUpdates() error {
 
 	for i := 0; i < numLocationUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
-			for _, locationUpdate := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
-				_, err := t.database.InsertSightingLocationTx(tx, locationUpdate.sighting.Id, time.Now(),
-					locationUpdate.alt, locationUpdate.lat, locationUpdate.lon)
+			for j := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
+				_, err := t.database.InsertSightingLocationTx(tx, locationUpdates[j].sighting.Id, locationUpdates[j].time,
+					locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				if err != nil {
 					return errors.Wrapf(err, "failed to insert sighting location")
 				}
@@ -658,7 +657,7 @@ func (t *Tracker) processDatabaseUpdates() error {
 
 	timeTaken := time.Since(begin)
 	log.Debugf("flushing updates (took %s)  sightings:%d  callsigns:%d  squawks:%d  locations:%d",
-		timeTaken, updatedSigthings, numCsUpdates, numSquawkUpdates, numLocationUpdates)
+		timeTaken, updatedSightings, numCsUpdates, numSquawkUpdates, numLocationUpdates)
 
 	return nil
 }
