@@ -472,6 +472,8 @@ type locationUpdate struct {
 	locationLog locationLog
 }
 
+// processDatabaseUpdates is called periodically to persist
+// recently received data to disk
 func (t *Tracker) processDatabaseUpdates() error {
 	t.projectMu.Lock()
 	defer t.projectMu.Unlock()
@@ -485,15 +487,18 @@ func (t *Tracker) processDatabaseUpdates() error {
 		for _, o := range proj.Observations {
 			o.mu.Lock()
 			if !o.dirty {
+				// not interesting, move on
 				o.mu.Unlock()
 				continue
 			}
+
 			hasNoSighting := o.sighting == nil
 			hasCsLogs := len(o.csLogs) > 0
 			hasSquawkLogs := len(o.squawkLogs) > 0
 			hasLocations := len(o.locationLogs) > 0
 
 			if hasNoSighting || hasCsLogs || hasSquawkLogs {
+				// Updates regarding the sighting record (also to gather build up inserts for batching)
 				err := o.db.Transaction(func(tx *sqlx.Tx) error {
 					var err error
 					if hasNoSighting {
@@ -543,6 +548,9 @@ func (t *Tracker) processDatabaseUpdates() error {
 					return err
 				}
 			}
+
+			// Locations is processed separately - if we only have locations, we avoid
+			// the above transaction
 			if hasLocations {
 				for _, locationLog := range o.locationLogs {
 					locationUpdates = append(locationUpdates, locationUpdate{
@@ -564,6 +572,8 @@ func (t *Tracker) processDatabaseUpdates() error {
 	numCsUpdates := len(csUpdates)
 	numSquawkUpdates := len(squawkUpdates)
 	numLocationUpdates := len(locationUpdates)
+
+	// Insert new callsigns, squawks, and location logs in batches
 
 	for i := 0; i < numCsUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
@@ -619,6 +629,9 @@ func (t *Tracker) processDatabaseUpdates() error {
 
 	return nil
 }
+
+// checkForLostAircraft is a goroutine that periodically calls doLostAircraftCheck
+// and stops once the stop signal is received.
 func (t *Tracker) checkForLostAircraft(ctx context.Context) {
 	waitTime := time.Second * 5
 	for {
@@ -634,17 +647,18 @@ func (t *Tracker) checkForLostAircraft(ctx context.Context) {
 	}
 }
 
+// doLostAircraftCheck is called by the checkForLostAircraft goroutine.
+// It searches for t.sightings which
+// - have a s.lastSeen > our timeout
+// - have a project whose observation.lastSeen > our timeout
+// If the sighting isn't lost, it's unlocked immediately
+// If a sighting is lost and:
+//   - no projects are interested -> it's deleted from the map in this section.
+//   - at least one project is interested -> it remains locked and is included in results
 func (t *Tracker) doLostAircraftCheck() error {
 	t.sightingMu.Lock()
 	defer t.sightingMu.Unlock()
 
-	// This section searches for t.sightings which
-	// - have a s.lastSeen > our timeout
-	// - have a project whose observation.lastSeen > our timeout
-	// If the sighting isn't lost, it's unlocked immediately
-	// If a sighting is lost and:
-	//   - no projects are interested -> it's deleted from the map in this section.
-	//   - at least one project is interested -> it remains locked and is included in results
 	lostSightings := make([]lostSighting, 0)
 	lostDbSightings := make([]*db.Sighting, 0)
 	for _, sighting := range t.sighting {
@@ -794,6 +808,8 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	}
 	return nil
 }
+
+// processLostAircraftMap performs map processing when the sighting closes
 func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *ProjectObservation) error {
 	if observation.sighting == nil {
 		return nil
@@ -911,6 +927,10 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 	}
 	return nil
 }
+
+// startConsumer is a goroutine that reads from the messages channel
+// and updates our state for each aircraft. Then ProcessMessage is
+// called with the sighting and each project.
 func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 	defer t.consumerWG.Done()
 
@@ -957,8 +977,8 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 	return s
 }
 
+// UpdateStateFromMessage takes msg and applies new or updated data to the sighting.
 func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
-
 	s.lastSeen = now
 
 	// Update Sighting state
@@ -1063,6 +1083,9 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	}
 	return nil
 }
+
+// ProcessMessage is called to process the updated Sighting in the context
+// of the provided project.
 func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, msg *pb.Message) error {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
 		us := v * 1000000 // make microseconds
@@ -1091,17 +1114,11 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		}
 	}
 
-	// initialize project sighting, if not already done
+	// Initialize project sighting, if not already done
 	observation, ok := s.observedBy[project.Session.Id]
 	var sightingOpened bool
 	if !ok {
-		//sighting, _, err := t.initProjectSighting(project, s.a)
-		//if err != nil {
-		//	// Cleanup reserved sighting
-		//	return errors.Wrapf(err, "failed to init project sighting")
-		//}
 		observation = NewProjectObservation(t.database, project, s, now)
-		//observation.sighting = sighting
 		project.obsMu.Lock()
 		s.observedBy[project.Session.Id] = observation
 		project.Observations[s.State.Icao] = observation
