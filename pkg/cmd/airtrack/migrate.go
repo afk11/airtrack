@@ -124,12 +124,12 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 	var driver database.Driver
 	var src source.Driver
 	var err error
+	u, err := dbConf.DataSource(loc)
+	if err != nil {
+		return nil, err
+	}
 	switch dbConf.Driver {
 	case config.DatabaseDriverMySQL, config.DatabaseDriverPostgresql:
-		u, err := dbConf.NetworkDatabaseUrl(loc)
-		if err != nil {
-			return nil, err
-		}
 		if dbConf.Driver == config.DatabaseDriverMySQL {
 			sep := "?"
 			if strings.Contains(u, "?") {
@@ -164,10 +164,6 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 			return nil, err
 		}
 	case config.DatabaseDriverSqlite3:
-		u, err := dbConf.Sqlite3Url(loc)
-		if err != nil {
-			return nil, err
-		}
 		db, err = sql.Open("sqlite3", u)
 		if err != nil {
 			return nil, err

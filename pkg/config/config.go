@@ -136,11 +136,15 @@ type (
 		Database string `yaml:"database"`
 	}
 
+	// Metrics - contains configuration for prometheus metrics
 	Metrics struct {
+		// Enabled - control whether to enable metrics. Default to off.
 		Enabled bool `yaml:"enabled"`
-		Port    int  `yaml:"port"`
+		// Port - port to listen for metrics HTTP server
+		Port int `yaml:"port"`
 	}
 
+	// AdsbxConfig contains configuration for the ADSB Exchange data source
 	AdsbxConfig struct {
 		// Custom ADSB Exchange URL (not required, but useful if
 		// you've a proxy setup)
@@ -149,6 +153,7 @@ type (
 		ApiKey string `yaml:"apikey"`
 	}
 
+	// BeastConfig contains configuration for a single BEAST server
 	BeastConfig struct {
 		// IP or hostname for beast server
 		Host string `yaml:"host"`
@@ -156,28 +161,43 @@ type (
 		Port uint16 `yaml:"port"`
 	}
 
+	// Config - represents the yaml block in the main config file.
 	Config struct {
-		TimeZone      *string        `yaml:"timezone"`
-		AdsbxConfig   *AdsbxConfig   `yaml:"adsbx"`
-		Beast         []BeastConfig  `yaml:"beast"`
-		Airports      *Airports      `yaml:"airports"`
+		// TimeZone - optional timezone to override system default
+		TimeZone *string `yaml:"timezone"`
+		// AdsbxConfig - optional element, set if using ADSBExchange API
+		AdsbxConfig *AdsbxConfig `yaml:"adsbx"`
+		// Beast - list of beast server configs
+		Beast []BeastConfig `yaml:"beast"`
+		// Airports - where directories of airport location files are configured
+		Airports *Airports `yaml:"airports"`
+		// EmailSettings - configuration of email driver.
 		EmailSettings *EmailSettings `yaml:"email"`
-		Database      Database       `yaml:"database"`
-		Metrics       *Metrics       `yaml:"metrics"`
-		MapSettings   *MapSettings   `yaml:"map"`
-		Sighting      struct {
+		// Database - configuration of the database driver.
+		Database Database `yaml:"database"`
+		// Metrics - configuration of prometheus metrics
+		Metrics *Metrics `yaml:"metrics"`
+		// MapSettings - configuration of the HTTP map server
+		MapSettings *MapSettings `yaml:"map"`
+		// Sighting - some global defaults for sighting configuration
+		Sighting struct {
 			Timeout *int64 `yaml:"timeout"`
 		} `yaml:"sighting"`
+		// Projects - list of project configurations
 		Projects []Project `yaml:"projects"`
 	}
 
+	// ProjectsConfig - represents the yaml block in a projects configuration file
 	ProjectsConfig struct {
+		// Projects - list of project configurations
 		Projects []Project `yaml:"projects"`
 	}
 )
 
+// GetTimeLocation returns a *time.Location (or an error on failure)
+// that is specified in the config file, or the system default if none
+// is provided.
 func (c *Config) GetTimeLocation() (*time.Location, error) {
-	// Use provided timezone, or use system timezone
 	if c.TimeZone == nil {
 		return time.Now().Location(), nil
 	}
@@ -190,38 +210,24 @@ func (c *Config) GetTimeLocation() (*time.Location, error) {
 	}
 	return loc, nil
 }
+
+// DataSource returns a connection string for the configured database driver
 func (d *Database) DataSource(loc *time.Location) (string, error) {
 	switch d.Driver {
 	case "":
 		return "", errors.New("no database driver configured")
-	case DatabaseDriverMySQL, DatabaseDriverPostgresql:
-		return d.NetworkDatabaseUrl(loc)
+	case DatabaseDriverMySQL:
+		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
+			d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(loc.String())), nil
+	case DatabaseDriverPostgresql:
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s ",
+			d.Host, d.Port, d.Username, d.Password, d.Database), nil
 	case DatabaseDriverSqlite3:
-		return d.Sqlite3Url(loc)
+		return fmt.Sprintf("file:%s?parseTime=true&loc=%s",
+			d.Database, url.PathEscape(loc.String())), nil
 	default:
 		return "", errors.Errorf("unsupported database driver `%s`", d.Driver)
 	}
-}
-func (d *Database) NetworkDatabaseUrl(location *time.Location) (string, error) {
-	if d.Database == "" {
-		return "", errors.New("database cannot be empty")
-	} else if d.Driver == DatabaseDriverMySQL {
-		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
-			d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(location.String())), nil
-	} else if d.Driver == DatabaseDriverPostgresql {
-		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s ",
-			d.Host, d.Port, d.Username, d.Password, d.Database), nil
-	} else {
-		return "", errors.New("error creating database connection string - wrong driver type for NetworkDatabaseUrl")
-	}
-
-}
-func (d *Database) Sqlite3Url(location *time.Location) (string, error) {
-	if d.Database == "" {
-		return "", errors.New("database filesystem path cannot be empty")
-	}
-	return fmt.Sprintf("file:%s?parseTime=true&loc=%s",
-		d.Database, url.PathEscape(location.String())), nil
 }
 
 // ReadConfigFromFile will read `filepath` and attempt to parse into
