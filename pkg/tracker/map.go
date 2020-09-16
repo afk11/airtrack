@@ -500,7 +500,7 @@ func (m *AircraftMap) updateJson(ctx context.Context) {
 		for _, ac := range m.ac {
 			ac.Lock()
 			ac.Seen = int64(time.Since(ac.lastMsgTime).Seconds())
-			ac.SeenPos = time.Since(ac.lastMsgTime).Seconds()
+			ac.SeenPos = time.Since(ac.lastPosTime).Seconds()
 			ac.Unlock()
 		}
 		m.acMu.RUnlock()
@@ -511,11 +511,11 @@ func (m *AircraftMap) updateJson(ctx context.Context) {
 
 			m.projMu.RLock()
 			projects := make([]string, 0, len(m.projects))
-			for _, project := range m.projects {
-				projects = append(projects, project.name)
+			for pk := range m.projects {
+				projects = append(projects, m.projects[pk].name)
 			}
-			for _, service := range m.services {
-				service.UpdateScheduler().UpdateHistory(projects)
+			for sk := range m.services {
+				m.services[sk].UpdateScheduler().UpdateHistory(projects)
 			}
 			m.projMu.RUnlock()
 			lastHistoryUpdate = time.Now()
@@ -525,7 +525,16 @@ func (m *AircraftMap) updateJson(ctx context.Context) {
 
 // Stop sends the stop signal to coroutines and waits for them
 // to finish
-func (m *AircraftMap) Stop() {
+func (m *AircraftMap) Stop() error {
 	m.canceller()
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		cancel()
+	}()
+	err := m.s.Shutdown(ctxShutDown)
+	if err != nil && err != http.ErrServerClosed {
+		return errors.Wrapf(err, "in map server shutdown")
+	}
 	m.wg.Wait()
+	return nil
 }
