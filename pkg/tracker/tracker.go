@@ -40,6 +40,7 @@ var (
 )
 
 type (
+	// Options wraps options + interfaces for the Tracker type.
 	Options struct {
 		Filter                    string
 		Workers                   int
@@ -55,26 +56,43 @@ type (
 		CountryCodes *iso3166.Store
 		Allocations  ccode.CountryAllocationSearcher
 	}
+	// GeocodeLocation contains the result of a geocode search.
+	// If ok is false, the search was unsuccessful and the other fields are empty.
+	// If ok is true, the lat,long & address fields will be set.
 	GeocodeLocation struct {
 		ok      bool
 		lat     float64
 		long    float64
 		address string
 	}
+	// callsignLog records a new callsign for a sighting and the time it was observed.
 	callsignLog struct {
 		callsign string
 		time     time.Time
+		// sighting is only set in the database processing routine, as it's
+		// not necessarily available if the sighting is new
+		sighting *db.Sighting
 	}
+	// squawkLog records a new squawk for a sighting and the time it was observed.
 	squawkLog struct {
 		squawk string
 		time   time.Time
+		// sighting is only set in the database processing routine, as it's
+		// not necessarily available if the sighting is new
+		sighting *db.Sighting
 	}
+	// locationLog records a new alt/lat/lon position for a sighting and the time it was observed.
 	locationLog struct {
 		alt int64
 		lat float64
 		lon float64
-		time.Time
+		time time.Time
+		// sighting is only set in the database processing routine, as it's
+		// not necessarily available if the sighting is new
+		sighting *db.Sighting
 	}
+	// ProjectObservation contains information about a sighting from the point of
+	// view of a particular project.
 	ProjectObservation struct {
 		db      db.Database
 		project *Project
@@ -114,8 +132,12 @@ type (
 		locationCount      int64
 		mu                 sync.RWMutex
 	}
+	// Sighting represents an aircraft we are receiving messages about
 	Sighting struct {
-		State           pb.State
+		// State represents everything we know about the aircraft. It
+		// is one of the structs filters operate on.
+		State pb.State
+		// Tags contains some meta information about the sighting.
 		Tags            SightingTags
 		firstSeen       time.Time
 		lastSeen        time.Time
@@ -129,6 +151,8 @@ type (
 
 		mu sync.RWMutex
 	}
+	// Tracker - this type is responsible for processing received messages
+	// and tracking aircraft
 	Tracker struct {
 		database                 db.Database
 		opt                      Options
@@ -144,17 +168,22 @@ type (
 		consumerWG               sync.WaitGroup
 		mailTemplates            *email.MailTemplates
 	}
+	// lostSighting contains information needed to process an aircraft
+	// that has gone out of view
 	lostSighting struct {
 		s       *Sighting
 		project *Project
 		session *db.CollectionSession
 	}
+	// SightingTags contains some meta information about the flight.
+	SightingTags struct {
+		// IsInTakeoff - this is set to true if we observe the aircraft
+		// transitioning from on_ground=true to on_ground=false.
+		IsInTakeoff bool
+	}
 )
 
-type SightingTags struct {
-	IsInTakeoff bool
-}
-
+// NewProjectObservation initializes a ProjectObservation structure for this sighting & project pair
 func NewProjectObservation(db db.Database, p *Project, s *Sighting, msgTime time.Time) *ProjectObservation {
 	return &ProjectObservation{
 		db:         db,
@@ -167,60 +196,66 @@ func NewProjectObservation(db db.Database, p *Project, s *Sighting, msgTime time
 		squawkLogs: make([]squawkLog, 0),
 	}
 }
+
+// HasCallSign - returns true if the ProjectObservation has a current callsign set
 func (o *ProjectObservation) HasCallSign() bool {
 	return o.haveCallsign
-	//return o.sighting != nil && o.sighting.CallSign != nil
 }
+
+// SetCallSign updates the current callsign for the sighting, and if track
+// is true, creates a callsign log to be written to the database.
 func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
 	if track {
 		o.dirty = true
-		o.csLogs = append(o.csLogs, callsignLog{callsign, time.Now()})
+		o.csLogs = append(o.csLogs, callsignLog{callsign, time.Now(), nil})
 	}
-	//o.sighting.CallSign = &callsign
 	o.callsign = callsign
 	if !o.haveCallsign {
 		o.haveCallsign = true
 	}
 	return nil
 }
+
+// CallSign returns a pointer to the current callsign
 func (o *ProjectObservation) CallSign() *string {
 	return &o.callsign
-	//if o.sighting == nil {
-	//	cs := ""
-	//	return &cs
-	//}
-	//return o.sighting.CallSign
 }
+
+// HasSquawk - returns true if the ProjectObservation has a current squawk set
 func (o *ProjectObservation) HasSquawk() bool {
 	return o.haveSquawk
-	//return o.sighting != nil && o.sighting.Squawk != nil
 }
+
+// SetSquawk updates the current squawk for the sighting, and if track
+// is true, creates a squawk log to be written to the database.
 func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
 	if track {
 		o.dirty = true
-		o.squawkLogs = append(o.squawkLogs, squawkLog{squawk, time.Now()})
+		o.squawkLogs = append(o.squawkLogs, squawkLog{squawk, time.Now(), nil})
 	}
 	o.squawk = squawk
-	//o.sighting.Squawk = &squawk
 	if !o.haveSquawk {
 		o.haveSquawk = true
 	}
 	return nil
 }
+
+// Squawk returns a pointer to the current squawk
 func (o *ProjectObservation) Squawk() *string {
 	return &o.squawk
-	//if o.sighting == nil {
-	//	s := ""
-	//	return &s
-	//}
-	//return o.sighting.Squawk
 }
+
+// HaveAltitude returns true if the current altitude is known
 func (o *ProjectObservation) HaveAltitude() bool {
 	return o.haveAlt
 }
+
+// Altitude returns the current altitude
 func (o *ProjectObservation) Altitude() int64 {
 	return o.altitude
 }
+
+// SetAltitude updates the current altitude
 func (o *ProjectObservation) SetAltitude(alt int64) error {
 	o.altitude = alt
 	if !o.haveAlt {
@@ -228,18 +263,25 @@ func (o *ProjectObservation) SetAltitude(alt int64) error {
 	}
 	return nil
 }
+
+// HaveLocation returns true if the current location is known
 func (o *ProjectObservation) HaveLocation() bool {
 	return o.haveLocation
 }
+
+// Location returns the current position
 func (o *ProjectObservation) Location() (float64, float64) {
 	return o.latitude, o.longitude
 }
+
+// SetLocation updates the current location for the sighting, and if track
+// is true, creates a location log to be written to the database.
 func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
 	if track && o.HaveAltitude() {
 		o.dirty = true
 		o.locationCount++
 		o.locationLogs = append(o.locationLogs, locationLog{
-			o.Altitude(), lat, lon, time.Now(),
+			o.Altitude(), lat, lon, time.Now(), nil,
 		})
 	}
 	o.latitude = lat
@@ -249,16 +291,8 @@ func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
 	}
 	return nil
 }
-func NewSightingWithAircraft(a *db.Aircraft) *Sighting {
-	return &Sighting{
-		State: pb.State{
-			Icao: a.Icao,
-		},
-		a:          a,
-		firstSeen:  time.Now(),
-		observedBy: make(map[uint64]*ProjectObservation, 0),
-	}
-}
+
+// NewSighting initializes a new sighting for aircraft with this ICAO
 func NewSighting(icao string) *Sighting {
 	return &Sighting{
 		State: pb.State{
@@ -269,6 +303,7 @@ func NewSighting(icao string) *Sighting {
 	}
 }
 
+// New initializes a new Tracker, or an error if one occurs
 func New(database db.Database, opt Options) (*Tracker, error) {
 	if opt.SightingTimeout < time.Second*30 {
 		return nil, errors.New("invalid sighting timeout - must be at least 30 seconds")
@@ -290,18 +325,27 @@ func New(database db.Database, opt Options) (*Tracker, error) {
 		mailTemplates:            tpls,
 	}, nil
 }
+
+// RegisterProjectStatusListener - accepts a new ProjectStatusListener to
+// use for project status updates
 func (t *Tracker) RegisterProjectStatusListener(l ProjectStatusListener) error {
 	t.projectMu.Lock()
 	defer t.projectMu.Unlock()
 	t.projectStatusListeners = append(t.projectStatusListeners, l)
 	return nil
 }
+
+// RegisterProjectAircraftUpdateListener - accepts a new ProjectAircraftUpdateListener to
+// use for aircraft updates
 func (t *Tracker) RegisterProjectAircraftUpdateListener(l ProjectAircraftUpdateListener) error {
 	t.projectMu.Lock()
 	defer t.projectMu.Unlock()
 	t.projectAcUpdateListeners = append(t.projectAcUpdateListeners, l)
 	return nil
 }
+
+// Start takes the messages channel and launches consumer goroutines. It
+// also starts the lost aircraft + database update goroutines.
 func (t *Tracker) Start(msgs chan *pb.Message) {
 	consumerCtx, consumerCanceller := context.WithCancel(context.Background())
 	t.consumerCanceller = consumerCanceller
@@ -325,6 +369,9 @@ func min(a, b int) int {
 	}
 	return b
 }
+
+// Stop begins the shutdown routine by signalling stop to goroutines,
+// flushes state to disk, and closes open sightings cleanly.
 func (t *Tracker) Stop() error {
 	log.Info("shutting down tracker")
 	log.Debug("await consumers to finish")
@@ -340,7 +387,6 @@ func (t *Tracker) Stop() error {
 		return errors.Wrapf(err, "flushing database updates")
 	}
 
-	// todo: need to trigger flush here so we don't lose data before every shutdown
 	// Take lock ourselves to cleanup pSightings and delete map
 	t.sightingMu.Lock()
 	defer t.sightingMu.Unlock()
@@ -392,6 +438,8 @@ func (t *Tracker) Stop() error {
 	return nil
 }
 
+// AddProject accepts a new project and adds it to the tracker.
+// Sends Activated event to ProjectStatusListeners
 func (t *Tracker) AddProject(p *Project) error {
 	t.projectMu.Lock()
 	defer t.projectMu.Unlock()
@@ -444,6 +492,8 @@ func (t *Tracker) AddProject(p *Project) error {
 	return nil
 }
 
+// startDatabaseTask is a goroutine that periodically writes state
+// to disk, and stops if the stop signal is received from ctx.
 func (t *Tracker) startDatabaseTask(ctx context.Context) {
 	waitTime := time.Second * 5
 	for {
@@ -459,41 +509,34 @@ func (t *Tracker) startDatabaseTask(ctx context.Context) {
 	}
 }
 
-type csUpdate struct {
-	sighting *db.Sighting
-	csLog    callsignLog
-}
-type squawkUpdate struct {
-	sighting  *db.Sighting
-	squawkLog squawkLog
-}
-type locationUpdate struct {
-	sighting    *db.Sighting
-	locationLog locationLog
-}
-
+// processDatabaseUpdates is called periodically to persist
+// recently received data to disk
 func (t *Tracker) processDatabaseUpdates() error {
 	t.projectMu.Lock()
 	defer t.projectMu.Unlock()
 	begin := time.Now()
-	updated := 0
-	var csUpdates []csUpdate
-	var squawkUpdates []squawkUpdate
-	var locationUpdates []locationUpdate
+	updatedSightings := 0
+	var csUpdates []callsignLog
+	var squawkUpdates []squawkLog
+	var locationUpdates []locationLog
 	for _, proj := range t.projects {
 		proj.obsMu.Lock()
 		for _, o := range proj.Observations {
 			o.mu.Lock()
 			if !o.dirty {
+				// not interesting, move on
 				o.mu.Unlock()
 				continue
 			}
+
 			hasNoSighting := o.sighting == nil
 			hasCsLogs := len(o.csLogs) > 0
 			hasSquawkLogs := len(o.squawkLogs) > 0
 			hasLocations := len(o.locationLogs) > 0
 
 			if hasNoSighting || hasCsLogs || hasSquawkLogs {
+				updatedSightings++
+				// Updates regarding the sighting record (also to gather build up inserts for batching)
 				err := o.db.Transaction(func(tx *sqlx.Tx) error {
 					var err error
 					if hasNoSighting {
@@ -504,34 +547,31 @@ func (t *Tracker) processDatabaseUpdates() error {
 						}
 					}
 					if hasCsLogs {
-						for _, csLog := range o.csLogs {
-							csUpdates = append(csUpdates, csUpdate{
-								sighting: o.sighting,
-								csLog:    csLog,
-							})
-						}
 						res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
 						if err != nil {
 							return errors.Wrap(err, "updating sighting callsign")
 						} else if err = db.CheckRowsUpdated(res, 1); err != nil {
 							return errors.Wrapf(err, "expected 1 updated row")
 						}
+
+						for i := 0; i < len(o.csLogs); i++ {
+							(&o.csLogs[i]).sighting = o.sighting
+						}
+						csUpdates = append(csUpdates, o.csLogs...)
 						o.csLogs = nil
 					}
 					if hasSquawkLogs {
-						for _, squawkLog := range o.squawkLogs {
-							squawkUpdates = append(squawkUpdates, squawkUpdate{
-								sighting:  o.sighting,
-								squawkLog: squawkLog,
-							})
-						}
-
 						_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
 						// todo: add this back in once we have 'sighting restore' added.
 						// reopened sightings trigger update though row count will be zero
 						if err != nil {
 							return errors.Wrap(err, "updating sighting squawk")
 						}
+
+						for i := 0; i < len(o.squawkLogs); i++ {
+							(&o.squawkLogs[i]).sighting = o.sighting
+						}
+						squawkUpdates = append(squawkUpdates, o.squawkLogs...)
 						o.squawkLogs = nil
 					}
 
@@ -543,17 +583,17 @@ func (t *Tracker) processDatabaseUpdates() error {
 					return err
 				}
 			}
+
+			// Locations is processed separately - if we only have locations, we avoid
+			// the above transaction
 			if hasLocations {
-				for _, locationLog := range o.locationLogs {
-					locationUpdates = append(locationUpdates, locationUpdate{
-						sighting:    o.sighting,
-						locationLog: locationLog,
-					})
+				for i := 0; i < len(o.locationLogs); i++ {
+					(&o.locationLogs[i]).sighting = o.sighting
 				}
+				locationUpdates = append(locationUpdates, o.locationLogs...)
 				o.locationLogs = nil
 			}
 
-			updated++
 			o.dirty = false
 			o.mu.Unlock()
 		}
@@ -565,11 +605,13 @@ func (t *Tracker) processDatabaseUpdates() error {
 	numSquawkUpdates := len(squawkUpdates)
 	numLocationUpdates := len(locationUpdates)
 
+	// Insert new callsigns, squawks, and location logs in batches
+
 	for i := 0; i < numCsUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
-			for _, csUpdate := range csUpdates[i:min(numCsUpdates, i+csBatch)] {
-				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdate.sighting, csUpdate.csLog.callsign, csUpdate.csLog.time)
+			for j := range csUpdates[i:min(numCsUpdates, i+csBatch)] {
+				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdates[j].sighting, csUpdates[j].callsign, csUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating callsign record")
 				}
@@ -584,8 +626,8 @@ func (t *Tracker) processDatabaseUpdates() error {
 	for i := 0; i < numSquawkUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
-			for _, squawkUpdate := range squawkUpdates[i:min(numSquawkUpdates, i+csBatch)] {
-				_, err = t.database.CreateNewSightingSquawkTx(tx, squawkUpdate.sighting, squawkUpdate.squawkLog.squawk, squawkUpdate.squawkLog.time)
+			for j := range squawkUpdates[i:min(numSquawkUpdates, i+csBatch)] {
+				_, err = t.database.CreateNewSightingSquawkTx(tx, squawkUpdates[j].sighting, squawkUpdates[j].squawk, squawkUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating squawk record")
 				}
@@ -599,9 +641,9 @@ func (t *Tracker) processDatabaseUpdates() error {
 
 	for i := 0; i < numLocationUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
-			for _, locationUpdate := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
-				_, err := t.database.InsertSightingLocationTx(tx, locationUpdate.sighting.Id, time.Now(),
-					locationUpdate.locationLog.alt, locationUpdate.locationLog.lat, locationUpdate.locationLog.lon)
+			for j := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
+				_, err := t.database.InsertSightingLocationTx(tx, locationUpdates[j].sighting.Id, locationUpdates[j].time,
+					locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				if err != nil {
 					return errors.Wrapf(err, "failed to insert sighting location")
 				}
@@ -615,10 +657,13 @@ func (t *Tracker) processDatabaseUpdates() error {
 
 	timeTaken := time.Since(begin)
 	log.Debugf("flushing updates (took %s)  sightings:%d  callsigns:%d  squawks:%d  locations:%d",
-		timeTaken, updated, numCsUpdates, numSquawkUpdates, numLocationUpdates)
+		timeTaken, updatedSightings, numCsUpdates, numSquawkUpdates, numLocationUpdates)
 
 	return nil
 }
+
+// checkForLostAircraft is a goroutine that periodically calls doLostAircraftCheck
+// and stops once the stop signal is received.
 func (t *Tracker) checkForLostAircraft(ctx context.Context) {
 	waitTime := time.Second * 5
 	for {
@@ -634,17 +679,18 @@ func (t *Tracker) checkForLostAircraft(ctx context.Context) {
 	}
 }
 
+// doLostAircraftCheck is called by the checkForLostAircraft goroutine.
+// It searches for t.sightings which
+// - have a s.lastSeen > our timeout
+// - have a project whose observation.lastSeen > our timeout
+// If the sighting isn't lost, it's unlocked immediately
+// If a sighting is lost and:
+//   - no projects are interested -> it's deleted from the map in this section.
+//   - at least one project is interested -> it remains locked and is included in results
 func (t *Tracker) doLostAircraftCheck() error {
 	t.sightingMu.Lock()
 	defer t.sightingMu.Unlock()
 
-	// This section searches for t.sightings which
-	// - have a s.lastSeen > our timeout
-	// - have a project whose observation.lastSeen > our timeout
-	// If the sighting isn't lost, it's unlocked immediately
-	// If a sighting is lost and:
-	//   - no projects are interested -> it's deleted from the map in this section.
-	//   - at least one project is interested -> it remains locked and is included in results
 	lostSightings := make([]lostSighting, 0)
 	lostDbSightings := make([]*db.Sighting, 0)
 	for _, sighting := range t.sighting {
@@ -729,6 +775,9 @@ func (t *Tracker) doLostAircraftCheck() error {
 	return nil
 }
 
+// reverseGeocode attempts to determine the nearest airport for the provided
+// latitude and longitude. The nearest airport is only accepted if we are
+// within 'NearestAirportMaxDistance' in range
 func (t *Tracker) reverseGeocode(lat float64, lon float64) (*GeocodeLocation, float64, error) {
 	location := &GeocodeLocation{}
 	addr, distance, err := t.opt.AirportGeocoder.ReverseGeocode(lat, lon)
@@ -794,6 +843,8 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	}
 	return nil
 }
+
+// processLostAircraftMap performs KML processing when the sighting closes
 func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *ProjectObservation) error {
 	if observation.sighting == nil {
 		return nil
@@ -911,6 +962,10 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 	}
 	return nil
 }
+
+// startConsumer is a goroutine that reads from the messages channel
+// and updates our state for each aircraft. Then ProcessMessage is
+// called with the sighting and each project.
 func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 	defer t.consumerWG.Done()
 
@@ -957,8 +1012,8 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 	return s
 }
 
+// UpdateStateFromMessage takes msg and applies new or updated data to the sighting.
 func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
-
 	s.lastSeen = now
 
 	// Update Sighting state
@@ -1063,6 +1118,9 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	}
 	return nil
 }
+
+// ProcessMessage is called to process the updated Sighting in the context
+// of the provided project.
 func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, msg *pb.Message) error {
 	timer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
 		us := v * 1000000 // make microseconds
@@ -1091,17 +1149,11 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		}
 	}
 
-	// initialize project sighting, if not already done
+	// Initialize project sighting, if not already done
 	observation, ok := s.observedBy[project.Session.Id]
 	var sightingOpened bool
 	if !ok {
-		//sighting, _, err := t.initProjectSighting(project, s.a)
-		//if err != nil {
-		//	// Cleanup reserved sighting
-		//	return errors.Wrapf(err, "failed to init project sighting")
-		//}
 		observation = NewProjectObservation(t.database, project, s, now)
-		//observation.sighting = sighting
 		project.obsMu.Lock()
 		s.observedBy[project.Session.Id] = observation
 		project.Observations[s.State.Icao] = observation
@@ -1322,6 +1374,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	return nil
 }
 
+// loadAircraft finds or creates an aircraft record for the provided icao.
 func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 	// create sighting
 	a, err := t.database.LoadAircraftByIcao(icao)
@@ -1341,6 +1394,7 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 	return a, nil
 }
 
+// initProjectSighting creates or reopens a sighting for the aircraft in the provided project
 func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) (*db.Sighting, bool, error) {
 	s, err := t.database.LoadLastSightingTx(tx, p.Session, ac)
 	if err != nil {
@@ -1387,6 +1441,8 @@ func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) 
 	return s, false, nil
 }
 
+// checkIfPassesFilter evaluates the CEL program and passes it's inputs.
+// The returned boolean result is only valid if no error is returned.
 func checkIfPassesFilter(prg cel.Program, msg *pb.Message, state *pb.State) (bool, error) {
 	filterTimer := prometheus.NewTimer(prometheus.ObserverFunc(func(v float64) {
 		us := v * 1000000 // make microseconds

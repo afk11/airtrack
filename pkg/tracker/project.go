@@ -12,46 +12,78 @@ import (
 )
 
 type (
-	Feature           string
+	// Feature represents a tracking capability to use in a project
+	Feature string
+	// EmailNotification represents an email topic to which the project is subscribed.
 	EmailNotification string
-	Project           struct {
+
+	// Project represents an active tracking project
+	Project struct {
+		// Name of the project
 		Name string
 		// ShouldMap indicates whether the map should be built for this project
-		ShouldMap          bool
-		Site               *db.CollectionSite
-		Session            *db.CollectionSession
-		Filter             string
-		Program            cel.Program
-		Features           []Feature
-		NotifyEmail        string
+		ShouldMap bool
+		// Site - the db record for this collection site
+		Site *db.CollectionSite
+		// Session - the db record for the current collection session
+		Session *db.CollectionSession
+		// Filter - a CEL expression for filtering aircraft (can be empty)
+		Filter string
+		// Program - a parsed CEL expression to evaluate later
+		Program cel.Program
+		// Features is the list of tracking features enabled in this project
+		Features []Feature
+		// NotifyEmail - the destination for email notifications
+		NotifyEmail string
+		// EmailNotifications - list of topics the project is subscribed to
 		EmailNotifications []EmailNotification
 
-		ReopenSightings         bool
+		// ReopenSightings - whether to reopen a sighting if it was seen within `ReopenSightingsInterval`
+		ReopenSightings bool
+		// ReopenSightingsInterval is a duration within which a previously closed sighting can
+		// be reopened
 		ReopenSightingsInterval time.Duration
+		// OnGroundUpdateThreshold - how many consecutive messages we receive with a new on_ground
+		// flag before we accept it
 		OnGroundUpdateThreshold int64
 
-		obsMu        sync.RWMutex
+		// Observations is a map of aircraft ICAO to it's state
 		Observations map[string]*ProjectObservation
+
+		obsMu sync.RWMutex
 	}
 )
 
 const (
-	TrackTxTypes     Feature = "track_tx_types"
-	TrackCallSigns   Feature = "track_callsigns"
-	TrackSquawks     Feature = "track_squawks"
+	// TrackTxTypes - track ADSB message types (only for BEAST messages)
+	TrackTxTypes Feature = "track_tx_types"
+	// TrackCallsigns - track current callsign and maintain history
+	TrackCallSigns Feature = "track_callsigns"
+	// TrackSquawks - track current squawk and maintain history
+	TrackSquawks Feature = "track_squawks"
+	// TrackKmlLocation - track location history for aircraft
 	TrackKmlLocation Feature = "track_kml"
-	TrackTakeoff     Feature = "track_takeoff"
+	// TrackTakeoff - (logs only) log when a takeoff begins/ends
+	TrackTakeoff Feature = "track_takeoff"
+	// GeocodeEndpoints - (logs only) geolocate the source + destination airport
 	GeocodeEndpoints Feature = "geocode_endpoints"
 
-	MapProduced           EmailNotification = "map_produced"
-	SpottedInFlight       EmailNotification = "spotted_in_flight"
-	TakeoffStart          EmailNotification = "takeoff_start"
-	TakeoffComplete       EmailNotification = "takeoff_complete"
+	// MapProduced - the notification about a new map
+	MapProduced EmailNotification = "map_produced"
+	// SpottedInFlight - the notification about an aircraft spotted in air
+	SpottedInFlight EmailNotification = "spotted_in_flight"
+	// TakeoffStart - the notification about an aircraft that just lifted off
+	TakeoffStart EmailNotification = "takeoff_start"
+	// TakeoffUnknownAirport - the notification about an aircraft that just lifted off from an unknown airport
 	TakeoffUnknownAirport EmailNotification = "takeoff_unknown_airport"
+	// TakeoffComplete - the notification about an aircraft that levels off after takeoff
+	TakeoffComplete EmailNotification = "takeoff_complete"
 
+	// DefaultSightingReopenInterval - default interval for sighting reopen behavior
 	DefaultSightingReopenInterval = time.Minute * 5
 )
 
+// FeatureFromString parses the Feature type from the provided string
 func FeatureFromString(f string) (Feature, error) {
 	switch f {
 	case string(TrackTxTypes):
@@ -70,6 +102,7 @@ func FeatureFromString(f string) (Feature, error) {
 	return "", errors.New("unknown feature")
 }
 
+// EmailNotificationFromString parses the EmailNotification type from the provided string
 func EmailNotificationFromString(n string) (EmailNotification, error) {
 	switch n {
 	case string(MapProduced):
@@ -84,6 +117,7 @@ func EmailNotificationFromString(n string) (EmailNotification, error) {
 	return "", errors.New("unknown notification")
 }
 
+// IsFeatureEnabled returns whether the project has Feature f enabled
 func (p *Project) IsFeatureEnabled(f Feature) bool {
 	for _, pf := range p.Features {
 		if pf == f {
@@ -93,6 +127,7 @@ func (p *Project) IsFeatureEnabled(f Feature) bool {
 	return false
 }
 
+// IsEmailNotificationEnabled returns whether the project has EmailNotification n enabled
 func (p *Project) IsEmailNotificationEnabled(n EmailNotification) bool {
 	for _, ni := range p.EmailNotifications {
 		if ni == n {
@@ -102,6 +137,7 @@ func (p *Project) IsEmailNotificationEnabled(n EmailNotification) bool {
 	return false
 }
 
+// InitProject initializes a project from its configuration or an error upon failure.
 func InitProject(cfg config.Project) (*Project, error) {
 	if cfg.Disabled {
 		return nil, errors.New("cannot init disabled project")
