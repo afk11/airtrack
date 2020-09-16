@@ -65,17 +65,18 @@ func NewAdsbxProducer(msgs chan *pb.Message, url string, apikey string) *AdsbxPr
 func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs chan *pb.Message, source *pb.Source) error {
 	start := time.Now()
 	cancelled := make(chan bool)
+	p.numReqs++
+	numReq := p.numReqs
 	defer func() {
 		cancelled <- true
-		p.numReqs++
 	}()
 
 	go func() {
 		select {
 		case <-time.After(time.Minute):
-			panic(fmt.Errorf("running after 1 minute, on request %d", p.numReqs))
+			panic(fmt.Errorf("adsbx request (%d) running after 1 minute", numReq))
 		case <-cancelled:
-			log.Debugf("adsbx http request terminated normally after %s", time.Since(start))
+			log.Debugf("adsbx request (%d) terminated normally after %s", numReq, time.Since(start))
 			break
 		}
 	}()
@@ -97,7 +98,7 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return errors.Errorf("received not-ok code %d from adsbx", resp.StatusCode)
+		return errors.Errorf("adsbx request (%d) received not-ok code %d", numReq, resp.StatusCode)
 	}
 
 	// check status
@@ -167,13 +168,13 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 				jsonErr, ok := (err).(*jsonDecodeError)
 				if ok {
 					if p.jsonPayloadDumpFile != "" {
-						log.Warnf("failed to decode adsbexchange response JSON. writing payload to %s", p.jsonPayloadDumpFile)
+						log.Warnf("adsbx request (%d) had invalid response JSON. writing payload to %s", p.numReqs, p.jsonPayloadDumpFile)
 						_ = ioutil.WriteFile(p.jsonPayloadDumpFile, jsonErr.response, 0644)
 					} else {
-						log.Warnf("failed to decode adsbexchange response JSON.")
+						log.Warnf("adsbx request (%d) had invalid response JSON.", p.numReqs)
 					}
 				} else {
-					log.Warnf("unexpected error: %s", err.Error())
+					log.Warnf("adsbx request (%d) error: %s", p.numReqs, err.Error())
 				}
 				if !degradedService {
 					degradedService = true
