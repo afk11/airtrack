@@ -82,7 +82,9 @@ type (
 	// Notifications - contains configuration of events to
 	// send to user
 	Notifications struct {
+		// Email - destination for email events
 		Email   string   `yaml:"email"`
+		// Enabled - list of subscribed email events
 		Enabled []string `yaml:"events"`
 	}
 
