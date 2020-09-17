@@ -10,6 +10,8 @@ package readsb
 // #include <icao_filter.h>
 /*
 // #include <readsb.h>
+
+// The following functions are helpers because go cannot access C bit fields
 int modesmessage_is_altitude_baro_valid(struct modesMessage *mm) {
 	return mm->altitude_baro_valid;
 }
@@ -219,25 +221,32 @@ import (
 	"github.com/pkg/errors"
 	"io"
 	"math"
+	"strings"
 	"time"
 	"unsafe"
 )
 
 type (
+	// Aircraft simply wraps a readsb aircraft pointer so we can pass it around
 	Aircraft struct {
 		a *C.struct_aircraft
 	}
 
+	// Decoder contains a pointer to the _Modes structure that contains
+	// our aircraft state. This state is required for location decoding.
 	Decoder struct {
 		modes *C.struct__Modes
 	}
 
+	// ModesMessage simply wraps a modesMessage pointer so we can pass it around
+	// and expose functions to other packages
 	ModesMessage struct {
 		msg *C.struct_modesMessage
 	}
 )
 
 var (
+	// ErrNoData is returned when the fields data was not available
 	ErrNoData = errors.New("no data for field")
 )
 
@@ -259,18 +268,27 @@ const (
 	ModesReadsbVariant = string(C.MODES_READSB_VARIANT)
 )
 
+// IcaoFilterInit calls the readsb function icaoFilterInit which
+// initializes an internal filter data structure
 func IcaoFilterInit() {
 	C.icaoFilterInit()
 }
+// IcaoFilterExpire should be called periodically so aircraft which
+// are out of range (not seen for some TTL) are removed from our filter
 func IcaoFilterExpire() {
 	C.icaoFilterExpire()
 }
+// ModeACInit calls the readsb function modeACInit which initializes
+// internal conversion tables for modeAC calculations
 func ModeACInit() {
 	C.modeACInit()
 }
+// ModesChecksumInit calls the readsb function modesChecksumInit which
+// precomputes data about CRC errors
 func ModesChecksumInit(numbits int) {
 	C.modesChecksumInit(C.int(numbits))
 }
+// DfToString returns the description of this df value.
 func DfToString(df uint) string {
 	return C.GoString(C.df_to_string(C.uint(df)))
 }
@@ -290,33 +308,38 @@ func TrackPeriodicUpdate(d *Decoder) {
 	C.trackPeriodicUpdate(d.modes)
 }
 
+// GetIcaoHex returns the ICAO as a hex string in upper case
 func (m *ModesMessage) GetIcaoHex() string {
 	icao := [3]byte{}
 	icao[0] = byte(m.msg.addr >> 16)
 	icao[1] = byte(m.msg.addr >> 8)
 	icao[2] = byte(m.msg.addr >> 0)
-	return hex.EncodeToString(icao[:])
+	return strings.ToUpper(hex.EncodeToString(icao[:]))
 }
+
+// GetSquawk will return the squawk from this message, or ErrNoData if unknown
 func (m *ModesMessage) GetSquawk() (string, error) {
 	if C.modesmessage_is_squawk_valid(m.msg) != 1 {
 		return "", ErrNoData
 	}
 	return fmt.Sprintf("%04x", uint(m.msg.squawk)), nil
 }
+// GetCallsign will return the callsign from this message, or ErrNoData if unknown
 func (m *ModesMessage) GetCallsign() (string, error) {
 	if C.modesmessage_is_callsign_valid(m.msg) != 1 {
 		return "", ErrNoData
 	}
 	return C.GoString((*C.char)(unsafe.Pointer(&m.msg.callsign[0]))), nil
 }
+// GetAltitudeBaro will return the barometric altitude from this message, or ErrNoData if unknown
 func (m *ModesMessage) GetAltitudeBaro() (int64, error) {
 	if C.modesmessage_is_altitude_baro_valid(m.msg) != 1 {
 		return 0, ErrNoData
 	}
-
 	// todo: wtf units are we returning - convert?
 	return int64(m.msg.altitude_baro), nil
 }
+// GetAltitudeGeom will return the geometric altitude from this message, or ErrNoData if unknown
 func (m *ModesMessage) GetAltitudeGeom() (int64, error) {
 	if C.modesmessage_is_altitude_geom_valid(m.msg) != 1 {
 		return 0, ErrNoData
@@ -325,6 +348,7 @@ func (m *ModesMessage) GetAltitudeGeom() (int64, error) {
 	// todo: wtf units are we returning - convert?
 	return int64(m.msg.altitude_geom), nil
 }
+// GetRateBaro will return the barometric vertical rate from this message, or ErrNoData if unknown
 func (m *ModesMessage) GetRateBaro() (int, error) {
 	if C.modesmessage_is_baro_rate_valid(m.msg) != 1 {
 		return 0, ErrNoData
@@ -333,6 +357,7 @@ func (m *ModesMessage) GetRateBaro() (int, error) {
 	// todo: wtf units are we returning - convert?
 	return int(m.msg.baro_rate), nil
 }
+// GetRateGeom will return the geometric vertical rate from this message, or ErrNoData if unknown
 func (m *ModesMessage) GetRateGeom() (int, error) {
 	if C.modesmessage_is_geom_rate_valid(m.msg) != 1 {
 		return 0, ErrNoData
@@ -351,6 +376,9 @@ func (m *ModesMessage) GetGroundSpeed() (float64, error) {
 
 	return float64(m.msg.gs.selected), nil
 }
+// GetDecodeLocation will return the position from this message, or ErrNoData if unknown.
+// This field is only set if the message has been processed by TrackUpdateFromMessage as
+// to successfully decode a location you need two consecutive odd + even messages.
 func (m *ModesMessage) GetDecodeLocation() (float64, float64, error) {
 	if C.modesmessage_is_cpr_valid(m.msg) != 1 ||
 		C.modesmessage_is_cpr_decoded(m.msg) != 1 {
@@ -360,6 +388,8 @@ func (m *ModesMessage) GetDecodeLocation() (float64, float64, error) {
 	lon := float64(m.msg.decoded_lon)
 	return lat, lon, nil
 }
+// IsOnGround will return whether the aircraft is on ground, or ErrNoData if
+// this is unknown or otherwise uncertain.
 func (m *ModesMessage) IsOnGround() (bool, error) {
 	if m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_INVALID ||
 		m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_UNCERTAIN {
@@ -367,6 +397,8 @@ func (m *ModesMessage) IsOnGround() (bool, error) {
 	}
 	return m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_GROUND, nil
 }
+// GetHeading returns the heading from the message.
+// this field is only set if the mesage has been processed by TrackUpdateFromMEssage
 func (m *ModesMessage) GetHeading() (float64, error) {
 	if C.modesmessage_is_heading_valid(m.msg) != 1 {
 		return 0.0, ErrNoData
@@ -374,6 +406,7 @@ func (m *ModesMessage) GetHeading() (float64, error) {
 	return float64(m.msg.heading), nil
 }
 
+// ParseMessage attempts to decode and process any messages it can find in b.
 func ParseMessage(d *Decoder, b []byte) ([]*ModesMessage, int, error) {
 	var ret []*ModesMessage
 
@@ -429,6 +462,8 @@ func ParseMessage(d *Decoder, b []byte) ([]*ModesMessage, int, error) {
 	}
 	return ret, som, nil
 }
+// DecodeBinMessage attempts to decode a single message, whose starting position
+// in m is indicated by p. If withModeAC is true, mode AC messages will be decoded also
 func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.struct_modesMessage, error) {
 	var msgLen = 0
 	var ch byte
@@ -521,12 +556,14 @@ func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.st
 	return nil, nil
 }
 
+// NewDecoder returns an initialized Decoder.
 func NewDecoder() *Decoder {
 	return &Decoder{
 		modes: &C.struct__Modes{},
 	}
 }
 
+// DebugModesMessage writes debug information about the message to w.
 func DebugModesMessage(w io.Writer, mm *C.struct_modesMessage) error {
 
 	b := C.GoBytes(unsafe.Pointer(&mm.msg[0]), mm.msgbits/8)
