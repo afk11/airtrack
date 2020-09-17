@@ -27,8 +27,13 @@ message Message {
   bool HaveVerticalRateBarometric = 46;
 
   string Track = 50;
+
+  bool HaveFmsAltitude = 60;
+  int64 FmsAltitude = 61;
+
   string GroundSpeed = 90;
 }
+
 message State {
   // 6 character hex identifier for aircraft
   string Icao = 1;
@@ -75,6 +80,9 @@ message State {
 
   bool HaveTrack = 80;
   double Track = 81;
+
+  bool HaveFmsAltitude = 85;
+  int64 FmsAltitude = 86;
 
   bool HaveGroundSpeed = 90;
   double GroundSpeed = 91;

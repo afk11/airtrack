@@ -418,6 +418,16 @@ func (m *ModesMessage) GetHeading() (float64, error) {
 	return float64(m.msg.heading), nil
 }
 
+// GetFmsAltitude returns the FMS selected altitude, or ErrNoData
+// if the data is not set.
+// todo: units?
+func (m *ModesMessage) GetFmsAltitude() (int64, error) {
+	if C.modesmessage_is_nav_fms_altitude_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return int64(m.msg.nav.fms_altitude), nil
+}
+
 // ParseMessage attempts to decode and process any messages it can find in b.
 func ParseMessage(d *Decoder, b []byte) ([]*ModesMessage, int, error) {
 	var ret []*ModesMessage

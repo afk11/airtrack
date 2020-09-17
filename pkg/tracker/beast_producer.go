@@ -174,6 +174,10 @@ func (p *BeastProducer) producer(ctx context.Context) {
 					proto.Latitude = strconv.FormatFloat(lat, 'f', 8, 64)
 					proto.Longitude = strconv.FormatFloat(lon, 'f', 8, 64)
 				}
+				if alt, err := msg.GetFmsAltitude(); err == nil {
+					proto.HaveFmsAltitude = true
+					proto.FmsAltitude = alt
+				}
 				p.messages <- proto
 			}
 

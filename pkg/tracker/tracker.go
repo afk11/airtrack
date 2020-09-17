@@ -1093,6 +1093,10 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 		s.State.HaveVerticalRateGeometric = true
 		s.State.VerticalRateGeometric = msg.VerticalRateBarometric
 	}
+	if msg.HaveFmsAltitude {
+		s.State.HaveFmsAltitude = true
+		s.State.FmsAltitude = msg.FmsAltitude
+	}
 	if msg.Track != "" {
 		track, err := strconv.ParseFloat(msg.Track, 64)
 		if err != nil {

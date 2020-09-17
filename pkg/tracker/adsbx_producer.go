@@ -141,6 +141,14 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 			}
 			// any other value for Vsit is unexpected
 		}
+		if ac.Talt != "" {
+			fmsAlt, err := strconv.ParseInt(ac.Talt, 10, 64)
+			if err != nil {
+				return err
+			}
+			msg.HaveFmsAltitude = true
+			msg.FmsAltitude = fmsAlt
+		}
 
 		msgs <- msg
 	}

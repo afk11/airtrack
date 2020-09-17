@@ -239,7 +239,9 @@ func (j *JsonAircraft) UpdateWithState(state *pb.State) {
 	if state.HaveVerticalRateGeometric {
 		j.GeometricRate = state.VerticalRateGeometric
 	}
-
+	if state.HaveFmsAltitude {
+		j.NavAltitudeFMS = state.FmsAltitude
+	}
 	j.GroundSpeed = state.GroundSpeed
 }
 
