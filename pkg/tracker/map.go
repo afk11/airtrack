@@ -242,7 +242,9 @@ func (j *JsonAircraft) UpdateWithState(state *pb.State) {
 	if state.HaveFmsAltitude {
 		j.NavAltitudeFMS = state.FmsAltitude
 	}
-	j.GroundSpeed = state.GroundSpeed
+	if state.HaveGroundSpeed {
+		j.GroundSpeed = state.GroundSpeed
+	}
 }
 
 // AircraftMap is the main service for receiving project+aircraft

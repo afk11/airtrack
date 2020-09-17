@@ -157,18 +157,21 @@ func (p *BeastProducer) producer(ctx context.Context) {
 					proto.HaveVerticalRateBarometric = true
 					proto.VerticalRateBarometric = int64(rate)
 				}
-				if heading, err := msg.GetHeading(); err == nil {
-					proto.Track = strconv.FormatFloat(heading, 'f', 6, 64)
+				if heading, headingType, err := msg.GetHeading(); err == nil {
+					switch headingType {
+					case readsb.HeadingGroundTrack:
+						proto.Track = strconv.FormatFloat(heading, 'f', 6, 64)
+					case readsb.HeadingMagnetic:
+						proto.MagneticHeading = heading
+					case readsb.HeadingTrue:
+						proto.TrueHeading = heading
+					}
 				}
 				if gs, err := msg.GetGroundSpeed(); err == nil {
 					proto.GroundSpeed = strconv.FormatFloat(gs, 'f', 1, 64)
 				}
 				if onground, err := msg.IsOnGround(); err == nil {
-					if onground {
-						proto.GroundSpeed = "1"
-					} else {
-						proto.GroundSpeed = "0"
-					}
+					proto.IsOnGround = onground
 				}
 				if lat, lon, err := msg.GetDecodeLocation(); err == nil {
 					proto.Latitude = strconv.FormatFloat(lat, 'f', 8, 64)

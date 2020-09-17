@@ -305,6 +305,8 @@ func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
 		o.locationLogs = append(o.locationLogs, locationLog{
 			o.AltitudeBarometric(), lat, lon, time.Now(), nil,
 		})
+		log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f) #pos=%d",
+			o.project.Session.Id, o.mem.State.Icao, o.AltitudeBarometric(), o.mem.State.Latitude, o.mem.State.Longitude, o.locationCount)
 	}
 	o.latitude = lat
 	o.longitude = lon
@@ -544,84 +546,111 @@ func (t *Tracker) processDatabaseUpdates() error {
 	for _, proj := range t.projects {
 		proj.obsMu.Lock()
 		for _, o := range proj.Observations {
-			o.mu.Lock()
-			if !o.dirty {
-				// not interesting, move on
-				o.mu.Unlock()
-				continue
+			createdSighting, csLogs, squawkLogs, locationLogs, err := t.updateSightingAndReturnLogs(o)
+			if err != nil {
+				proj.obsMu.Unlock()
+				return err
 			}
-
-			hasNoSighting := o.sighting == nil
-			hasCsLogs := len(o.csLogs) > 0
-			hasSquawkLogs := len(o.squawkLogs) > 0
-			hasLocations := len(o.locationLogs) > 0
-
-			if hasNoSighting || hasCsLogs || hasSquawkLogs {
+			if createdSighting {
 				updatedSightings++
-				// Updates regarding the sighting record (also to gather build up inserts for batching)
-				err := o.db.Transaction(func(tx *sqlx.Tx) error {
-					var err error
-					if hasNoSighting {
-						o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a)
-						if err != nil {
-							// Cleanup reserved sighting
-							return errors.Wrapf(err, "failed to init project sighting")
-						}
-					}
-					if hasCsLogs {
-						res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
-						if err != nil {
-							return errors.Wrap(err, "updating sighting callsign")
-						} else if err = db.CheckRowsUpdated(res, 1); err != nil {
-							return errors.Wrapf(err, "expected 1 updated row")
-						}
-
-						for i := 0; i < len(o.csLogs); i++ {
-							(&o.csLogs[i]).sighting = o.sighting
-						}
-						csUpdates = append(csUpdates, o.csLogs...)
-						o.csLogs = nil
-					}
-					if hasSquawkLogs {
-						_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
-						// todo: add this back in once we have 'sighting restore' added.
-						// reopened sightings trigger update though row count will be zero
-						if err != nil {
-							return errors.Wrap(err, "updating sighting squawk")
-						}
-
-						for i := 0; i < len(o.squawkLogs); i++ {
-							(&o.squawkLogs[i]).sighting = o.sighting
-						}
-						squawkUpdates = append(squawkUpdates, o.squawkLogs...)
-						o.squawkLogs = nil
-					}
-
-					return nil
-				})
-				if err != nil {
-					o.mu.Unlock()
-					proj.obsMu.Unlock()
-					return err
-				}
 			}
-
-			// Locations is processed separately - if we only have locations, we avoid
-			// the above transaction
-			if hasLocations {
-				for i := 0; i < len(o.locationLogs); i++ {
-					(&o.locationLogs[i]).sighting = o.sighting
-				}
-				locationUpdates = append(locationUpdates, o.locationLogs...)
-				o.locationLogs = nil
-			}
-
-			o.dirty = false
-			o.mu.Unlock()
+			csUpdates = append(csUpdates, csLogs...)
+			squawkUpdates = append(squawkUpdates, squawkLogs...)
+			locationUpdates = append(locationUpdates, locationLogs...)
 		}
 		proj.obsMu.Unlock()
 	}
 
+	err := t.writeUpdates(csUpdates, squawkUpdates, locationUpdates)
+	if err != nil {
+		return errors.Wrapf(err, "write updates")
+	}
+	timeTaken := time.Since(begin)
+	numCsUpdates := len(csUpdates)
+	numSquawkUpdates := len(squawkUpdates)
+	numLocationUpdates := len(locationUpdates)
+	log.Debugf("flushing updates (took %s)  sightings:%d  callsigns:%d  squawks:%d  locations:%d",
+		timeTaken, updatedSightings, numCsUpdates, numSquawkUpdates, numLocationUpdates)
+
+	return nil
+}
+func (t *Tracker) updateSightingAndReturnLogs(o *ProjectObservation) (bool, []callsignLog, []squawkLog, []locationLog, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if !o.dirty {
+		// not interesting, move on
+		return false, nil, nil, nil, nil
+	}
+
+	hasNoSighting := o.sighting == nil
+	hasCsLogs := len(o.csLogs) > 0
+	hasSquawkLogs := len(o.squawkLogs) > 0
+	hasLocations := len(o.locationLogs) > 0
+	var csUpdates []callsignLog
+	var squawkUpdates []squawkLog
+	var locationUpdates []locationLog
+	if hasNoSighting || hasCsLogs || hasSquawkLogs {
+		// Updates regarding the sighting record (also to gather build up inserts for batching)
+		err := o.db.Transaction(func(tx *sqlx.Tx) error {
+			var err error
+			if hasNoSighting {
+				o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a)
+				if err != nil {
+					// Cleanup reserved sighting
+					return errors.Wrapf(err, "failed to init project sighting")
+				}
+			}
+			if hasCsLogs {
+				res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
+				if err != nil {
+					return errors.Wrap(err, "updating sighting callsign")
+				} else if err = db.CheckRowsUpdated(res, 1); err != nil {
+					return errors.Wrapf(err, "expected 1 updated row")
+				}
+
+				for i := 0; i < len(o.csLogs); i++ {
+					(&o.csLogs[i]).sighting = o.sighting
+				}
+				csUpdates = o.csLogs
+				o.csLogs = nil
+			}
+			if hasSquawkLogs {
+				_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
+				// todo: add this back in once we have 'sighting restore' added.
+				// reopened sightings trigger update though row count will be zero
+				if err != nil {
+					return errors.Wrap(err, "updating sighting squawk")
+				}
+
+				for i := 0; i < len(o.squawkLogs); i++ {
+					(&o.squawkLogs[i]).sighting = o.sighting
+				}
+				squawkUpdates = o.squawkLogs
+				o.squawkLogs = nil
+			}
+
+			return nil
+		})
+		if err != nil {
+			return false, nil, nil, nil, err
+		}
+	}
+
+	// Locations is processed separately - if we only have locations, we avoid
+	// the above transaction
+	if hasLocations {
+		for i := 0; i < len(o.locationLogs); i++ {
+			(&o.locationLogs[i]).sighting = o.sighting
+		}
+		locationUpdates = o.locationLogs
+		o.locationLogs = nil
+	}
+
+	o.dirty = false
+
+	return hasNoSighting, csUpdates, squawkUpdates, locationUpdates, nil
+}
+func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLog, locationUpdates []locationLog) error {
 	csBatch := 100
 	numCsUpdates := len(csUpdates)
 	numSquawkUpdates := len(squawkUpdates)
@@ -664,6 +693,9 @@ func (t *Tracker) processDatabaseUpdates() error {
 	for i := 0; i < numLocationUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			for j := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
+				fmt.Printf("insert location ac=%d sighting=%d session=%d site=%d alt=%d lat=%f lon=%f\n",
+					locationUpdates[j].sighting.AircraftId, locationUpdates[j].sighting.Id, locationUpdates[j].sighting.CollectionSessionId,
+					locationUpdates[j].sighting.CollectionSiteId, locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				_, err := t.database.InsertSightingLocationTx(tx, locationUpdates[j].sighting.Id, locationUpdates[j].time,
 					locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				if err != nil {
@@ -676,11 +708,6 @@ func (t *Tracker) processDatabaseUpdates() error {
 			return errors.Wrapf(err, "in transaction")
 		}
 	}
-
-	timeTaken := time.Since(begin)
-	log.Debugf("flushing updates (took %s)  sightings:%d  callsigns:%d  squawks:%d  locations:%d",
-		timeTaken, updatedSightings, numCsUpdates, numSquawkUpdates, numLocationUpdates)
-
 	return nil
 }
 
@@ -850,6 +877,21 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 			}
 			observation.destination = location
 		}
+	}
+
+	// this ensures that all database updates are applied before doing map processing.
+	// necessary for aircraft that go out of range, with a location in memory, but none
+	// in the table yet. when handling session close, we have already processed updates, so
+	// this shouldn't have any major cost
+	_, csLogs, squawkLogs, locationLogs, err := t.updateSightingAndReturnLogs(observation)
+	if err != nil {
+		return errors.Wrapf(err, "updateSightingAndReturnLogs")
+	}
+	fmt.Printf("lost aircraft updates %s callsigns %d squawks %d locations %d\n",
+		sighting.State.Icao, len(csLogs), len(squawkLogs), len(locationLogs))
+	err = t.writeUpdates(csLogs, squawkLogs, locationLogs)
+	if err != nil {
+		return errors.Wrapf(err, "writeUpdates")
 	}
 
 	if project.IsFeatureEnabled(TrackKmlLocation) && observation.locationCount > 1 {
@@ -1108,10 +1150,11 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	if msg.GroundSpeed != "" {
 		gs, err := strconv.ParseFloat(msg.GroundSpeed, 64)
 		if err != nil {
-			return errors.Wrapf(err, "parse msg latitude")
+			return errors.Wrapf(err, "parse msg ground speed")
 		}
 		s.State.GroundSpeed = gs
 		s.State.HaveGroundSpeed = true
+
 	}
 	if s.State.IsOnGround != msg.IsOnGround {
 		if s.onGroundCandidate == msg.IsOnGround {
@@ -1242,13 +1285,6 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 			if err != nil {
 				return errors.Wrapf(err, "setting location")
 			}
-		}
-		// We have alt + location, and there's been an update - save the location
-		if (observation.HaveAltitudeBarometric() && observation.HaveLocation()) &&
-			(updatedAltBaro || updatedLocation) &&
-			project.IsFeatureEnabled(TrackKmlLocation) {
-			log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f)",
-				project.Session.Id, s.State.Icao, observation.AltitudeBarometric(), s.State.Latitude, s.State.Longitude)
 		}
 	}
 	if s.State.HaveCallsign {

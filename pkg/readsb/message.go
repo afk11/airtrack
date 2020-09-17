@@ -250,6 +250,8 @@ var (
 	ErrNoData = errors.New("no data for field")
 )
 
+type HeadingType int
+
 const (
 	ModeACMsgBytes = int(C.MODEAC_MSG_BYTES)
 
@@ -264,6 +266,13 @@ const (
 
 	// AsciiIntZero - '0' in ASCII
 	AsciiIntZero = 0x30
+
+	HeadingInvalid HeadingType = C.HEADING_INVALID
+	HeadingGroundTrack HeadingType = C.HEADING_GROUND_TRACK
+	HeadingTrue HeadingType = C.HEADING_TRUE
+	HeadingMagnetic HeadingType = C.HEADING_MAGNETIC
+	HeadingMagneticOrTrue HeadingType = C.HEADING_MAGNETIC_OR_TRUE
+	HeadingTrackOrHeading HeadingType = C.HEADING_TRACK_OR_HEADING
 
 	ModesReadsbVariant = string(C.MODES_READSB_VARIANT)
 )
@@ -411,11 +420,11 @@ func (m *ModesMessage) IsOnGround() (bool, error) {
 
 // GetHeading returns the heading from the message.
 // this field is only set if the mesage has been processed by TrackUpdateFromMEssage
-func (m *ModesMessage) GetHeading() (float64, error) {
+func (m *ModesMessage) GetHeading() (float64, HeadingType, error) {
 	if C.modesmessage_is_heading_valid(m.msg) != 1 {
-		return 0.0, ErrNoData
+		return 0.0, 0, ErrNoData
 	}
-	return float64(m.msg.heading), nil
+	return float64(m.msg.heading), HeadingType(m.msg.heading_type), nil
 }
 
 // GetFmsAltitude returns the FMS selected altitude, or ErrNoData

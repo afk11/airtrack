@@ -27,6 +27,10 @@ message Message {
   bool HaveVerticalRateBarometric = 46;
 
   string Track = 50;
+  double MagneticHeading = 51;
+  bool HaveMagneticHeading = 52;
+  double TrueHeading = 53;
+  bool HaveTrueHeading = 54;
 
   bool HaveFmsAltitude = 60;
   int64 FmsAltitude = 61;
