@@ -209,6 +209,11 @@ func (o *ProjectObservation) HasCallSign() bool {
 // is true, creates a callsign log to be written to the database.
 func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
 	if track {
+		if o.HasCallSign() {
+			log.Infof("[session %d] %s: updated callsign %s -> %s", o.project.Session.Id, o.mem.State.Icao, *o.CallSign(), callsign)
+		} else {
+			log.Infof("[session %d] %s: found callsign %s", o.project.Session.Id, o.mem.State.Icao, callsign)
+		}
 		o.dirty = true
 		o.csLogs = append(o.csLogs, callsignLog{callsign, time.Now(), nil})
 	}
@@ -233,6 +238,11 @@ func (o *ProjectObservation) HasSquawk() bool {
 // is true, creates a squawk log to be written to the database.
 func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
 	if track {
+		if o.HasSquawk() {
+			log.Infof("[session %d] %s: updated squawk %s -> %s", o.project.Session.Id, o.mem.State.Icao, *o.Squawk(), squawk)
+		} else {
+			log.Infof("[session %d] %s: found squawk %s", o.project.Session.Id, o.mem.State.Icao, squawk)
+		}
 		o.dirty = true
 		o.squawkLogs = append(o.squawkLogs, squawkLog{squawk, time.Now(), nil})
 	}
@@ -1237,6 +1247,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		project.Observations[s.State.Icao] = observation
 		project.obsMu.Unlock()
 		sightingOpened = true
+		log.Infof("[session %d] %s: new sighting", project.Session.Id, s.State.Icao)
 	}
 	observation.mu.Lock()
 	defer observation.mu.Unlock()
@@ -1290,13 +1301,6 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	if s.State.HaveCallsign {
 		updatedCallSign := !observation.HasCallSign() || s.State.CallSign != *observation.CallSign()
 		if updatedCallSign {
-			if project.IsFeatureEnabled(TrackCallSigns) {
-				if observation.HasCallSign() {
-					log.Infof("[session %d] %s: updated callsign %s -> %s", project.Session.Id, s.State.Icao, *observation.CallSign(), s.State.CallSign)
-				} else {
-					log.Infof("[session %d] %s: found callsign %s", project.Session.Id, s.State.Icao, s.State.CallSign)
-				}
-			}
 			err := observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns))
 			if err != nil {
 				return errors.Wrapf(err, "setting callsign")
@@ -1306,13 +1310,6 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	if s.State.HaveSquawk {
 		updatedSquawk := !observation.HasSquawk() || (s.State.Squawk != *observation.Squawk())
 		if updatedSquawk {
-			if project.IsFeatureEnabled(TrackSquawks) {
-				if observation.HasSquawk() {
-					log.Infof("[session %d] %s: updated squawk %s -> %s", project.Session.Id, s.State.Icao, *observation.Squawk(), s.State.Squawk)
-				} else {
-					log.Infof("[session %d] %s: found squawk %s", project.Session.Id, s.State.Icao, s.State.Squawk)
-				}
-			}
 			err := observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks))
 			if err != nil {
 				return errors.Wrapf(err, "setting squawk")
@@ -1510,12 +1507,6 @@ func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) 
 	s, err = t.database.LoadLastSightingTx(tx, p.Session, ac)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "load new sighting failed")
-	}
-
-	if s != nil && s.ClosedAt != nil {
-		log.Infof("[session %d] %s: new sighting (last seen: %s)", p.Session.Id, ac.Icao, *s.ClosedAt)
-	} else {
-		log.Infof("[session %d] %s: new sighting", p.Session.Id, ac.Icao)
 	}
 
 	return s, false, nil
