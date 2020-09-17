@@ -13,7 +13,8 @@ message Message {
   string Icao = 10;
   string Squawk = 11;
   string CallSign = 12;
-  string Altitude = 13;
+  string AltitudeGeometric = 13;
+  string AltitudeBarometric = 14;
 
   string Latitude = 20;
   string Longitude = 21;
@@ -29,9 +30,13 @@ message State {
   // 6 character hex identifier for aircraft
   string Icao = 1;
 
-  bool HaveAltitude = 10;
-  // Aircraft altitude in feet
-  int64 Altitude = 11;
+  // barometric altitude in feet
+  bool HaveAltitudeBarometric = 10;
+  int64 AltitudeBarometric = 11;
+
+  // geometric altitude in feet
+  bool HaveAltitudeGeometric = 12;
+  int64 AltitudeGeometric = 13;
 
   bool HaveLocation = 20;
   // Latitude

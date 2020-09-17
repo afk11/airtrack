@@ -144,9 +144,10 @@ func (p *BeastProducer) producer(ctx context.Context) {
 					proto.CallSign = callsign
 				}
 				if altitude, err := msg.GetAltitudeGeom(); err == nil {
-					proto.Altitude = strconv.FormatInt(altitude, 10)
-				} else if altitude, err := msg.GetAltitudeBaro(); err == nil {
-					proto.Altitude = strconv.FormatInt(altitude, 10)
+					proto.AltitudeGeometric = strconv.FormatInt(altitude, 10)
+				}
+				if altitude, err := msg.GetAltitudeBaro(); err == nil {
+					proto.AltitudeBarometric = strconv.FormatInt(altitude, 10)
 				}
 				if rate, err := msg.GetRateGeom(); err == nil {
 					proto.VerticalRate = strconv.Itoa(rate)

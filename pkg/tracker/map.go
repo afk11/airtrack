@@ -145,7 +145,7 @@ type JsonAircraft struct {
 	// BarometricAltitude: the aircraft barometric altitude in feet
 	BarometricAltitude int64 `json:"alt_baro,omitempty"`
 	// GeometricAltitude: geometric (GNSS / INS) altitude in feet referenced to the WGS84 ellipsoid
-	GeometricAltitude string `json:"alt_geom,omitempty"`
+	GeometricAltitude int64 `json:"alt_geom,omitempty"`
 	// GroundSpeed: ground speed in knots
 	GroundSpeed float64 `json:"gs,omitempty"`
 	// IndicatedAirSpeed: indicated air speed in knots
@@ -231,7 +231,8 @@ func (j *JsonAircraft) UpdateWithState(state *pb.State) {
 	j.Squawk = state.Squawk
 	j.MagneticHeading = state.Track
 	j.Track = state.Track
-	j.BarometricAltitude = state.Altitude
+	j.BarometricAltitude = state.AltitudeBarometric
+	j.GeometricAltitude = state.AltitudeGeometric
 	j.BarometricRate = state.VerticalRate
 	j.GroundSpeed = state.GroundSpeed
 }

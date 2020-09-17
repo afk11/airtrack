@@ -83,9 +83,9 @@ type (
 	}
 	// locationLog records a new alt/lat/lon position for a sighting and the time it was observed.
 	locationLog struct {
-		alt int64
-		lat float64
-		lon float64
+		alt  int64
+		lat  float64
+		lon  float64
 		time time.Time
 		// sighting is only set in the database processing routine, as it's
 		// not necessarily available if the sighting is new
@@ -114,8 +114,11 @@ type (
 		csLogs       []callsignLog
 		squawkLogs   []squawkLog
 		locationLogs []locationLog
-		haveAlt      bool
-		altitude     int64
+		haveAltBaro  bool
+		altitudeBaro int64
+
+		haveAltGeom  bool
+		altitudeGeom int64
 
 		haveGS bool
 		gs     float64
@@ -245,21 +248,40 @@ func (o *ProjectObservation) Squawk() *string {
 	return &o.squawk
 }
 
-// HaveAltitude returns true if the current altitude is known
-func (o *ProjectObservation) HaveAltitude() bool {
-	return o.haveAlt
+// HaveAltitudeBarometric returns true if the current barometric altitude is known
+func (o *ProjectObservation) HaveAltitudeBarometric() bool {
+	return o.haveAltBaro
 }
 
-// Altitude returns the current altitude
-func (o *ProjectObservation) Altitude() int64 {
-	return o.altitude
+// AltitudeBarometric returns the current barometric altitude
+func (o *ProjectObservation) AltitudeBarometric() int64 {
+	return o.altitudeBaro
 }
 
-// SetAltitude updates the current altitude
-func (o *ProjectObservation) SetAltitude(alt int64) error {
-	o.altitude = alt
-	if !o.haveAlt {
-		o.haveAlt = true
+// SetAltitudeBarometric updates the current barmetric altitude
+func (o *ProjectObservation) SetAltitudeBarometric(alt int64) error {
+	o.altitudeBaro = alt
+	if !o.haveAltBaro {
+		o.haveAltBaro = true
+	}
+	return nil
+}
+
+// HaveAltitudeGeometric returns true if the current barometric altitude is known
+func (o *ProjectObservation) HaveAltitudeGeometric() bool {
+	return o.haveAltGeom
+}
+
+// AltitudeGeometric returns the current barometric altitude
+func (o *ProjectObservation) AltitudeGeometric() int64 {
+	return o.altitudeGeom
+}
+
+// SetAltitudeGeometric updates the current barmetric altitude
+func (o *ProjectObservation) SetAltitudeGeometric(alt int64) error {
+	o.altitudeGeom = alt
+	if !o.haveAltGeom {
+		o.haveAltGeom = true
 	}
 	return nil
 }
@@ -277,11 +299,11 @@ func (o *ProjectObservation) Location() (float64, float64) {
 // SetLocation updates the current location for the sighting, and if track
 // is true, creates a location log to be written to the database.
 func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
-	if track && o.HaveAltitude() {
+	if track && o.HaveAltitudeBarometric() {
 		o.dirty = true
 		o.locationCount++
 		o.locationLogs = append(o.locationLogs, locationLog{
-			o.Altitude(), lat, lon, time.Now(), nil,
+			o.AltitudeBarometric(), lat, lon, time.Now(), nil,
 		})
 	}
 	o.latitude = lat
@@ -808,7 +830,7 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 		project.Session.Id, sighting.State.Icao, observation.firstSeen.Format(time.RFC822), time.Since(observation.firstSeen))
 
 	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.haveLocation {
-		if observation.altitude > t.opt.NearestAirportMaxAltitude {
+		if observation.altitudeBaro > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport
 			log.Debugf("[session %d] %s: too high to determine destination location",
 				project.Session.Id, sighting.State.Icao)
@@ -1018,14 +1040,23 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 
 	// Update Sighting state
 	var err error
-	if msg.Altitude != "" {
+	if msg.AltitudeGeometric != "" {
 		var alt int64
-		alt, err = strconv.ParseInt(msg.Altitude, 10, 64)
+		alt, err = strconv.ParseInt(msg.AltitudeGeometric, 10, 64)
 		if err != nil {
-			return errors.Wrapf(err, "parse altitude")
+			return errors.Wrapf(err, "parse geometric altitude")
 		}
-		s.State.HaveAltitude = true
-		s.State.Altitude = alt
+		s.State.HaveAltitudeGeometric = true
+		s.State.AltitudeGeometric = alt
+	}
+	if msg.AltitudeBarometric != "" {
+		var alt int64
+		alt, err = strconv.ParseInt(msg.AltitudeBarometric, 10, 64)
+		if err != nil {
+			return errors.Wrapf(err, "parse barometric altitudeBaro")
+		}
+		s.State.HaveAltitudeBarometric = true
+		s.State.AltitudeBarometric = alt
 	}
 	if msg.Latitude != "" && msg.Longitude != "" {
 		var lat, long float64
@@ -1057,10 +1088,11 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 		}
 		s.State.HaveVerticalRate = true
 		s.State.VerticalRate = vr
-		if vr == 0 && s.Tags.IsInTakeoff && (s.State.HaveAltitude && s.State.Altitude > 200) {
+		// todo: is there geometric rate also?
+		if vr == 0 && s.Tags.IsInTakeoff && (s.State.HaveAltitudeBarometric && s.State.AltitudeBarometric > 200) {
 			s.Tags.IsInTakeoff = false
 			log.Tracef("ac finished takeoff %s (Alt: %d, VerticalRate: %d)",
-				s.State.Icao, s.State.Altitude, vr)
+				s.State.Icao, s.State.AltitudeBarometric, vr)
 		}
 	}
 	if msg.Track != "" {
@@ -1086,7 +1118,8 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 				log.Tracef("%s: updated IsOnGround: %t -> %t", s.State.Icao, s.State.IsOnGround, msg.IsOnGround)
 				s.State.IsOnGround = msg.IsOnGround
 				if !s.State.IsOnGround && s.State.VerticalRate > 0 {
-					log.Tracef("%s: IsInTakeoff (Alt: %d, VerticalRate: %d)", s.State.Icao, s.State.Altitude, s.State.VerticalRate)
+					// todo: review best altitude for here
+					log.Tracef("%s: IsInTakeoff (Alt: %d, VerticalRate: %d)", s.State.Icao, s.State.AltitudeBarometric, s.State.VerticalRate)
 					s.Tags.IsInTakeoff = true
 					// takeoff_begin
 				}
@@ -1166,13 +1199,22 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	// Update Projects information in DB
 	observation.lastSeen = now
 
-	var updatedAlt, updatedLocation, updatedGS, updatedTrack bool
-	if s.State.HaveAltitude {
-		updatedAlt = !observation.HaveAltitude() || s.State.Altitude != observation.Altitude()
-		if updatedAlt {
-			err := observation.SetAltitude(s.State.Altitude)
+	var updatedAltBaro, updatedAltGeom, updatedLocation, updatedGS, updatedTrack bool
+	if s.State.HaveAltitudeBarometric {
+		updatedAltBaro = !observation.HaveAltitudeBarometric() || s.State.AltitudeBarometric != observation.AltitudeBarometric()
+		if updatedAltBaro {
+			err := observation.SetAltitudeBarometric(s.State.AltitudeBarometric)
 			if err != nil {
-				return errors.Wrapf(err, "setting altitude")
+				return errors.Wrapf(err, "setting barometric altitude")
+			}
+		}
+	}
+	if s.State.HaveAltitudeGeometric {
+		updatedAltGeom = !observation.HaveAltitudeGeometric() || s.State.AltitudeGeometric != observation.AltitudeGeometric()
+		if updatedAltGeom {
+			err := observation.SetAltitudeGeometric(s.State.AltitudeGeometric)
+			if err != nil {
+				return errors.Wrapf(err, "setting geometric altitude")
 			}
 		}
 	}
@@ -1200,11 +1242,11 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 			}
 		}
 		// We have alt + location, and there's been an update - save the location
-		if (observation.HaveAltitude() && observation.HaveLocation()) &&
-			(updatedAlt || updatedLocation) &&
+		if (observation.HaveAltitudeBarometric() && observation.HaveLocation()) &&
+			(updatedAltBaro || updatedLocation) &&
 			project.IsFeatureEnabled(TrackKmlLocation) {
 			log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f)",
-				project.Session.Id, s.State.Icao, observation.Altitude(), s.State.Latitude, s.State.Longitude)
+				project.Session.Id, s.State.Icao, observation.AltitudeBarometric(), s.State.Latitude, s.State.Longitude)
 		}
 	}
 	if s.State.HaveCallsign {
@@ -1340,10 +1382,10 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		}
 	}
 	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.origin == nil && observation.HaveLocation() {
-		if observation.altitude > t.opt.NearestAirportMaxAltitude {
+		if observation.altitudeBaro > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport
 			log.Debugf("[session %d] %s: too high to determine origin location (%d over max %d)",
-				project.Session.Id, s.State.Icao, observation.altitude, t.opt.NearestAirportMaxAltitude)
+				project.Session.Id, s.State.Icao, observation.altitudeBaro, t.opt.NearestAirportMaxAltitude)
 			observation.origin = &GeocodeLocation{}
 		} else {
 			lat, lon := observation.Location()
