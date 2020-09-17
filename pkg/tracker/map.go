@@ -233,7 +233,13 @@ func (j *JsonAircraft) UpdateWithState(state *pb.State) {
 	j.Track = state.Track
 	j.BarometricAltitude = state.AltitudeBarometric
 	j.GeometricAltitude = state.AltitudeGeometric
-	j.BarometricRate = state.VerticalRate
+	if state.HaveVerticalRateBarometric {
+		j.BarometricRate = state.VerticalRateBarometric
+	}
+	if state.HaveVerticalRateGeometric {
+		j.GeometricRate = state.VerticalRateGeometric
+	}
+
 	j.GroundSpeed = state.GroundSpeed
 }
 

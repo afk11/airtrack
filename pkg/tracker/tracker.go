@@ -1080,20 +1080,18 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 		s.State.HaveSquawk = true
 		s.State.Squawk = msg.Squawk
 	}
-	if msg.VerticalRate != "" {
-		var vr int64
-		vr, err = strconv.ParseInt(msg.VerticalRate, 10, 64)
-		if err != nil {
-			return errors.Wrapf(err, "parse vertical rate")
-		}
-		s.State.HaveVerticalRate = true
-		s.State.VerticalRate = vr
-		// todo: is there geometric rate also?
-		if vr == 0 && s.Tags.IsInTakeoff && (s.State.HaveAltitudeBarometric && s.State.AltitudeBarometric > 200) {
+	if msg.HaveVerticalRateBarometric {
+		s.State.HaveVerticalRateBarometric = true
+		s.State.VerticalRateBarometric = msg.VerticalRateBarometric
+		if msg.VerticalRateBarometric == 0 && s.Tags.IsInTakeoff && (s.State.HaveAltitudeBarometric && s.State.AltitudeBarometric > 200) {
 			s.Tags.IsInTakeoff = false
 			log.Tracef("ac finished takeoff %s (Alt: %d, VerticalRate: %d)",
-				s.State.Icao, s.State.AltitudeBarometric, vr)
+				s.State.Icao, s.State.AltitudeBarometric, msg.VerticalRateBarometric)
 		}
+	}
+	if msg.HaveVerticalRateGeometric {
+		s.State.HaveVerticalRateGeometric = true
+		s.State.VerticalRateGeometric = msg.VerticalRateBarometric
 	}
 	if msg.Track != "" {
 		track, err := strconv.ParseFloat(msg.Track, 64)
@@ -1117,9 +1115,9 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 			if s.onGroundCounter > t.opt.OnGroundUpdateThreshold {
 				log.Tracef("%s: updated IsOnGround: %t -> %t", s.State.Icao, s.State.IsOnGround, msg.IsOnGround)
 				s.State.IsOnGround = msg.IsOnGround
-				if !s.State.IsOnGround && s.State.VerticalRate > 0 {
+				if !s.State.IsOnGround && s.State.VerticalRateBarometric > 0 {
 					// todo: review best altitude for here
-					log.Tracef("%s: IsInTakeoff (Alt: %d, VerticalRate: %d)", s.State.Icao, s.State.AltitudeBarometric, s.State.VerticalRate)
+					log.Tracef("%s: IsInTakeoff (Alt: %d, VerticalRate: %d)", s.State.Icao, s.State.AltitudeBarometric, s.State.VerticalRateBarometric)
 					s.Tags.IsInTakeoff = true
 					// takeoff_begin
 				}

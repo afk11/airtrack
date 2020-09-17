@@ -150,9 +150,12 @@ func (p *BeastProducer) producer(ctx context.Context) {
 					proto.AltitudeBarometric = strconv.FormatInt(altitude, 10)
 				}
 				if rate, err := msg.GetRateGeom(); err == nil {
-					proto.VerticalRate = strconv.Itoa(rate)
-				} else if rate, err := msg.GetRateBaro(); err == nil {
-					proto.VerticalRate = strconv.Itoa(rate)
+					proto.HaveVerticalRateGeometric = true
+					proto.VerticalRateGeometric = int64(rate)
+				}
+				if rate, err := msg.GetRateBaro(); err == nil {
+					proto.HaveVerticalRateBarometric = true
+					proto.VerticalRateBarometric = int64(rate)
 				}
 				if heading, err := msg.GetHeading(); err == nil {
 					proto.Track = strconv.FormatFloat(heading, 'f', 6, 64)

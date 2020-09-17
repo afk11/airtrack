@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -123,10 +124,24 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 			Latitude:           ac.Lat,
 			Longitude:          ac.Lon,
 			IsOnGround:         ac.Ground == "1",
-			VerticalRate:       ac.Vsi,
 			Track:              ac.Trak,
 			GroundSpeed:        ac.Spd,
 		}
+		if ac.Vsi != "" {
+			vsi, err := strconv.ParseInt(ac.Vsi, 10, 64)
+			if err != nil {
+				return err
+			}
+			if ac.Vsit == "0" {
+				msg.HaveVerticalRateBarometric = true
+				msg.VerticalRateBarometric = vsi
+			} else if ac.Vsit == "1" {
+				msg.HaveVerticalRateBarometric = true
+				msg.VerticalRateBarometric = vsi
+			}
+			// any other value for Vsit is unexpected
+		}
+
 		msgs <- msg
 	}
 
