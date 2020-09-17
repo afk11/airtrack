@@ -153,7 +153,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		}
 	}
 
-	if len(cfg.Airports.OpenAIPDirectories) > 0 {
+	if cfg.Airports != nil && len(cfg.Airports.OpenAIPDirectories) > 0 {
 		files, err := fs.ScanDirectoriesForFiles("aip", cfg.Airports.OpenAIPDirectories)
 		if err != nil {
 			log.Fatalf("error scanning openaip directories: %s", err.Error())
@@ -176,7 +176,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		}
 		airportFiles += len(files)
 	}
-	if len(cfg.Airports.CupDirectories) > 0 {
+	if cfg.Airports != nil && len(cfg.Airports.CupDirectories) > 0 {
 		files, err := fs.ScanDirectoriesForFiles("cup", cfg.Airports.CupDirectories)
 		if err != nil {
 			log.Fatalf("error scanning cup directories: %s", err.Error())
@@ -373,7 +373,10 @@ func (c *TrackCmd) Run(ctx *Context) error {
 
 		if mapServer != nil {
 			log.Info("stopping map server")
-			mapServer.Stop()
+			err = mapServer.Stop()
+			if err != nil {
+				return err
+			}
 		}
 		if mailSender != nil {
 			log.Info("stopping mailer")
