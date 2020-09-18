@@ -2,7 +2,7 @@ package airtrackqa
 
 import (
 	"fmt"
-	"github.com/afk11/airtrack/pkg/db/migrations"
+	"github.com/afk11/airtrack/pkg/db/migrations_mysql"
 	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 	"github.com/pkg/errors"
 )
@@ -12,9 +12,9 @@ type DumpMigration struct {
 }
 
 func (e *DumpMigration) Run(ctx *Context) error {
-	s := bindata.Resource(migrations.AssetNames(),
+	s := bindata.Resource(migrations_mysql.AssetNames(),
 		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
+			return migrations_mysql.Asset(name)
 		})
 	for _, name := range s.Names {
 		if e.File == name {

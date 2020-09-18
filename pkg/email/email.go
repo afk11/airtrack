@@ -3,7 +3,6 @@ package email
 import (
 	"bytes"
 	"fmt"
-	asset "github.com/afk11/airtrack/pkg/assets"
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/pkg/errors"
 	"text/template"
@@ -72,11 +71,11 @@ type (
 )
 
 const (
-	MapProducedEmail      Email = "assets/email/map_produced.tpl"
-	SpottedInFlight       Email = "assets/email/spotted_in_flight.tpl"
-	TakeoffUnknownAirport Email = "assets/email/takeoff_unknown_airport.tpl"
-	TakeoffFromAirport    Email = "assets/email/takeoff_from_airport.tpl"
-	TakeoffComplete       Email = "assets/email/takeoff_complete.tpl"
+	MapProducedEmail      Email = "map_produced.tpl"
+	SpottedInFlight       Email = "spotted_in_flight.tpl"
+	TakeoffUnknownAirport Email = "takeoff_unknown_airport.tpl"
+	TakeoffFromAirport    Email = "takeoff_from_airport.tpl"
+	TakeoffComplete       Email = "takeoff_complete.tpl"
 )
 
 func GetTemplates() []Email {
@@ -106,7 +105,7 @@ func LoadMailTemplates(templates ...Email) (*MailTemplates, error) {
 		m: make(map[Email]*template.Template),
 	}
 	for _, email := range templates {
-		data, err := asset.Asset(email.String())
+		data, err := Asset(email.String())
 		if err != nil {
 			return nil, err
 		}

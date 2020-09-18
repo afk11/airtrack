@@ -20,19 +20,21 @@ install-protobuf-c:
 		cd protobuf-c && git checkout $(PROTOBUF_C_VERSION) && ./autogen.sh && ./configure && make && sudo make install && sudo ldconfig
 build-bindata-assets:
 		go-bindata -pkg asset -o ./pkg/assets/asset.go assets/...
-build-bindata-migrations:
-		go-bindata -pkg migrations -o ./pkg/db/migrations/migrations.go -prefix db/migrations db/migrations
+build-bindata-email:
+		go-bindata -pkg email -o ./pkg/email/asset.go -prefix resources/email resources/email/...
+build-bindata-migrations-mysql:
+		go-bindata -pkg migrations_mysql -o ./pkg/db/migrations_mysql/migrations.go -prefix resources/migrations_mysql resources/migrations_mysql
 build-bindata-migrations-sqlite3:
-		go-bindata -pkg migrations_sqlite3 -o ./pkg/db/migrations_sqlite3/migrations.go -prefix db/migrations_sqlite3 db/migrations_sqlite3
+		go-bindata -pkg migrations_sqlite3 -o ./pkg/db/migrations_sqlite3/migrations.go -prefix resources/migrations_sqlite3 resources/migrations_sqlite3
 build-bindata-migrations-postgres:
-		go-bindata -pkg migrations_postgres -o ./pkg/db/migrations_postgres/migrations.go -prefix db/migrations_postgres db/migrations_postgres
+		go-bindata -pkg migrations_postgres -o ./pkg/db/migrations_postgres/migrations.go -prefix resources/migrations_postgres resources/migrations_postgres
 build-bindata-dump1090: resources/dump1090
 		go-bindata -pkg acmap -o ./pkg/dump1090/acmap/assets.go -prefix resources/dump1090/public_html resources/dump1090/...
 build-bindata-tar1090: resources/tar1090
 		go-bindata -pkg tar1090 -o ./pkg/tar1090/assets.go -prefix resources/tar1090/html resources/tar1090/...
 build-bindata-openaip: build-dir-airports
 		go-bindata -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
-build-bindata: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-migrations-postgres build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip
+build-bindata: build-bindata-assets build-bindata-email build-bindata-migrations-mysql build-bindata-migrations-sqlite3 build-bindata-migrations-postgres build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip
 build-easyjson-adsbx:
 		easyjson -all ./pkg/tracker/adsbx_http.go
 build-easyjson: build-easyjson-adsbx
