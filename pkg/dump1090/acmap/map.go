@@ -621,12 +621,11 @@ func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/aircraft.json", d.JsonHandler)
 	r.HandleFunc("/{project}/data/receiver.json", d.ReceiverHandler)
 	for _, file := range d.statics() {
-		assetPath := "dump1090/public_html/" + file
-		_, err := Asset(assetPath)
+		_, err := Asset(file)
 		if err != nil {
 			return errors.Wrap(err, "loading dump1090 asset "+file)
 		}
-		handler := assetResponseHandler(assetPath)
+		handler := assetResponseHandler(file)
 		r.HandleFunc("/{project}/"+file, handler.responseHandler)
 	}
 	return nil

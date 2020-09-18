@@ -8,8 +8,10 @@ tmpdir=$(mktemp -d)
 gitroot=$(git rev-parse --show-toplevel)
 cd $tmpdir
 git clone https://github.com/flightaware/dump1090
-rm -rf $gitroot/dump1090
-mkdir -p $gitroot/dump1090/
-cp -a $tmpdir/dump1090/public_html $gitroot/dump1090/public_html
+cd dump1090
+git checkout "$version"
+rm -rf $gitroot/resources/dump1090
+mkdir -p $gitroot/resources/dump1090/
+cp -a $tmpdir/dump1090/public_html $gitroot/resources/dump1090/public_html
 rm -rf $tmpdir/dump1090
 rmdir $tmpdir

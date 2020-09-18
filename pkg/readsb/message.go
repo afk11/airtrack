@@ -267,10 +267,10 @@ const (
 	// AsciiIntZero - '0' in ASCII
 	AsciiIntZero = 0x30
 
-	HeadingInvalid HeadingType = C.HEADING_INVALID
-	HeadingGroundTrack HeadingType = C.HEADING_GROUND_TRACK
-	HeadingTrue HeadingType = C.HEADING_TRUE
-	HeadingMagnetic HeadingType = C.HEADING_MAGNETIC
+	HeadingInvalid        HeadingType = C.HEADING_INVALID
+	HeadingGroundTrack    HeadingType = C.HEADING_GROUND_TRACK
+	HeadingTrue           HeadingType = C.HEADING_TRUE
+	HeadingMagnetic       HeadingType = C.HEADING_MAGNETIC
 	HeadingMagneticOrTrue HeadingType = C.HEADING_MAGNETIC_OR_TRUE
 	HeadingTrackOrHeading HeadingType = C.HEADING_TRACK_OR_HEADING
 
