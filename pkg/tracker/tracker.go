@@ -870,8 +870,8 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	log.Infof("[session %d] %s: lost aircraft (firstSeen: %s, duration: %s)",
 		project.Session.Id, sighting.State.Icao, observation.firstSeen.Format(time.RFC822), time.Since(observation.firstSeen))
 
-	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.haveLocation {
-		if observation.altitudeBaro > t.opt.NearestAirportMaxAltitude {
+	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.HaveLocation() {
+		if observation.AltitudeBarometric() > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport
 			log.Debugf("[session %d] %s: too high to determine destination location",
 				project.Session.Id, sighting.State.Icao)
