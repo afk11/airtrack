@@ -361,27 +361,28 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	case <-gracefulStop:
 		log.Infof("graceful stop received")
 		for _, producer := range producers {
-			log.Infof("stopping %s producer..", producer.Name())
+			log.Debugf("stopping %s producer..", producer.Name())
 			producer.Stop()
 		}
 		close(msgs)
-		log.Info("stopping tracker")
+		log.Debugf("stopping tracker")
 		err = t.Stop()
 		if err != nil {
 			return err
 		}
 
 		if mapServer != nil {
-			log.Info("stopping map server")
+			log.Debugf("stopping map server")
 			err = mapServer.Stop()
 			if err != nil {
 				return err
 			}
 		}
 		if mailSender != nil {
-			log.Info("stopping mailer")
+			log.Debugf("stopping mailer")
 			mailSender.Stop()
 		}
+		log.Info("shutdown complete")
 		return nil
 	}
 }
