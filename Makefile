@@ -8,9 +8,6 @@ READSB_VERSION=4815cbe7441ae045890b9adfac3426b93b7b8d75
 READSB_REPO=https://github.com/afk11/readsb-protobuf
 PROTOBUF_C_VERSION=v1.3.3
 
-readsb-src:
-		git clone $(READSB_REPO) readsb-src
-		cd readsb-src && git checkout $(READSB_VERSION) && make
 install-go-bindata:
 		go get -u github.com/jteeuwen/go-bindata/...
 install-easyjson:
@@ -34,7 +31,9 @@ build-bindata-tar1090: resources/tar1090
 		go-bindata -pkg tar1090 -o ./pkg/tar1090/assets.go -prefix resources/tar1090/html resources/tar1090/...
 build-bindata-openaip: build-dir-airports
 		go-bindata -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
-build-bindata: build-bindata-assets build-bindata-email build-bindata-migrations-mysql build-bindata-migrations-sqlite3 build-bindata-migrations-postgres build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip
+build-bindata-readsb-db: resources/readsb-src
+		go-bindata -pkg db -o ./pkg/readsb/db/assets.go -prefix resources/readsb-src/webapp/src/db resources/readsb-src/webapp/src/db/*.json
+build-bindata: build-bindata-assets build-bindata-email build-bindata-migrations-mysql build-bindata-migrations-sqlite3 build-bindata-migrations-postgres build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip build-bindata-readsb-db
 build-easyjson-adsbx:
 		easyjson -all ./pkg/tracker/adsbx_http.go
 build-easyjson: build-easyjson-adsbx
@@ -47,12 +46,12 @@ build-dir:
 build-dir-airports: build-dir
 		mkdir build/airports/
 		go run ./contrib/copy_airport_resources/main.go resources/airports
-build-airtrack-linux-amd64: delete-build-dir readsb-src build-bindata build-easyjson build-protobuf
+build-airtrack-linux-amd64: delete-build-dir resources/readsb-src build-bindata build-easyjson build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
-build-airtrack-qa-linux-amd64: delete-build-dir readsb-src build-bindata build-easyjson build-protobuf
+build-airtrack-qa-linux-amd64: delete-build-dir resources/readsb-src build-bindata build-easyjson build-protobuf
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
-test: delete-build-dir readsb-src build-bindata build-easyjson test-cleanup
+test: delete-build-dir resources/readsb-src build-bindata build-easyjson test-cleanup
 	go test -coverprofile=./coverage/tests.out ./... \
 	$(TESTARGS)
 
@@ -79,3 +78,7 @@ resources/dump1090:
 
 resources/tar1090:
 	./contrib/refresh_tar1090.sh "${TAR1090_VERSION}"
+
+resources/readsb-src:
+		cd resources && git clone $(READSB_REPO) readsb-src
+		cd resources/readsb-src && git checkout $(READSB_VERSION) && make

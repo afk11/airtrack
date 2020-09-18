@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/tracker"
+	readsb_db "github.com/afk11/airtrack/pkg/readsb/db"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -125,19 +126,24 @@ type jsonAircraft struct {
 	Aircraft []*tracker.JsonAircraft `json:"aircraft"`
 }
 
-type assetResponseHandler string
+type assetResponseHandler struct {
+	name string
+	loader func (string) ([]byte, error)
+}
 
 func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
-	dat, err := Asset(string(h))
+	dat, err := h.loader(h.name)
 	if err != nil {
-		panic("asset: Asset(" + string(h) + "): " + err.Error())
+		panic("asset: Asset(" + h.name + "): " + err.Error())
 	}
 
-	if len(h) > 4 && h[len(h)-4:] == ".css" {
+	if len(h.name) > 4 && h.name[len(h.name)-4:] == ".css" {
 		w.Header().Set("Content-Type", "text/css")
-	} else if len(h) > 3 && h[len(h)-3:] == ".js" {
+	} else if len(h.name) > 3 && h.name[len(h.name)-3:] == ".js" {
 		w.Header().Set("Content-Type", "text/javascript")
-	} else if len(h) > 5 && h[len(h)-5:] == ".html" {
+	} else if len(h.name) > 5 && h.name[len(h.name)-5:] == ".json" {
+		w.Header().Set("Content-Type", "application/json")
+	} else if len(h.name) > 5 && h.name[len(h.name)-5:] == ".html" {
 		w.Header().Set("Content-Type", "text/html")
 	}
 	_, err = w.Write(dat)
@@ -169,12 +175,13 @@ func (t *Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/aircraft.json", t.AircraftJsonHandler)
 	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJsonHandler)
 	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverJsonHandler)
+	r.HandleFunc("/{project}/db2/icao_aircraft_types.js", assetResponseHandler{"types.json", readsb_db.Asset}.responseHandler)
 	for _, file := range t.statics() {
 		_, err := Asset(file)
 		if err != nil {
 			return errors.Wrap(err, "loading dump1090 asset "+file)
 		}
-		r.HandleFunc("/{project}/"+file, assetResponseHandler(file).responseHandler)
+		r.HandleFunc("/{project}/"+file, assetResponseHandler{file, Asset}.responseHandler)
 	}
 	return nil
 }

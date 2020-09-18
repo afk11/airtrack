@@ -1,7 +1,7 @@
 package readsb
 
-// #cgo CFLAGS: -I${SRCDIR}/../../readsb-src/
-// #cgo LDFLAGS: -lm -lprotobuf-c ${SRCDIR}/../../readsb-src/readsb.o ${SRCDIR}/../../readsb-src/mode_s.o ${SRCDIR}/../../readsb-src/mode_ac.o ${SRCDIR}/../../readsb-src/ais_charset.o ${SRCDIR}/../../readsb-src/icao_filter.o ${SRCDIR}/../../readsb-src/crc.o ${SRCDIR}/../../readsb-src/comm_b.o ${SRCDIR}/../../readsb-src/util.o ${SRCDIR}/../../readsb-src/cpr.o ${SRCDIR}/../../readsb-src/track.o ${SRCDIR}/../../readsb-src/readsb.pb-c.o ${SRCDIR}/../../readsb-src/geomag.o
+// #cgo CFLAGS: -I${SRCDIR}/../../resources/readsb-src/
+// #cgo LDFLAGS: -lm -lprotobuf-c ${SRCDIR}/../../resources/readsb-src/readsb.o ${SRCDIR}/../../resources/readsb-src/mode_s.o ${SRCDIR}/../../resources/readsb-src/mode_ac.o ${SRCDIR}/../../resources/readsb-src/ais_charset.o ${SRCDIR}/../../resources/readsb-src/icao_filter.o ${SRCDIR}/../../resources/readsb-src/crc.o ${SRCDIR}/../../resources/readsb-src/comm_b.o ${SRCDIR}/../../resources/readsb-src/util.o ${SRCDIR}/../../resources/readsb-src/cpr.o ${SRCDIR}/../../resources/readsb-src/track.o ${SRCDIR}/../../resources/readsb-src/readsb.pb-c.o ${SRCDIR}/../../resources/readsb-src/geomag.o
 // #include <readsb.h>
 // #include <station.h>
 // #include <track.h>
