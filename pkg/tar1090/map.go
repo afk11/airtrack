@@ -170,12 +170,11 @@ func (t *Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJsonHandler)
 	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverJsonHandler)
 	for _, file := range t.statics() {
-		assetPath := "tar1090/html/" + file
-		_, err := Asset(assetPath)
+		_, err := Asset(file)
 		if err != nil {
 			return errors.Wrap(err, "loading dump1090 asset "+file)
 		}
-		r.HandleFunc("/{project}/"+file, assetResponseHandler(assetPath).responseHandler)
+		r.HandleFunc("/{project}/"+file, assetResponseHandler(file).responseHandler)
 	}
 	return nil
 }
