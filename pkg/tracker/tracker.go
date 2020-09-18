@@ -433,16 +433,20 @@ func (t *Tracker) Stop() error {
 	for _, sighting := range t.sighting {
 		if len(sighting.observedBy) > 0 {
 			pAircraft++
-			for _, observation := range sighting.observedBy {
-				err := t.handleLostAircraft(observation.project, sighting)
-				if err != nil {
-					log.Warnf("error encountered processing lost aircraft: %s", err.Error())
-				}
-				if observation.sighting != nil {
-					pSightings = append(pSightings, observation.sighting)
-				}
-			}
 		}
+		for _, observation := range sighting.observedBy {
+			err := t.handleLostAircraft(observation.project, sighting)
+			if err != nil {
+				log.Warnf("error encountered processing lost aircraft: %s", err.Error())
+			}
+			if observation.sighting != nil {
+				pSightings = append(pSightings, observation.sighting)
+			}
+			observation.project.obsMu.Lock()
+			delete(observation.project.Observations, sighting.State.Icao)
+			observation.project.obsMu.Unlock()
+		}
+		sighting.observedBy = nil
 	}
 
 	numListeners := len(t.projectStatusListeners)
