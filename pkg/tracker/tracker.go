@@ -799,10 +799,14 @@ func (t *Tracker) doLostAircraftCheck() error {
 		uniqueSightings := make(map[string]*Sighting)
 		for _, lost := range lostSightings {
 			if !hadError {
+				project := lost.s.observedBy[lost.session.Id].project
+				project.obsMu.Lock()
+				delete(project.Observations, lost.s.State.Icao)
 				delete(lost.s.observedBy, lost.session.Id)
 				if len(lost.s.observedBy) == 0 {
 					delete(t.sighting, lost.s.State.Icao)
 				}
+				project.obsMu.Unlock()
 			}
 			uniqueSightings[lost.s.State.Icao] = lost.s
 		}
