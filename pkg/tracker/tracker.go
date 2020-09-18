@@ -445,6 +445,13 @@ func (t *Tracker) Stop() error {
 		}
 	}
 
+	numListeners := len(t.projectStatusListeners)
+	for i := 0; i < numListeners; i++ {
+		for pi := range t.projects {
+			t.projectStatusListeners[i].Deactivated(t.projects[pi])
+		}
+	}
+
 	log.Infof("closed with %d aircraft being monitored", pAircraft)
 
 	t.sighting = make(map[string]*Sighting)
