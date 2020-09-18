@@ -26,10 +26,10 @@ build-bindata-migrations-sqlite3:
 		go-bindata -pkg migrations_sqlite3 -o ./pkg/db/migrations_sqlite3/migrations.go -prefix db/migrations_sqlite3 db/migrations_sqlite3
 build-bindata-migrations-postgres:
 		go-bindata -pkg migrations_postgres -o ./pkg/db/migrations_postgres/migrations.go -prefix db/migrations_postgres db/migrations_postgres
-build-bindata-dump1090: dump1090
-		go-bindata -pkg acmap -o ./pkg/dump1090/acmap/assets.go dump1090/...
-build-bindata-tar1090: tar1090
-		go-bindata -pkg tar1090 -o ./pkg/tar1090/assets.go tar1090/...
+build-bindata-dump1090: resources/dump1090
+		go-bindata -pkg acmap -o ./pkg/dump1090/acmap/assets.go -prefix resources resources/dump1090/...
+build-bindata-tar1090: resources/tar1090
+		go-bindata -pkg tar1090 -o ./pkg/tar1090/assets.go -prefix resources/ resources/tar1090/...
 build-bindata-openaip: build-dir-airports
 		go-bindata -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
 build-bindata: build-bindata-assets build-bindata-migrations build-bindata-migrations-sqlite3 build-bindata-migrations-postgres build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip
@@ -72,8 +72,8 @@ coverage: coverage-concat
 coverage-html: coverage-concat
 	go tool cover -html=coverage/full $(COVERAGEARGS)
 
-dump1090:
+resources/dump1090:
 	./contrib/refresh_dump1090.sh "${DUMP1090_VERSION}"
 
-tar1090:
+resources/tar1090:
 	./contrib/refresh_tar1090.sh "${TAR1090_VERSION}"
