@@ -3,7 +3,7 @@ package test
 import (
 	"database/sql"
 	"fmt"
-	"github.com/afk11/airtrack/pkg/db/migrations"
+	"github.com/afk11/airtrack/pkg/db/migrations_mysql"
 	"github.com/afk11/airtrack/pkg/db/migrations_sqlite3"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
@@ -94,9 +94,9 @@ func LoadTestDbConfig() (*TestDbConfig, error) {
 }
 
 func InitMysqlMigration(database string, db *sql.DB) (*migrate.Migrate, error) {
-	s := bindata.Resource(migrations.AssetNames(),
+	s := bindata.Resource(migrations_mysql.AssetNames(),
 		func(name string) ([]byte, error) {
-			return migrations.Asset(name)
+			return migrations_mysql.Asset(name)
 		})
 	d, err := bindata.WithInstance(s)
 	if err != nil {

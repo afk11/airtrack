@@ -5,7 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
-	"github.com/afk11/airtrack/pkg/db/migrations"
+	"github.com/afk11/airtrack/pkg/db/migrations_mysql"
 	"github.com/afk11/airtrack/pkg/db/migrations_postgres"
 	"github.com/afk11/airtrack/pkg/db/migrations_sqlite3"
 	_ "github.com/go-sql-driver/mysql"
@@ -150,9 +150,9 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 				})
 			driver, err = postgres.WithInstance(db, &postgres.Config{})
 		} else {
-			s = bindata.Resource(migrations.AssetNames(),
+			s = bindata.Resource(migrations_mysql.AssetNames(),
 				func(name string) ([]byte, error) {
-					return migrations.Asset(name)
+					return migrations_mysql.Asset(name)
 				})
 			driver, err = mysql.WithInstance(db, &mysql.Config{})
 		}
