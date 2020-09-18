@@ -9,6 +9,7 @@ import (
 	"io/ioutil"
 	"net"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -114,18 +115,41 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 
 	for _, ac := range msg.Aircraft {
 		msg := &pb.Message{
-			Source:       source,
-			Icao:         ac.Icao,
-			Squawk:       ac.Sqk,
-			CallSign:     ac.Call,
-			Altitude:     ac.Alt,
-			Latitude:     ac.Lat,
-			Longitude:    ac.Lon,
-			IsOnGround:   ac.Ground == "1",
-			VerticalRate: ac.Vsi,
-			Track:        ac.Trak,
-			GroundSpeed:  ac.Spd,
+			Source:             source,
+			Icao:               ac.Icao,
+			Squawk:             ac.Sqk,
+			CallSign:           ac.Call,
+			AltitudeBarometric: ac.Alt,
+			AltitudeGeometric:  ac.Galt,
+			Latitude:           ac.Lat,
+			Longitude:          ac.Lon,
+			IsOnGround:         ac.Ground == "1",
+			Track:              ac.Trak,
+			GroundSpeed:        ac.Spd,
 		}
+		if ac.Vsi != "" {
+			vsi, err := strconv.ParseInt(ac.Vsi, 10, 64)
+			if err != nil {
+				return err
+			}
+			if ac.Vsit == "0" {
+				msg.HaveVerticalRateBarometric = true
+				msg.VerticalRateBarometric = vsi
+			} else if ac.Vsit == "1" {
+				msg.HaveVerticalRateBarometric = true
+				msg.VerticalRateBarometric = vsi
+			}
+			// any other value for Vsit is unexpected
+		}
+		if ac.Talt != "" {
+			fmsAlt, err := strconv.ParseInt(ac.Talt, 10, 64)
+			if err != nil {
+				return err
+			}
+			msg.HaveFmsAltitude = true
+			msg.FmsAltitude = fmsAlt
+		}
+
 		msgs <- msg
 	}
 

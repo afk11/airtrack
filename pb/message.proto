@@ -13,25 +13,42 @@ message Message {
   string Icao = 10;
   string Squawk = 11;
   string CallSign = 12;
-  string Altitude = 13;
+  string AltitudeGeometric = 13;
+  string AltitudeBarometric = 14;
 
   string Latitude = 20;
   string Longitude = 21;
 
   bool IsOnGround = 30;
 
-  string VerticalRate = 40;
+  int64 VerticalRateGeometric = 40;
+  bool HaveVerticalRateGeometric = 41;
+  int64 VerticalRateBarometric = 45;
+  bool HaveVerticalRateBarometric = 46;
 
   string Track = 50;
+  double MagneticHeading = 51;
+  bool HaveMagneticHeading = 52;
+  double TrueHeading = 53;
+  bool HaveTrueHeading = 54;
+
+  bool HaveFmsAltitude = 60;
+  int64 FmsAltitude = 61;
+
   string GroundSpeed = 90;
 }
+
 message State {
   // 6 character hex identifier for aircraft
   string Icao = 1;
 
-  bool HaveAltitude = 10;
-  // Aircraft altitude in feet
-  int64 Altitude = 11;
+  // barometric altitude in feet
+  bool HaveAltitudeBarometric = 10;
+  int64 AltitudeBarometric = 11;
+
+  // geometric altitude in feet
+  bool HaveAltitudeGeometric = 12;
+  int64 AltitudeGeometric = 13;
 
   bool HaveLocation = 20;
   // Latitude
@@ -57,12 +74,19 @@ message State {
   // IsOnGround tracks whether the aircraft is on ground or in the air.
   bool IsOnGround = 60;
 
-  bool HaveVerticalRate = 70;
-  // VerticalRate is the change in vertical rate (+/-) in feet per minute
-  int64 VerticalRate = 71;
+  // barometric change in vertical rate (+/-) in feet per minute
+  bool HaveVerticalRateBarometric = 70;
+  int64 VerticalRateBarometric = 71;
+
+  // geometric change in vertical rate (+/-) in feet per minute
+  bool HaveVerticalRateGeometric = 75;
+  int64 VerticalRateGeometric = 76;
 
   bool HaveTrack = 80;
   double Track = 81;
+
+  bool HaveFmsAltitude = 85;
+  int64 FmsAltitude = 86;
 
   bool HaveGroundSpeed = 90;
   double GroundSpeed = 91;
