@@ -316,7 +316,7 @@ func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
 			o.AltitudeBarometric(), lat, lon, time.Now(), nil,
 		})
 		log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f) #pos=%d",
-			o.project.Session.Id, o.mem.State.Icao, o.AltitudeBarometric(), o.mem.State.Latitude, o.mem.State.Longitude, o.locationCount)
+			o.project.Session.Id, o.mem.State.Icao, o.AltitudeBarometric(), lat, lon, o.locationCount)
 	}
 	o.latitude = lat
 	o.longitude = lon
