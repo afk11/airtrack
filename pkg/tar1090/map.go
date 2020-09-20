@@ -3,8 +3,8 @@ package tar1090
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/afk11/airtrack/pkg/tracker"
 	readsb_db "github.com/afk11/airtrack/pkg/readsb/db"
+	"github.com/afk11/airtrack/pkg/tracker"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
@@ -82,7 +82,7 @@ func (h *History) GetHistoryFile(project string, file int64) ([]byte, error) {
 	if file > int64(hist.historyLen) {
 		return nil, errors.New("history file is out of range")
 	}
-	fmt.Printf("getHistoryFile historyLen=%d file=%d\n", hist.historyLen, file)
+
 	return hist.history[file], nil
 }
 
@@ -127,8 +127,8 @@ type jsonAircraft struct {
 }
 
 type assetResponseHandler struct {
-	name string
-	loader func (string) ([]byte, error)
+	name   string
+	loader func(string) ([]byte, error)
 }
 
 func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
@@ -176,6 +176,22 @@ func (t *Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJsonHandler)
 	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverJsonHandler)
 	r.HandleFunc("/{project}/db2/icao_aircraft_types.js", assetResponseHandler{"types.json", readsb_db.Asset}.responseHandler)
+	r.HandleFunc("/{project}/db2/files.js", assetResponseHandler{"files.json", readsb_db.Asset}.responseHandler)
+
+	dat, err := readsb_db.Asset("files.json")
+	if err != nil {
+		return errors.Wrapf(err, "reading readsb_db asset files.json")
+	}
+	var shards []string
+	err = json.Unmarshal(dat, &shards)
+	if err != nil {
+		return errors.Wrapf(err, "decoding readsb_db asset files.json")
+	}
+
+	for _, shard := range shards {
+		r.HandleFunc("/{project}/db2/"+shard+".js", assetResponseHandler{shard + ".json", readsb_db.Asset}.responseHandler)
+	}
+
 	for _, file := range t.statics() {
 		_, err := Asset(file)
 		if err != nil {

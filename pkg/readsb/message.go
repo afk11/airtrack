@@ -321,6 +321,13 @@ func TrackPeriodicUpdate(d *Decoder) {
 	C.trackPeriodicUpdate(d.modes)
 }
 
+func (a *Aircraft) GetCategory() (string, error) {
+	if a.a.fatsv_emitted_category == 0 {
+		return "", ErrNoData
+	}
+	return fmt.Sprintf("%02x", a.a.fatsv_emitted_category), nil
+}
+
 // GetIcaoHex returns the ICAO as a hex string in upper case
 func (m *ModesMessage) GetIcaoHex() string {
 	icao := [3]byte{}

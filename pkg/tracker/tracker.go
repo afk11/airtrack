@@ -714,9 +714,9 @@ func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLo
 	for i := 0; i < numLocationUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			for j := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
-				fmt.Printf("insert location ac=%d sighting=%d session=%d site=%d alt=%d lat=%f lon=%f\n",
-					locationUpdates[j].sighting.AircraftId, locationUpdates[j].sighting.Id, locationUpdates[j].sighting.CollectionSessionId,
-					locationUpdates[j].sighting.CollectionSiteId, locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
+				//fmt.Printf("insert location ac=%d sighting=%d session=%d site=%d alt=%d lat=%f lon=%f\n",
+				//	locationUpdates[j].sighting.AircraftId, locationUpdates[j].sighting.Id, locationUpdates[j].sighting.CollectionSessionId,
+				//	locationUpdates[j].sighting.CollectionSiteId, locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				_, err := t.database.InsertSightingLocationTx(tx, locationUpdates[j].sighting.Id, locationUpdates[j].time,
 					locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				if err != nil {
@@ -912,8 +912,6 @@ func (t *Tracker) handleLostAircraft(project *Project, sighting *Sighting) error
 	if err != nil {
 		return errors.Wrapf(err, "updateSightingAndReturnLogs")
 	}
-	fmt.Printf("lost aircraft updates %s callsigns %d squawks %d locations %d\n",
-		sighting.State.Icao, len(csLogs), len(squawkLogs), len(locationLogs))
 	err = t.writeUpdates(csLogs, squawkLogs, locationLogs)
 	if err != nil {
 		return errors.Wrapf(err, "writeUpdates")

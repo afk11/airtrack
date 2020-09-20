@@ -226,8 +226,13 @@ type JsonAircraft struct {
 // UpdateWithState updates JsonAircraft with the latest state
 func (j *JsonAircraft) UpdateWithState(state *pb.State) {
 	j.Flight = state.CallSign
-	j.Latitude = state.Latitude
-	j.Longitude = state.Longitude
+	if state.HaveLocation {
+		j.Latitude = state.Latitude
+		j.Longitude = state.Longitude
+	}
+	if state.HaveCategory {
+		j.Category = state.Category
+	}
 	j.Squawk = state.Squawk
 	j.MagneticHeading = state.Track
 	j.Track = state.Track
