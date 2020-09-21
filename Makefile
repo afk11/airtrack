@@ -1,5 +1,6 @@
 # gather options for tests
 TESTARGS=$(TESTOPTIONS)
+BUILDARGS=$(BUILDOPTIONS)
 BINDATAARGS=$(BINDATAOPTIONS)
 # gather options for coverage
 COVERAGEARGS=$(COVERAGEOPTIONS)
@@ -52,9 +53,9 @@ build-dir-airports: build-dir
 		mkdir build/airports/
 		go run ./contrib/copy_airport_resources/main.go resources/airports
 build-airtrack-linux-amd64: delete-build-dir resources/readsb-src build-bindata build-easyjson build-protobuf
-		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrack.linux-amd64 cmd/airtrack/main.go
+		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -o airtrack.linux-amd64 cmd/airtrack/main.go
 build-airtrack-qa-linux-amd64: delete-build-dir resources/readsb-src build-bindata build-easyjson build-protobuf
-		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
+		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
 test: delete-build-dir resources/readsb-src build-bindata build-easyjson test-cleanup
 	go test -coverprofile=./coverage/tests.out ./... \

@@ -311,12 +311,12 @@ func (o *ProjectObservation) Location() (float64, float64) {
 func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
 	if track && o.HaveAltitudeBarometric() {
 		o.dirty = true
-		o.locationCount++
 		o.locationLogs = append(o.locationLogs, locationLog{
 			o.AltitudeBarometric(), lat, lon, time.Now(), nil,
 		})
 		log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f) #pos=%d",
 			o.project.Session.Id, o.mem.State.Icao, o.AltitudeBarometric(), lat, lon, o.locationCount)
+		o.locationCount++
 	}
 	o.latitude = lat
 	o.longitude = lon
@@ -678,11 +678,11 @@ func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLo
 	numLocationUpdates := len(locationUpdates)
 
 	// Insert new callsigns, squawks, and location logs in batches
-
 	for i := 0; i < numCsUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
-			for j := range csUpdates[i:min(numCsUpdates, i+csBatch)] {
+			last := min(numCsUpdates, i+csBatch)
+			for j := i; j < last; j++ {
 				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdates[j].sighting, csUpdates[j].callsign, csUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating callsign record")
@@ -694,11 +694,11 @@ func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLo
 			return errors.Wrapf(err, "in transaction")
 		}
 	}
-
 	for i := 0; i < numSquawkUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
-			for j := range squawkUpdates[i:min(numSquawkUpdates, i+csBatch)] {
+			last := min(numSquawkUpdates, i+csBatch)
+			for j := i; j < last; j++ {
 				_, err = t.database.CreateNewSightingSquawkTx(tx, squawkUpdates[j].sighting, squawkUpdates[j].squawk, squawkUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating squawk record")
@@ -710,13 +710,10 @@ func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLo
 			return errors.Wrapf(err, "in transaction")
 		}
 	}
-
 	for i := 0; i < numLocationUpdates; i += csBatch {
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
-			for j := range locationUpdates[i:min(numLocationUpdates, i+csBatch)] {
-				//fmt.Printf("insert location ac=%d sighting=%d session=%d site=%d alt=%d lat=%f lon=%f\n",
-				//	locationUpdates[j].sighting.AircraftId, locationUpdates[j].sighting.Id, locationUpdates[j].sighting.CollectionSessionId,
-				//	locationUpdates[j].sighting.CollectionSiteId, locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
+			last := min(numLocationUpdates, i+csBatch)
+			for j := i; j < last; j++ {
 				_, err := t.database.InsertSightingLocationTx(tx, locationUpdates[j].sighting.Id, locationUpdates[j].time,
 					locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				if err != nil {
@@ -1072,10 +1069,15 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 				s.mu.Unlock()
 				panic(err)
 			}
+
 		}
 		s.mu.Unlock()
 		t.projectMu.RUnlock()
+
+		t.sightingMu.Lock()
 		aircraftCountVec.WithLabelValues().Set(float64(len(t.sighting)))
+		t.sightingMu.Unlock()
+
 		inflightMsgVec.WithLabelValues().Dec()
 		msgsProcessed.Inc()
 	}
@@ -1092,10 +1094,12 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 	s, ok := t.sighting[icao]
 	if !ok {
 		s = NewSighting(icao)
+		s.mu.Lock()
 		t.sighting[icao] = s
+	} else {
+		s.mu.Lock()
 	}
 
-	s.mu.Lock()
 	return s
 }
 
@@ -1461,6 +1465,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 			t.projectAcUpdateListeners[i].UpdatedAircraft(project, s)
 		}
 	}
+
 	return nil
 }
 

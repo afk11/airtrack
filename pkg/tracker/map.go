@@ -475,7 +475,7 @@ func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*Js
 		}
 	}()
 
-	err := f(m.messages, l)
+	err := f(atomic.LoadInt64(&m.messages), l)
 	if err != nil {
 		return err
 	}
