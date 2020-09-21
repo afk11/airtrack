@@ -35,6 +35,9 @@ message Message {
   bool HaveFmsAltitude = 60;
   int64 FmsAltitude = 61;
 
+  bool HaveCategory = 70;
+  string Category = 71;
+
   string GroundSpeed = 90;
 }
 
@@ -90,4 +93,7 @@ message State {
 
   bool HaveGroundSpeed = 90;
   double GroundSpeed = 91;
+
+  bool HaveCategory = 100;
+  string Category = 101;
 }

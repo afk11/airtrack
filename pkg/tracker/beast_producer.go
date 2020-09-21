@@ -132,10 +132,14 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				panic(err)
 			}
 			for _, msg := range msgs {
-				readsb.TrackUpdateFromMessage(p.decoder, msg)
+				ac := readsb.TrackUpdateFromMessage(p.decoder, msg)
 
 				proto := &pb.Message{
 					Icao: msg.GetIcaoHex(),
+				}
+				if category, err := ac.GetCategory(); err == nil {
+					proto.HaveCategory = true
+					proto.Category = category
 				}
 				if squawk, err := msg.GetSquawk(); err == nil {
 					proto.Squawk = squawk
