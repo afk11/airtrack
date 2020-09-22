@@ -7,8 +7,20 @@ message Source {
   string Type = 2;
   string Url = 3;
 };
+message AircraftInfo {
+  string Registration = 1;
+  string TypeCode = 2;
+  string F = 3;
+  string Description = 4;
+}
+message Operator {
+  string Name = 1;
+  string CountryName = 2;
+  string R = 3;
+}
 message Message {
   Source Source = 1;
+
   // 6 character hex identifier for aircraft
   string Icao = 10;
   string Squawk = 11;
@@ -44,6 +56,7 @@ message Message {
 message State {
   // 6 character hex identifier for aircraft
   string Icao = 1;
+  AircraftInfo Info = 2;
 
   // barometric altitude in feet
   bool HaveAltitudeBarometric = 10;

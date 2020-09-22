@@ -3,7 +3,7 @@ package tar1090
 import (
 	"encoding/json"
 	"fmt"
-	readsb_db "github.com/afk11/airtrack/pkg/readsb/db"
+	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
 	"github.com/afk11/airtrack/pkg/tracker"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -175,21 +175,21 @@ func (t *Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/aircraft.json", t.AircraftJsonHandler)
 	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJsonHandler)
 	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverJsonHandler)
-	r.HandleFunc("/{project}/db2/icao_aircraft_types.js", assetResponseHandler{"types.json", readsb_db.Asset}.responseHandler)
-	r.HandleFunc("/{project}/db2/files.js", assetResponseHandler{"files.json", readsb_db.Asset}.responseHandler)
+	r.HandleFunc("/{project}/db2/icao_aircraft_types.js", assetResponseHandler{"types.json", aircraft_db.Asset}.responseHandler)
+	r.HandleFunc("/{project}/db2/files.js", assetResponseHandler{"files.json", aircraft_db.Asset}.responseHandler)
 
-	dat, err := readsb_db.Asset("files.json")
+	dat, err := aircraft_db.Asset("files.json")
 	if err != nil {
-		return errors.Wrapf(err, "reading readsb_db asset files.json")
+		return errors.Wrapf(err, "reading aircraft_db asset files.json")
 	}
 	var shards []string
 	err = json.Unmarshal(dat, &shards)
 	if err != nil {
-		return errors.Wrapf(err, "decoding readsb_db asset files.json")
+		return errors.Wrapf(err, "decoding aircraft_db asset files.json")
 	}
 
 	for _, shard := range shards {
-		r.HandleFunc("/{project}/db2/"+shard+".js", assetResponseHandler{shard + ".json", readsb_db.Asset}.responseHandler)
+		r.HandleFunc("/{project}/db2/"+shard+".js", assetResponseHandler{shard + ".json", aircraft_db.Asset}.responseHandler)
 	}
 
 	for _, file := range t.statics() {

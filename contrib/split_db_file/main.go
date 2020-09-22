@@ -3,12 +3,12 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/afk11/airtrack/pkg/mictronics"
+	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
 	"io/ioutil"
 	"os"
 )
 
-type AcJsonAsSlice mictronics.Aircraft
+type AcJsonAsSlice aircraft_db.Aircraft
 func (t AcJsonAsSlice) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]string{t.Registration, t.TypeCode, t.F, t.Description})
 }
@@ -16,12 +16,12 @@ type dbJson map[string]*AcJsonAsSlice
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("missing mictronics db file path")
-		fmt.Println("usage: <mictronics_db_file> <output_directory>")
+		fmt.Println("missing db file path")
+		fmt.Println("usage: <db_file> <output_directory>")
 		os.Exit(1)
 	} else if len(os.Args) < 3 {
 		fmt.Println("missing output directory")
-		fmt.Println("usage: <mictronics_db_file> <output_directory>")
+		fmt.Println("usage: <db_file> <output_directory>")
 		os.Exit(1)
 	}
 	dbFile := os.Args[1]

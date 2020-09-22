@@ -17,6 +17,7 @@ import (
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/afk11/airtrack/pkg/readsb"
+	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
 	"github.com/afk11/airtrack/pkg/tar1090"
 	"github.com/afk11/airtrack/pkg/tracker"
 	smtp "github.com/afk11/mail"
@@ -259,6 +260,11 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		}
 	}
 
+	opt.AircraftDb = aircraft_db.New()
+	err = aircraft_db.LoadAssets(opt.AircraftDb)
+	if err != nil {
+		return errors.Wrapf(err, "load aircraft db assets")
+	}
 	t, err := tracker.New(database, opt)
 	if err != nil {
 		return err

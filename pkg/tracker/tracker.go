@@ -12,6 +12,7 @@ import (
 	"github.com/afk11/airtrack/pkg/kml"
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/uuid"
@@ -55,6 +56,7 @@ type (
 
 		CountryCodes *iso3166.Store
 		Allocations  ccode.CountryAllocationSearcher
+		AircraftDb   *aircraft_db.Db
 	}
 	// GeocodeLocation contains the result of a geocode search.
 	// If ok is false, the search was unsuccessful and the other fields are empty.
@@ -141,10 +143,12 @@ type (
 		// is one of the structs filters operate on.
 		State pb.State
 		// Tags contains some meta information about the sighting.
-		Tags            SightingTags
-		firstSeen       time.Time
-		lastSeen        time.Time
-		searchedCountry bool
+		Tags             SightingTags
+		firstSeen        time.Time
+		lastSeen         time.Time
+		searchedCountry  bool
+		searchedOperator bool
+		searchedInfo     bool
 
 		a          *db.Aircraft
 		observedBy map[uint64]*ProjectObservation
@@ -1220,6 +1224,21 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 			s.State.Country = country.Name()
 			log.Tracef("icao %s country determined: %s %s", s.State.Icao, code.String(), country.Name())
 		}
+	}
+
+	if !s.searchedInfo {
+		ac, ok := t.opt.AircraftDb.GetAircraft(s.State.Icao)
+		if ok {
+			s.State.Info = ac
+		}
+		s.searchedInfo = true
+	}
+	if !s.searchedOperator {
+		//op, ok := t.opt.AircraftDb.GetOperator(s.State.Icao)
+		//if ok {
+		//	s.State.Operator = op
+		//}
+		s.searchedOperator = true
 	}
 	return nil
 }
