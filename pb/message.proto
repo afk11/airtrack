@@ -56,7 +56,15 @@ message Message {
 message State {
   // 6 character hex identifier for aircraft
   string Icao = 1;
+  // Contains aircraft registration, type, and description of the aircraft
   AircraftInfo Info = 2;
+  // OperatorCode is a three letter code which references the operator for
+  // this flight. The field is not empty if the callsign begins with three
+  // letters followed by a number.
+  string OperatorCode = 3;
+  // Operator information contains the name of the operator and its country.
+  // It will only be set if the `OperatorCode` is found in the database.
+  Operator Operator = 4;
 
   // barometric altitude in feet
   bool HaveAltitudeBarometric = 10;

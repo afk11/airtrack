@@ -23,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"unicode"
 )
 
 const (
@@ -1106,6 +1107,19 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 
 	return s
 }
+func AirlineCodeFromCallsign(callSign string) (string, bool) {
+	csLen := len(callSign)
+	if csLen < 3 {
+		return "", false
+	} else if !(unicode.IsLetter(rune(callSign[0])) && unicode.IsLetter(rune(callSign[1])) && unicode.IsLetter(rune(callSign[2]))) {
+		return "", false
+	} else if csLen > 3 && !unicode.IsNumber(rune(callSign[3])) {
+		return "notnum", false
+	}
+
+	callSignPrefix := callSign[0:3]
+	return callSignPrefix, true
+}
 
 // UpdateStateFromMessage takes msg and applies new or updated data to the sighting.
 func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
@@ -1148,6 +1162,14 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	if msg.CallSign != "" && msg.CallSign != s.State.CallSign {
 		s.State.HaveCallsign = true
 		s.State.CallSign = msg.CallSign
+
+		code, ok := AirlineCodeFromCallsign(msg.CallSign)
+		if ok && (s.State.Operator == nil || s.State.OperatorCode != code) {
+			s.State.OperatorCode = code
+			if info, ok := t.opt.AircraftDb.GetOperator(code); ok {
+				s.State.Operator = info
+			}
+		}
 	}
 	if msg.Squawk != "" && msg.Squawk != s.State.Squawk {
 		s.State.HaveSquawk = true
@@ -1233,13 +1255,7 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 		}
 		s.searchedInfo = true
 	}
-	if !s.searchedOperator {
-		//op, ok := t.opt.AircraftDb.GetOperator(s.State.Icao)
-		//if ok {
-		//	s.State.Operator = op
-		//}
-		s.searchedOperator = true
-	}
+
 	return nil
 }
 
