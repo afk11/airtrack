@@ -25,6 +25,7 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
+// Source contains information about which receiver produced the message
 type Source struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -88,15 +89,21 @@ func (x *Source) GetUrl() string {
 	return ""
 }
 
+// AircraftInfo represents an entry in the readsb database, containing
+// information about the aircraft
 type AircraftInfo struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Registration - assigned registration for the aircraft.
 	Registration string `protobuf:"bytes,1,opt,name=Registration,proto3" json:"Registration,omitempty"`
-	TypeCode     string `protobuf:"bytes,2,opt,name=TypeCode,proto3" json:"TypeCode,omitempty"`
-	F            string `protobuf:"bytes,3,opt,name=F,proto3" json:"F,omitempty"`
-	Description  string `protobuf:"bytes,4,opt,name=Description,proto3" json:"Description,omitempty"`
+	// TypeCode - identifies the type of aircraft
+	TypeCode string `protobuf:"bytes,2,opt,name=TypeCode,proto3" json:"TypeCode,omitempty"`
+	// F
+	F string `protobuf:"bytes,3,opt,name=F,proto3" json:"F,omitempty"`
+	// Description - brief description of the aircraft type for humans
+	Description string `protobuf:"bytes,4,opt,name=Description,proto3" json:"Description,omitempty"`
 }
 
 func (x *AircraftInfo) Reset() {
@@ -159,14 +166,19 @@ func (x *AircraftInfo) GetDescription() string {
 	return ""
 }
 
+// Operator represents an entry in the readsb operators database, and
+// contains information about the operator of the current flight.
 type Operator struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Name        string `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	// Name - name of the operator
+	Name string `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	// CountryName - where the operator is based
 	CountryName string `protobuf:"bytes,2,opt,name=CountryName,proto3" json:"CountryName,omitempty"`
-	R           string `protobuf:"bytes,3,opt,name=R,proto3" json:"R,omitempty"`
+	// R
+	R string `protobuf:"bytes,3,opt,name=R,proto3" json:"R,omitempty"`
 }
 
 func (x *Operator) Reset() {
@@ -222,35 +234,53 @@ func (x *Operator) GetR() string {
 	return ""
 }
 
+// Message - a payload produced by one of our receivers
 type Message struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Source identifiers the receiver which produced the message
 	Source *Source `protobuf:"bytes,1,opt,name=Source,proto3" json:"Source,omitempty"`
-	// 6 character hex identifier for aircraft
-	Icao                       string  `protobuf:"bytes,10,opt,name=Icao,proto3" json:"Icao,omitempty"`
-	Squawk                     string  `protobuf:"bytes,11,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
-	CallSign                   string  `protobuf:"bytes,12,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
-	AltitudeGeometric          string  `protobuf:"bytes,13,opt,name=AltitudeGeometric,proto3" json:"AltitudeGeometric,omitempty"`
-	AltitudeBarometric         string  `protobuf:"bytes,14,opt,name=AltitudeBarometric,proto3" json:"AltitudeBarometric,omitempty"`
-	Latitude                   string  `protobuf:"bytes,20,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
-	Longitude                  string  `protobuf:"bytes,21,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
-	IsOnGround                 bool    `protobuf:"varint,30,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
-	VerticalRateGeometric      int64   `protobuf:"varint,40,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
-	HaveVerticalRateGeometric  bool    `protobuf:"varint,41,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
-	VerticalRateBarometric     int64   `protobuf:"varint,45,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
+	// Icao - 6 character hex identifier for aircraft
+	Icao string `protobuf:"bytes,10,opt,name=Icao,proto3" json:"Icao,omitempty"`
+	// Squawk - a 4 digit octal squawk code (as a string)
+	Squawk string `protobuf:"bytes,11,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
+	// CallSign - aircrafts flight ID/callsign
+	CallSign string `protobuf:"bytes,12,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
+	// AltitudeGeometric - geometric altitude
+	AltitudeGeometric string `protobuf:"bytes,13,opt,name=AltitudeGeometric,proto3" json:"AltitudeGeometric,omitempty"`
+	// AltitudeBarometric - barometric altitude
+	AltitudeBarometric string `protobuf:"bytes,14,opt,name=AltitudeBarometric,proto3" json:"AltitudeBarometric,omitempty"`
+	// Latitude - latitude coordinate
+	Latitude string `protobuf:"bytes,20,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
+	// Longitude - longitude coordinate
+	Longitude string `protobuf:"bytes,21,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
+	// IsOnGround is '1' if the aircraft is on ground, '0' otherwise
+	IsOnGround bool `protobuf:"varint,30,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
+	// VerticalRateGeometric - change in altitude by ft per minute (UNITS??)
+	VerticalRateGeometric int64 `protobuf:"varint,40,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
+	// HaveVerticalRateGeometric - whether VerticalRateGeometric is set
+	HaveVerticalRateGeometric bool `protobuf:"varint,41,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
+	// VerticalRateBarometric - change in altitude by ft per minute (UNITS??)
+	VerticalRateBarometric int64 `protobuf:"varint,45,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
+	// HaveVerticalRateBarometric - whether VerticalRateBarometric is set
 	HaveVerticalRateBarometric bool    `protobuf:"varint,46,opt,name=HaveVerticalRateBarometric,proto3" json:"HaveVerticalRateBarometric,omitempty"`
 	Track                      string  `protobuf:"bytes,50,opt,name=Track,proto3" json:"Track,omitempty"`
 	MagneticHeading            float64 `protobuf:"fixed64,51,opt,name=MagneticHeading,proto3" json:"MagneticHeading,omitempty"`
 	HaveMagneticHeading        bool    `protobuf:"varint,52,opt,name=HaveMagneticHeading,proto3" json:"HaveMagneticHeading,omitempty"`
 	TrueHeading                float64 `protobuf:"fixed64,53,opt,name=TrueHeading,proto3" json:"TrueHeading,omitempty"`
 	HaveTrueHeading            bool    `protobuf:"varint,54,opt,name=HaveTrueHeading,proto3" json:"HaveTrueHeading,omitempty"`
-	HaveFmsAltitude            bool    `protobuf:"varint,60,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
-	FmsAltitude                int64   `protobuf:"varint,61,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
-	HaveCategory               bool    `protobuf:"varint,70,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
-	Category                   string  `protobuf:"bytes,71,opt,name=Category,proto3" json:"Category,omitempty"`
-	GroundSpeed                string  `protobuf:"bytes,90,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
+	// HaveFmsAltitude - used to indicate that FmsAltitude is set
+	HaveFmsAltitude bool `protobuf:"varint,60,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
+	// FmsAltitude - the target altitude set on the aircrafts navigation
+	FmsAltitude int64 `protobuf:"varint,61,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
+	// HaveCategory - used to indicate that Category is set
+	HaveCategory bool `protobuf:"varint,70,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
+	// Category - type of the transponder
+	Category string `protobuf:"bytes,71,opt,name=Category,proto3" json:"Category,omitempty"`
+	// GroundSpeed - speed in knots
+	GroundSpeed string `protobuf:"bytes,90,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
 }
 
 func (x *Message) Reset() {
@@ -446,6 +476,7 @@ func (x *Message) GetGroundSpeed() string {
 	return ""
 }
 
+// State contains general information about a sighting.
 type State struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -468,39 +499,52 @@ type State struct {
 	// geometric altitude in feet
 	HaveAltitudeGeometric bool  `protobuf:"varint,12,opt,name=HaveAltitudeGeometric,proto3" json:"HaveAltitudeGeometric,omitempty"`
 	AltitudeGeometric     int64 `protobuf:"varint,13,opt,name=AltitudeGeometric,proto3" json:"AltitudeGeometric,omitempty"`
-	HaveLocation          bool  `protobuf:"varint,20,opt,name=HaveLocation,proto3" json:"HaveLocation,omitempty"`
+	// HaveLocation - used to indicate whether Latitude and Longitude are set.
+	HaveLocation bool `protobuf:"varint,20,opt,name=HaveLocation,proto3" json:"HaveLocation,omitempty"`
 	// Latitude
 	Latitude float64 `protobuf:"fixed64,21,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
 	// Longitude
-	Longitude    float64 `protobuf:"fixed64,22,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
-	HaveCallsign bool    `protobuf:"varint,30,opt,name=HaveCallsign,proto3" json:"HaveCallsign,omitempty"`
+	Longitude float64 `protobuf:"fixed64,22,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
+	// HaveCallsign - indicates whether Callsign is set.
+	HaveCallsign bool `protobuf:"varint,30,opt,name=HaveCallsign,proto3" json:"HaveCallsign,omitempty"`
 	// Callsign or flight identifier
-	CallSign   string `protobuf:"bytes,31,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
-	HaveSquawk bool   `protobuf:"varint,40,opt,name=HaveSquawk,proto3" json:"HaveSquawk,omitempty"`
-	// 4 digit octal number (as string)
-	Squawk      string `protobuf:"bytes,41,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
-	HaveCountry bool   `protobuf:"varint,50,opt,name=HaveCountry,proto3" json:"HaveCountry,omitempty"`
-	// Aircraft registration country determined by ICAO Country Allocation
+	CallSign string `protobuf:"bytes,31,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
+	// HaveSquawk - indicates whether Squawk is set.
+	HaveSquawk bool `protobuf:"varint,40,opt,name=HaveSquawk,proto3" json:"HaveSquawk,omitempty"`
+	// Squawk - 4 digit octal number (as string)
+	Squawk string `protobuf:"bytes,41,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
+	// HaveCountry - indicates whether Country and CountryCode fields are set.
+	HaveCountry bool `protobuf:"varint,50,opt,name=HaveCountry,proto3" json:"HaveCountry,omitempty"`
+	// CountryCode - Aircraft registration country determined by ICAO Country Allocation
 	// CountryCode is ISO3166 2 letter code
 	CountryCode string `protobuf:"bytes,51,opt,name=CountryCode,proto3" json:"CountryCode,omitempty"`
 	// Country is the long country name
 	Country string `protobuf:"bytes,52,opt,name=Country,proto3" json:"Country,omitempty"`
 	// IsOnGround tracks whether the aircraft is on ground or in the air.
 	IsOnGround bool `protobuf:"varint,60,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
-	// barometric change in vertical rate (+/-) in feet per minute
-	HaveVerticalRateBarometric bool  `protobuf:"varint,70,opt,name=HaveVerticalRateBarometric,proto3" json:"HaveVerticalRateBarometric,omitempty"`
-	VerticalRateBarometric     int64 `protobuf:"varint,71,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
-	// geometric change in vertical rate (+/-) in feet per minute
-	HaveVerticalRateGeometric bool    `protobuf:"varint,75,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
-	VerticalRateGeometric     int64   `protobuf:"varint,76,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
-	HaveTrack                 bool    `protobuf:"varint,80,opt,name=HaveTrack,proto3" json:"HaveTrack,omitempty"`
-	Track                     float64 `protobuf:"fixed64,81,opt,name=Track,proto3" json:"Track,omitempty"`
-	HaveFmsAltitude           bool    `protobuf:"varint,85,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
-	FmsAltitude               int64   `protobuf:"varint,86,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
-	HaveGroundSpeed           bool    `protobuf:"varint,90,opt,name=HaveGroundSpeed,proto3" json:"HaveGroundSpeed,omitempty"`
-	GroundSpeed               float64 `protobuf:"fixed64,91,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
-	HaveCategory              bool    `protobuf:"varint,100,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
-	Category                  string  `protobuf:"bytes,101,opt,name=Category,proto3" json:"Category,omitempty"`
+	// HaveVerticalRateBarometric indicates whether VerticalRateBarometric is set.
+	HaveVerticalRateBarometric bool `protobuf:"varint,70,opt,name=HaveVerticalRateBarometric,proto3" json:"HaveVerticalRateBarometric,omitempty"`
+	// VerticalRateBarometric - barometric change in vertical rate (+/-) in feet per minute
+	VerticalRateBarometric int64 `protobuf:"varint,71,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
+	// HaveVerticalRateGeometric indicates whether VerticalRateGeometric is set.
+	HaveVerticalRateGeometric bool `protobuf:"varint,75,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
+	// VerticalRateGeometric - geometric change in vertical rate (+/-) in feet per minute
+	VerticalRateGeometric int64 `protobuf:"varint,76,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
+	// HaveTrack indicates whether Track is set.
+	HaveTrack bool    `protobuf:"varint,80,opt,name=HaveTrack,proto3" json:"HaveTrack,omitempty"`
+	Track     float64 `protobuf:"fixed64,81,opt,name=Track,proto3" json:"Track,omitempty"`
+	// HaveFmsAltitude indicates whether FmsAltitude is set.
+	HaveFmsAltitude bool `protobuf:"varint,85,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
+	// FmsAltitude - the target altitude set on navigation instruments
+	FmsAltitude int64 `protobuf:"varint,86,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
+	// HaveGroundSpeed indicates whether GroundSpeed is set.
+	HaveGroundSpeed bool `protobuf:"varint,90,opt,name=HaveGroundSpeed,proto3" json:"HaveGroundSpeed,omitempty"`
+	// GroundSpeed - the ground speed in knots
+	GroundSpeed float64 `protobuf:"fixed64,91,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
+	// HaveCategory indicates whether Category is set.
+	HaveCategory bool `protobuf:"varint,100,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
+	// Category - the transponder type
+	Category string `protobuf:"bytes,101,opt,name=Category,proto3" json:"Category,omitempty"`
 }
 
 func (x *State) Reset() {
