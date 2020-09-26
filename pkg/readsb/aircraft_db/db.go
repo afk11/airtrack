@@ -37,15 +37,6 @@ type Operator struct {
 	R       string `json:"r"`
 }
 
-//easyjson:json
-type aircraftFile map[string][4]string
-
-//easyjson:json
-type operatorFile map[string]Operator
-
-//easyjson:json
-type shardFile []string
-
 type aircraftMap map[string]pb.AircraftInfo
 type operatorMap map[string]pb.Operator
 
@@ -75,7 +66,18 @@ func (d *Db) GetOperator(code string) (*pb.Operator, bool) {
 	}
 	return &op, true
 }
-func LoadAssets(db *Db) error {
+
+
+//easyjson:json
+type aircraftFile map[string][4]string
+
+//easyjson:json
+type operatorFile map[string]Operator
+
+//easyjson:json
+type shardFile []string
+
+func LoadAssets(db *Db, Asset func(string) ([]byte, error)) error {
 	if db.initialized {
 		return nil
 	}

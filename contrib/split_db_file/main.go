@@ -3,12 +3,18 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
 	"io/ioutil"
 	"os"
 )
 
-type AcJsonAsSlice aircraft_db.Aircraft
+type Aircraft struct {
+	Registration string `json:"r"`
+	TypeCode     string `json:"t"`
+	F            string `json:"f"`
+	Description  string `json:"d"`
+}
+
+type AcJsonAsSlice Aircraft
 func (t AcJsonAsSlice) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]string{t.Registration, t.TypeCode, t.F, t.Description})
 }

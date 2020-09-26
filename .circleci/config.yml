@@ -33,8 +33,8 @@ jobs: # basic units of work in a run
           command: sudo apt install autoconf libtool libprotobuf-dev libprotoc-dev libncurses-dev protobuf-compiler librrd-dev build-essential
 
       - run:
-          name: Install go-bindata and easyjson and protobuf-c
-          command: make install-protobuf-c install-go-bindata install-easyjson
+          name: Install go-bindata and easyjson and protobuf tools
+          command: make install-protobuf-c install-protoc-gen-go install-go-bindata install-easyjson
 
       - run:
           name: Run unit tests

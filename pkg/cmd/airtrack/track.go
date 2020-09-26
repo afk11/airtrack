@@ -261,7 +261,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	}
 
 	opt.AircraftDb = aircraft_db.New()
-	err = aircraft_db.LoadAssets(opt.AircraftDb)
+	err = aircraft_db.LoadAssets(opt.AircraftDb, aircraft_db.Asset)
 	if err != nil {
 		return errors.Wrapf(err, "load aircraft db assets")
 	}
