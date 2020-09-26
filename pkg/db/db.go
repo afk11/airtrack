@@ -20,7 +20,7 @@ const (
 )
 
 type (
-	CollectionSite struct {
+	Project struct {
 		Id         uint64     `db:"id"`
 		Identifier string     `db:"identifier"`
 		Label      *string    `db:"label"`
@@ -32,7 +32,7 @@ type (
 	CollectionSession struct {
 		Id                    uint64     `db:"id"`
 		Identifier            string     `db:"identifier"`
-		CollectionSiteId      uint64     `db:"collection_site_id"`
+		CollectionSiteId      uint64     `db:"project_id"`
 		ClosedAt              *time.Time `db:"closed_at"`
 		CreatedAt             time.Time  `db:"created_at"`
 		UpdatedAt             time.Time  `db:"updated_at"`
@@ -51,7 +51,7 @@ type (
 
 	Sighting struct {
 		Id                  uint64  `db:"id"`
-		CollectionSiteId    uint64  `db:"collection_site_id"`
+		CollectionSiteId    uint64  `db:"project_id"`
 		CollectionSessionId uint64  `db:"collection_session_id"`
 		AircraftId          uint64  `db:"aircraft_id"`
 		CallSign            *string `db:"callsign"`
@@ -157,9 +157,9 @@ func CheckRowsUpdated(res sql.Result, expectAffected int64) error {
 type Database interface {
 	Transaction(f func(tx *sqlx.Tx) error) error
 	NewCollectionSite(siteName string, now time.Time) (sql.Result, error)
-	LoadCollectionSite(siteName string) (*CollectionSite, error)
-	NewCollectionSession(site *CollectionSite, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
-	LoadSessionByIdentifier(site *CollectionSite, identifier string) (*CollectionSession, error)
+	LoadCollectionSite(siteName string) (*Project, error)
+	NewCollectionSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
+	LoadSessionByIdentifier(site *Project, identifier string) (*CollectionSession, error)
 	CloseSession(session *CollectionSession) (sql.Result, error)
 	LoadAircraftByIcao(icao string) (*Aircraft, error)
 	LoadAircraftById(id int64) (*Aircraft, error)
@@ -204,7 +204,7 @@ func (d *DatabaseImpl) Transaction(f func(tx *sqlx.Tx) error) error {
 }
 func (d *DatabaseImpl) NewCollectionSite(siteName string, now time.Time) (sql.Result, error) {
 	q := d.dialect.
-		Insert("collection_site").
+		Insert("project").
 		Prepared(true).
 		Cols("identifier", "created_at", "updated_at").
 		Vals(goqu.Vals{siteName, now, now})
@@ -215,9 +215,9 @@ func (d *DatabaseImpl) NewCollectionSite(siteName string, now time.Time) (sql.Re
 	return d.db.Exec(s, p...)
 }
 
-func (d *DatabaseImpl) LoadCollectionSite(siteName string) (*CollectionSite, error) {
+func (d *DatabaseImpl) LoadCollectionSite(siteName string) (*Project, error) {
 	q := d.dialect.
-		From("collection_site").
+		From("project").
 		Prepared(true).
 		Where(goqu.C("identifier").Eq(siteName))
 	s, p, err := q.ToSQL()
@@ -225,19 +225,19 @@ func (d *DatabaseImpl) LoadCollectionSite(siteName string) (*CollectionSite, err
 		return nil, err
 	}
 	row := d.db.QueryRowx(s, p...)
-	site := CollectionSite{}
+	site := Project{}
 	err = row.StructScan(&site)
 	if err != nil {
 		return nil, err
 	}
 	return &site, err
 }
-func (d *DatabaseImpl) NewCollectionSession(site *CollectionSite, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
+func (d *DatabaseImpl) NewCollectionSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
 		Insert("collection_session").
 		Prepared(true).
-		Cols("collection_site_id", "identifier", "with_squawks", "with_transmission_types",
+		Cols("project_id", "identifier", "with_squawks", "with_transmission_types",
 			"with_callsigns", "created_at", "updated_at", "closed_at").
 		Vals(goqu.Vals{site.Id, identifier, withSquawks, withTxTypes, withCallSigns, now, now, nil}).
 		ToSQL()
@@ -250,12 +250,12 @@ func (d *DatabaseImpl) NewCollectionSession(site *CollectionSite, identifier str
 	}
 	return res, nil
 }
-func (d *DatabaseImpl) LoadSessionByIdentifier(site *CollectionSite, identifier string) (*CollectionSession, error) {
+func (d *DatabaseImpl) LoadSessionByIdentifier(site *Project, identifier string) (*CollectionSession, error) {
 	s, p, err := d.dialect.
 		From("collection_session").
 		Prepared(true).
 		Where(goqu.Ex{
-			"collection_site_id": site.Id,
+			"project_id": site.Id,
 			"identifier":         identifier,
 		}).
 		ToSQL()
@@ -344,7 +344,7 @@ func (d *DatabaseImpl) CreateSighting(session *CollectionSession, ac *Aircraft) 
 	s, p, err := d.dialect.
 		Insert("sighting").
 		Prepared(true).
-		Cols("collection_site_id", "collection_session_id", "aircraft_id", "created_at", "updated_at").
+		Cols("project_id", "collection_session_id", "aircraft_id", "created_at", "updated_at").
 		Vals(goqu.Vals{session.CollectionSiteId, session.Id, ac.Id, &now, &now}).
 		ToSQL()
 	if err != nil {
@@ -357,7 +357,7 @@ func (d *DatabaseImpl) CreateSightingTx(tx *sqlx.Tx, session *CollectionSession,
 	s, p, err := d.dialect.
 		Insert("sighting").
 		Prepared(true).
-		Cols("collection_site_id", "collection_session_id", "aircraft_id", "created_at", "updated_at").
+		Cols("project_id", "collection_session_id", "aircraft_id", "created_at", "updated_at").
 		Vals(goqu.Vals{session.CollectionSiteId, session.Id, ac.Id, &now, &now}).
 		ToSQL()
 	if err != nil {

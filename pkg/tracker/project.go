@@ -24,7 +24,7 @@ type (
 		// ShouldMap indicates whether the map should be built for this project
 		ShouldMap bool
 		// Site - the db record for this collection site
-		Site *db.CollectionSite
+		Site *db.Project
 		// Session - the db record for the current collection session
 		Session *db.CollectionSession
 		// Filter - a CEL expression for filtering aircraft (can be empty)

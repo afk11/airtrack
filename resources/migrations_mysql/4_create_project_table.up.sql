@@ -1,0 +1,2 @@
+create table `project` (`id` int unsigned not null auto_increment primary key, `identifier` varchar(100) not null, `label` varchar(255) null, `deleted_at` timestamp null, `created_at` timestamp null, `updated_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
+alter table `project` add unique `project_identifier_unique`(`identifier`);

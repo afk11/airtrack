@@ -1,4 +1,4 @@
-create table `collection_site` (
+create table `project` (
     `id` integer not null primary key autoincrement,
     `identifier` varchar(100) not null,
     `label` varchar(255) null,
@@ -6,4 +6,4 @@ create table `collection_site` (
     `created_at` timestamp null,
     `updated_at` timestamp null
                                );
-create unique index collection_site_identifier_unique on collection_site(`identifier`);
+create unique index project_identifier_unique on project(`identifier`);

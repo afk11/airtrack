@@ -1,2 +1,2 @@
-create table `sighting` (`id` int unsigned not null auto_increment primary key, `collection_site_id` int not null, `collection_session_id` int not null, `aircraft_id` int not null, `callsign` varchar(20) null, `created_at` timestamp null, `updated_at` timestamp null, `closed_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
-alter table `sighting` add index `closed_at`(`collection_site_id`);
+create table `sighting` (`id` int unsigned not null auto_increment primary key, `project_id` int not null, `collection_session_id` int not null, `aircraft_id` int not null, `callsign` varchar(20) null, `created_at` timestamp null, `updated_at` timestamp null, `closed_at` timestamp null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
+alter table `sighting` add index `closed_at`(`project_id`);
