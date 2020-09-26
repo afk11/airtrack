@@ -33,7 +33,7 @@ build-bindata-tar1090: resources/tar1090
 		go-bindata $(BINDATAARGS) -pkg tar1090 -o ./pkg/tar1090/assets.go -prefix resources/tar1090/html resources/tar1090/...
 build-bindata-openaip: build-dir-airports
 		go-bindata $(BINDATAARGS) -pkg airports -o ./pkg/airports/assets.go -prefix build/airports build/airports
-build-bindata-readsb-db: resources/readsb-src
+build-bindata-readsb-db: resources/readsb-src build-easyjson
 		mkdir build/aircraft_db
 		cp resources/readsb-src/webapp/src/db/*.json build/aircraft_db/
 		go run contrib/split_db_file/main.go ./build/aircraft_db/aircrafts.json ./build/aircraft_db/
