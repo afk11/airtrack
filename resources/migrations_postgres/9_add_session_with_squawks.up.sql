@@ -1,1 +1,0 @@
-alter table session add column with_squawks boolean null;

@@ -1,1 +1,0 @@
-alter table session drop column with_transmission_types;

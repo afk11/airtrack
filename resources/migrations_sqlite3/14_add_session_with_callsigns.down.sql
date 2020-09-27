@@ -1,1 +1,0 @@
-alter table `session` drop `with_callsigns`;
