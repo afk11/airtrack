@@ -26,7 +26,7 @@ type (
 		// Site - the db record for this collection site
 		Site *db.Project
 		// Session - the db record for the current collection session
-		Session *db.CollectionSession
+		Session *db.Session
 		// Filter - a CEL expression for filtering aircraft (can be empty)
 		Filter string
 		// Program - a parsed CEL expression to evaluate later

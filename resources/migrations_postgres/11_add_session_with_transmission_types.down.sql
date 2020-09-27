@@ -1,1 +1,1 @@
-alter table collection_session drop column with_transmission_types;
+alter table session drop column with_transmission_types;

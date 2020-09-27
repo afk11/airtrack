@@ -1,1 +1,1 @@
-alter table collection_session add with_transmission_types bool not null;
+alter table session add with_transmission_types bool not null;

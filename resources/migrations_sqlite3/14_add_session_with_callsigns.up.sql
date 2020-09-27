@@ -1,0 +1,1 @@
+alter table `session` add `with_callsigns` tinyint not null default '0';

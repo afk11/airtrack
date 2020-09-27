@@ -1,4 +1,4 @@
-create table `collection_session` (
+create table `session` (
     `id` integer not null primary key autoincrement,
     `identifier` varchar(100) not null,
     `project_id` int not null,
@@ -8,4 +8,4 @@ create table `collection_session` (
     `deleted_at` timestamp null
                                   );
 
-create index closed_at on collection_session(`project_id`);
+create index closed_at on session(`project_id`);

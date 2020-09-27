@@ -181,7 +181,7 @@ type (
 	lostSighting struct {
 		s       *Sighting
 		project *Project
-		session *db.CollectionSession
+		session *db.Session
 	}
 	// SightingTags contains some meta information about the flight.
 	SightingTags struct {

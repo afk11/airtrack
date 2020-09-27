@@ -1,0 +1,1 @@
+alter table `session` add `with_squawks` tinyint null;
