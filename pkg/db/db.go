@@ -736,7 +736,7 @@ func (d *DatabaseImpl) CreateSightingKml(sighting *Sighting, kmlData []byte) (sq
 
 func (d *DatabaseImpl) CreateEmailJobTx(tx *sqlx.Tx, createdAt time.Time, content []byte) (sql.Result, error) {
 	s, p, err := d.dialect.
-		Insert("email_v2").
+		Insert("email").
 		Prepared(true).
 		Cols("status", "retries", "created_at", "updated_at", "retry_after", "job").
 		Vals(goqu.Vals{EmailPending, 0, createdAt, createdAt, nil, content}).
@@ -749,7 +749,7 @@ func (d *DatabaseImpl) CreateEmailJobTx(tx *sqlx.Tx, createdAt time.Time, conten
 
 func (d *DatabaseImpl) GetPendingEmailJobs(now time.Time) ([]Email, error) {
 	s, p, err := d.dialect.
-		From("email_v2").
+		From("email").
 		Prepared(true).
 		Where(goqu.C("status").Eq(EmailPending)).
 		Where(goqu.Or(
@@ -779,11 +779,11 @@ func (d *DatabaseImpl) GetPendingEmailJobs(now time.Time) ([]Email, error) {
 }
 
 func (d *DatabaseImpl) DeleteCompletedEmail(tx *sqlx.Tx, job Email) (sql.Result, error) {
-	return tx.Exec("DELETE FROM email_v2 WHERE id = ?", job.Id)
+	return tx.Exec("DELETE FROM email WHERE id = ?", job.Id)
 }
 func (d *DatabaseImpl) MarkEmailFailedTx(tx *sqlx.Tx, job Email) (sql.Result, error) {
-	return tx.Exec("UPDATE email_v2 SET retry_after = 0, status = ? WHERE id = ?", EmailFailed, job.Id)
+	return tx.Exec("UPDATE email SET retry_after = 0, status = ? WHERE id = ?", EmailFailed, job.Id)
 }
 func (d *DatabaseImpl) RetryEmailAfter(tx *sqlx.Tx, job Email, retryAfter time.Time) (sql.Result, error) {
-	return tx.Exec("UPDATE email_v2 SET retry_after = ?, retries = ? WHERE id = ?", retryAfter, job.Retries+1, job.Id)
+	return tx.Exec("UPDATE email SET retry_after = ?, retries = ? WHERE id = ?", retryAfter, job.Retries+1, job.Id)
 }
