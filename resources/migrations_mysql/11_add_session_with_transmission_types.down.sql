@@ -1,1 +1,1 @@
-alter table `collection_session` drop `with_transmission_types`;
+alter table `session` drop `with_transmission_types`;

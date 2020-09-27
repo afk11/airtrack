@@ -1,1 +1,1 @@
-alter table `sighting` add index `sighting_collection_site_id_aircraft_id_callsign_index`(`collection_site_id`, `aircraft_id`, `callsign`);
+alter table `sighting` add index `sighting_project_id_aircraft_id_callsign_index`(`project_id`, `aircraft_id`, `callsign`);

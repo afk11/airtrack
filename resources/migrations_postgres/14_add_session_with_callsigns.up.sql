@@ -1,0 +1,1 @@
+alter table session add with_callsigns boolean not null default false;
