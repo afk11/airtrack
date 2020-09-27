@@ -6,3 +6,4 @@ create table `sighting_location` (
     `latitude` double(12, 8) not null,
     `longitude` double(12, 8) not null
                                  );
+create index `sighting_location_sighting_id_index` on `sighting_location`(`sighting_id`);
