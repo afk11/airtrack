@@ -1,3 +1,0 @@
-create table `dutch_registry` (`id` int unsigned not null auto_increment primary key, `created_at` timestamp null, `updated_at` timestamp null, `icao_hex` varchar(6) null, `registration` varchar(12) not null, `registration_number` int not null, `aircraft_model` varchar(255) null, `registration_date` datetime null, `mtow` int null, `year_of_manufacture` int null, `owner_name` varchar(255) null, `owner_address` text null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
-alter table `dutch_registry` add unique `dutch_registry_icao_hex_unique`(`icao_hex`);
-alter table `dutch_registry` add index `dutch_registry_registration_index`(`registration`);
