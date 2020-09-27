@@ -1,1 +1,0 @@
-alter table `sighting_kml` drop index `sighting_kml_sighting_id_index`;

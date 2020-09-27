@@ -4,3 +4,4 @@ create table `sighting_kml` (
     `content_type` int not null,
     `kml` blob not null
                             );
+create index `sighting_kml_sighting_id_index` on `sighting_kml`(`sighting_id`);

@@ -1,1 +1,0 @@
-create index `sighting_kml_sighting_id_index` on `sighting_kml`(`sighting_id`);
