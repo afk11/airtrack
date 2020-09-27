@@ -1,1 +1,0 @@
-alter table sighting add column squawk varchar(4) null;

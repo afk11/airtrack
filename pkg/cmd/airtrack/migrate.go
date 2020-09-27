@@ -157,7 +157,7 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 			driver, err = mysql.WithInstance(db, &mysql.Config{})
 		}
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "loading migration resources")
 		}
 		src, err = bindata.WithInstance(s)
 		if err != nil {
@@ -191,7 +191,7 @@ func initMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migra
 		driver,
 	)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "init migrations instance")
 	}
 	return m, nil
 }

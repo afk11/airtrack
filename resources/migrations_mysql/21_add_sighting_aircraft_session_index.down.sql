@@ -1,1 +1,0 @@
-DROP INDEX `sighting_aircraft_session` on `sighting`;

@@ -1,1 +1,0 @@
-alter table sighting add transmission_types int not null default 0;

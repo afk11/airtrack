@@ -1,1 +1,0 @@
-alter table `sighting` add index `sighting_project_id_aircraft_id_callsign_index`(`project_id`, `aircraft_id`, `callsign`);

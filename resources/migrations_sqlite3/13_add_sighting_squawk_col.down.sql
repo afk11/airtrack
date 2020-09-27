@@ -1,1 +1,0 @@
-alter table `sighting` drop `squawk`;
