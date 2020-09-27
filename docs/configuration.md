@@ -29,10 +29,14 @@ Placeholders for certain types of data:
  * `<feature>`: a tracking feature supported by airtrack
  * `<mapservice>`: a valid map layout supported by airtrack
 
+This document contains overviews of various YML configuration blocks, the types of
+each parameter, and the structures representing entire configuration files.
+
 ### Main configuration file
 
 The `--config` command line option specifies the main configuration file.
  
+The main configuration file has the following structure:
 ```yaml
 # Local time zone
 timezone: <string>
@@ -66,6 +70,7 @@ It's also possible to pass additional _projects only_ configuration files using 
 `--projects` command line option. The option can be repeated to pass several project
 only configuration files.
 
+A project configuration file has the following structure:
 ```yaml
 # Project configurations
 projects:
@@ -99,8 +104,12 @@ port: <port>
 
 ### `<airports_config>`
 
-Airtrack can geolocate the takeoff and landing airport based user provided airport 
-files, supporting `aip` and `cup` formats.
+Airtrack can geolocate the takeoff and landing airport for a flight.
+Locations are provided to airtrack via `aip` and `cup` files. Airtrack
+releases contain the latest available version of the openaip database.
+
+Use of the built-in openaip locations can be disabled in this configuration section.
+It's also possible to configure custom directories containing `aip` and `cup` files.
 
 [Click here for information about airport location files](airport-locations.html)
 

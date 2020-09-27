@@ -22,10 +22,6 @@ When a message is received from an aircraft which was not in view before the fol
     contains some minimal information about every aircraft in view. However, information is stored only if
     there is at least one project following the aircraft.
 
- 3. If not done already, attempt to determine the country this ICAO was issued by, using the ICAO
-    Country Allocations list. If successful, the `State.CountryCode` and `State.Country` parameters
-    will be set, and `State.HaveCountry` will be `true`.
-
 ## Project tracking
 
 Airtrack has the project concept to help organize aircraft tracking. We might have multiple projects because

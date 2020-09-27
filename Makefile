@@ -14,6 +14,8 @@ install-go-bindata:
 		go get -u github.com/jteeuwen/go-bindata/...
 install-easyjson:
 		go get -u github.com/mailru/easyjson/...
+install-protoc-gen-go:
+		go get -u google.golang.org/protobuf/cmd/protoc-gen-go
 install-protobuf-c:
 		git clone https://github.com/protobuf-c/protobuf-c protobuf-c
 		cd protobuf-c && git checkout $(PROTOBUF_C_VERSION) && ./autogen.sh && ./configure && make && sudo make install && sudo ldconfig
@@ -38,11 +40,11 @@ build-bindata-readsb-db: resources/readsb-src
 		cp resources/readsb-src/webapp/src/db/*.json build/aircraft_db/
 		go run contrib/split_db_file/main.go ./build/aircraft_db/aircrafts.json ./build/aircraft_db/
 		rm ./build/aircraft_db/aircrafts.json
-		go-bindata $(BINDATAARGS) -pkg db -o ./pkg/readsb/db/assets.go -prefix build/aircraft_db/ build/aircraft_db/
+		go-bindata $(BINDATAARGS) -pkg aircraft_db -o ./pkg/readsb/aircraft_db/assets.go -prefix build/aircraft_db/ build/aircraft_db/
 build-bindata: build-bindata-assets build-bindata-email build-bindata-migrations-mysql build-bindata-migrations-sqlite3 build-bindata-migrations-postgres build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip build-bindata-readsb-db
-build-easyjson-adsbx:
-		easyjson -all ./pkg/tracker/adsbx_http.go
-build-easyjson: build-easyjson-adsbx
+build-easyjson:
+		easyjson ./pkg/readsb/aircraft_db/db.go ./pkg/tracker/adsbx_http.go
+
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto
 delete-build-dir:
@@ -52,12 +54,13 @@ build-dir:
 build-dir-airports: build-dir
 		mkdir build/airports/
 		go run ./contrib/copy_airport_resources/main.go resources/airports
-build-airtrack-linux-amd64: delete-build-dir resources/readsb-src build-bindata build-easyjson build-protobuf
+build-deps: build-protobuf build-bindata build-easyjson
+build-airtrack-linux-amd64: delete-build-dir resources/readsb-src build-deps
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -o airtrack.linux-amd64 cmd/airtrack/main.go
-build-airtrack-qa-linux-amd64: delete-build-dir resources/readsb-src build-bindata build-easyjson build-protobuf
+build-airtrack-qa-linux-amd64: delete-build-dir resources/readsb-src build-deps
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
-test: delete-build-dir resources/readsb-src build-bindata build-easyjson test-cleanup
+test: test-cleanup delete-build-dir resources/readsb-src build-deps
 	go test -coverprofile=./coverage/tests.out ./... \
 	$(TESTARGS)
 

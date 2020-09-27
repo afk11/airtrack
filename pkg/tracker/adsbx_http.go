@@ -1,5 +1,6 @@
 package tracker
 
+//easyjson:json
 type AdsbxAircraftResponse struct {
 	Aircraft []AdsbxAircraft `json:"ac"`
 	Msg      string          `json:"msg"`
@@ -8,6 +9,7 @@ type AdsbxAircraftResponse struct {
 	PTime    int64           `json:"ptime"`
 }
 
+//easyjson:json
 type AdsbxAircraft struct {
 	PosTime      string `json:"postime"`
 	Icao         string `json:"icao"`

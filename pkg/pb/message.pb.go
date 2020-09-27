@@ -25,6 +25,7 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
+// Source contains information about which receiver produced the message
 type Source struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -88,41 +89,204 @@ func (x *Source) GetUrl() string {
 	return ""
 }
 
+// AircraftInfo represents an entry in the readsb database, containing
+// information about the aircraft
+type AircraftInfo struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Registration - assigned registration for the aircraft.
+	Registration string `protobuf:"bytes,1,opt,name=Registration,proto3" json:"Registration,omitempty"`
+	// TypeCode - identifies the type of aircraft
+	TypeCode string `protobuf:"bytes,2,opt,name=TypeCode,proto3" json:"TypeCode,omitempty"`
+	// F
+	F string `protobuf:"bytes,3,opt,name=F,proto3" json:"F,omitempty"`
+	// Description - brief description of the aircraft type for humans
+	Description string `protobuf:"bytes,4,opt,name=Description,proto3" json:"Description,omitempty"`
+}
+
+func (x *AircraftInfo) Reset() {
+	*x = AircraftInfo{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_message_proto_msgTypes[1]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *AircraftInfo) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AircraftInfo) ProtoMessage() {}
+
+func (x *AircraftInfo) ProtoReflect() protoreflect.Message {
+	mi := &file_message_proto_msgTypes[1]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AircraftInfo.ProtoReflect.Descriptor instead.
+func (*AircraftInfo) Descriptor() ([]byte, []int) {
+	return file_message_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *AircraftInfo) GetRegistration() string {
+	if x != nil {
+		return x.Registration
+	}
+	return ""
+}
+
+func (x *AircraftInfo) GetTypeCode() string {
+	if x != nil {
+		return x.TypeCode
+	}
+	return ""
+}
+
+func (x *AircraftInfo) GetF() string {
+	if x != nil {
+		return x.F
+	}
+	return ""
+}
+
+func (x *AircraftInfo) GetDescription() string {
+	if x != nil {
+		return x.Description
+	}
+	return ""
+}
+
+// Operator represents an entry in the readsb operators database, and
+// contains information about the operator of the current flight.
+type Operator struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Name - name of the operator
+	Name string `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	// CountryName - where the operator is based
+	CountryName string `protobuf:"bytes,2,opt,name=CountryName,proto3" json:"CountryName,omitempty"`
+	// R
+	R string `protobuf:"bytes,3,opt,name=R,proto3" json:"R,omitempty"`
+}
+
+func (x *Operator) Reset() {
+	*x = Operator{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_message_proto_msgTypes[2]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Operator) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Operator) ProtoMessage() {}
+
+func (x *Operator) ProtoReflect() protoreflect.Message {
+	mi := &file_message_proto_msgTypes[2]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Operator.ProtoReflect.Descriptor instead.
+func (*Operator) Descriptor() ([]byte, []int) {
+	return file_message_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *Operator) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Operator) GetCountryName() string {
+	if x != nil {
+		return x.CountryName
+	}
+	return ""
+}
+
+func (x *Operator) GetR() string {
+	if x != nil {
+		return x.R
+	}
+	return ""
+}
+
+// Message - a payload produced by one of our receivers
 type Message struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Source identifiers the receiver which produced the message
 	Source *Source `protobuf:"bytes,1,opt,name=Source,proto3" json:"Source,omitempty"`
-	// 6 character hex identifier for aircraft
-	Icao                       string  `protobuf:"bytes,10,opt,name=Icao,proto3" json:"Icao,omitempty"`
-	Squawk                     string  `protobuf:"bytes,11,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
-	CallSign                   string  `protobuf:"bytes,12,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
-	AltitudeGeometric          string  `protobuf:"bytes,13,opt,name=AltitudeGeometric,proto3" json:"AltitudeGeometric,omitempty"`
-	AltitudeBarometric         string  `protobuf:"bytes,14,opt,name=AltitudeBarometric,proto3" json:"AltitudeBarometric,omitempty"`
-	Latitude                   string  `protobuf:"bytes,20,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
-	Longitude                  string  `protobuf:"bytes,21,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
-	IsOnGround                 bool    `protobuf:"varint,30,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
-	VerticalRateGeometric      int64   `protobuf:"varint,40,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
-	HaveVerticalRateGeometric  bool    `protobuf:"varint,41,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
-	VerticalRateBarometric     int64   `protobuf:"varint,45,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
+	// Icao - 6 character hex identifier for aircraft
+	Icao string `protobuf:"bytes,10,opt,name=Icao,proto3" json:"Icao,omitempty"`
+	// Squawk - a 4 digit octal squawk code (as a string)
+	Squawk string `protobuf:"bytes,11,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
+	// CallSign - aircrafts flight ID/callsign
+	CallSign string `protobuf:"bytes,12,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
+	// AltitudeGeometric - geometric altitude
+	AltitudeGeometric string `protobuf:"bytes,13,opt,name=AltitudeGeometric,proto3" json:"AltitudeGeometric,omitempty"`
+	// AltitudeBarometric - barometric altitude
+	AltitudeBarometric string `protobuf:"bytes,14,opt,name=AltitudeBarometric,proto3" json:"AltitudeBarometric,omitempty"`
+	// Latitude - latitude coordinate
+	Latitude string `protobuf:"bytes,20,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
+	// Longitude - longitude coordinate
+	Longitude string `protobuf:"bytes,21,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
+	// IsOnGround is '1' if the aircraft is on ground, '0' otherwise
+	IsOnGround bool `protobuf:"varint,30,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
+	// VerticalRateGeometric - change in altitude by ft per minute (UNITS??)
+	VerticalRateGeometric int64 `protobuf:"varint,40,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
+	// HaveVerticalRateGeometric - whether VerticalRateGeometric is set
+	HaveVerticalRateGeometric bool `protobuf:"varint,41,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
+	// VerticalRateBarometric - change in altitude by ft per minute (UNITS??)
+	VerticalRateBarometric int64 `protobuf:"varint,45,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
+	// HaveVerticalRateBarometric - whether VerticalRateBarometric is set
 	HaveVerticalRateBarometric bool    `protobuf:"varint,46,opt,name=HaveVerticalRateBarometric,proto3" json:"HaveVerticalRateBarometric,omitempty"`
 	Track                      string  `protobuf:"bytes,50,opt,name=Track,proto3" json:"Track,omitempty"`
 	MagneticHeading            float64 `protobuf:"fixed64,51,opt,name=MagneticHeading,proto3" json:"MagneticHeading,omitempty"`
 	HaveMagneticHeading        bool    `protobuf:"varint,52,opt,name=HaveMagneticHeading,proto3" json:"HaveMagneticHeading,omitempty"`
 	TrueHeading                float64 `protobuf:"fixed64,53,opt,name=TrueHeading,proto3" json:"TrueHeading,omitempty"`
 	HaveTrueHeading            bool    `protobuf:"varint,54,opt,name=HaveTrueHeading,proto3" json:"HaveTrueHeading,omitempty"`
-	HaveFmsAltitude            bool    `protobuf:"varint,60,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
-	FmsAltitude                int64   `protobuf:"varint,61,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
-	HaveCategory               bool    `protobuf:"varint,70,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
-	Category                   string  `protobuf:"bytes,71,opt,name=Category,proto3" json:"Category,omitempty"`
-	GroundSpeed                string  `protobuf:"bytes,90,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
+	// HaveFmsAltitude - used to indicate that FmsAltitude is set
+	HaveFmsAltitude bool `protobuf:"varint,60,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
+	// FmsAltitude - the target altitude set on the aircrafts navigation
+	FmsAltitude int64 `protobuf:"varint,61,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
+	// HaveCategory - used to indicate that Category is set
+	HaveCategory bool `protobuf:"varint,70,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
+	// Category - type of the transponder
+	Category string `protobuf:"bytes,71,opt,name=Category,proto3" json:"Category,omitempty"`
+	// GroundSpeed - speed in knots
+	GroundSpeed string `protobuf:"bytes,90,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
 }
 
 func (x *Message) Reset() {
 	*x = Message{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_message_proto_msgTypes[1]
+		mi := &file_message_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -135,7 +299,7 @@ func (x *Message) String() string {
 func (*Message) ProtoMessage() {}
 
 func (x *Message) ProtoReflect() protoreflect.Message {
-	mi := &file_message_proto_msgTypes[1]
+	mi := &file_message_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -148,7 +312,7 @@ func (x *Message) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Message.ProtoReflect.Descriptor instead.
 func (*Message) Descriptor() ([]byte, []int) {
-	return file_message_proto_rawDescGZIP(), []int{1}
+	return file_message_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *Message) GetSource() *Source {
@@ -312,6 +476,7 @@ func (x *Message) GetGroundSpeed() string {
 	return ""
 }
 
+// State contains general information about a sighting.
 type State struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
@@ -319,51 +484,73 @@ type State struct {
 
 	// 6 character hex identifier for aircraft
 	Icao string `protobuf:"bytes,1,opt,name=Icao,proto3" json:"Icao,omitempty"`
+	// Contains aircraft registration, type, and description of the aircraft
+	Info *AircraftInfo `protobuf:"bytes,2,opt,name=Info,proto3" json:"Info,omitempty"`
+	// OperatorCode is a three letter code which references the operator for
+	// this flight. The field is not empty if the callsign begins with three
+	// letters followed by a number.
+	OperatorCode string `protobuf:"bytes,3,opt,name=OperatorCode,proto3" json:"OperatorCode,omitempty"`
+	// Operator information contains the name of the operator and its country.
+	// It will only be set if the `OperatorCode` is found in the database.
+	Operator *Operator `protobuf:"bytes,4,opt,name=Operator,proto3" json:"Operator,omitempty"`
 	// barometric altitude in feet
 	HaveAltitudeBarometric bool  `protobuf:"varint,10,opt,name=HaveAltitudeBarometric,proto3" json:"HaveAltitudeBarometric,omitempty"`
 	AltitudeBarometric     int64 `protobuf:"varint,11,opt,name=AltitudeBarometric,proto3" json:"AltitudeBarometric,omitempty"`
 	// geometric altitude in feet
 	HaveAltitudeGeometric bool  `protobuf:"varint,12,opt,name=HaveAltitudeGeometric,proto3" json:"HaveAltitudeGeometric,omitempty"`
 	AltitudeGeometric     int64 `protobuf:"varint,13,opt,name=AltitudeGeometric,proto3" json:"AltitudeGeometric,omitempty"`
-	HaveLocation          bool  `protobuf:"varint,20,opt,name=HaveLocation,proto3" json:"HaveLocation,omitempty"`
+	// HaveLocation - used to indicate whether Latitude and Longitude are set.
+	HaveLocation bool `protobuf:"varint,20,opt,name=HaveLocation,proto3" json:"HaveLocation,omitempty"`
 	// Latitude
 	Latitude float64 `protobuf:"fixed64,21,opt,name=Latitude,proto3" json:"Latitude,omitempty"`
 	// Longitude
-	Longitude    float64 `protobuf:"fixed64,22,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
-	HaveCallsign bool    `protobuf:"varint,30,opt,name=HaveCallsign,proto3" json:"HaveCallsign,omitempty"`
+	Longitude float64 `protobuf:"fixed64,22,opt,name=Longitude,proto3" json:"Longitude,omitempty"`
+	// HaveCallsign - indicates whether Callsign is set.
+	HaveCallsign bool `protobuf:"varint,30,opt,name=HaveCallsign,proto3" json:"HaveCallsign,omitempty"`
 	// Callsign or flight identifier
-	CallSign   string `protobuf:"bytes,31,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
-	HaveSquawk bool   `protobuf:"varint,40,opt,name=HaveSquawk,proto3" json:"HaveSquawk,omitempty"`
-	// 4 digit octal number (as string)
-	Squawk      string `protobuf:"bytes,41,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
-	HaveCountry bool   `protobuf:"varint,50,opt,name=HaveCountry,proto3" json:"HaveCountry,omitempty"`
-	// Aircraft registration country determined by ICAO Country Allocation
+	CallSign string `protobuf:"bytes,31,opt,name=CallSign,proto3" json:"CallSign,omitempty"`
+	// HaveSquawk - indicates whether Squawk is set.
+	HaveSquawk bool `protobuf:"varint,40,opt,name=HaveSquawk,proto3" json:"HaveSquawk,omitempty"`
+	// Squawk - 4 digit octal number (as string)
+	Squawk string `protobuf:"bytes,41,opt,name=Squawk,proto3" json:"Squawk,omitempty"`
+	// HaveCountry - indicates whether Country and CountryCode fields are set.
+	HaveCountry bool `protobuf:"varint,50,opt,name=HaveCountry,proto3" json:"HaveCountry,omitempty"`
+	// CountryCode - Aircraft registration country determined by ICAO Country Allocation
 	// CountryCode is ISO3166 2 letter code
 	CountryCode string `protobuf:"bytes,51,opt,name=CountryCode,proto3" json:"CountryCode,omitempty"`
 	// Country is the long country name
 	Country string `protobuf:"bytes,52,opt,name=Country,proto3" json:"Country,omitempty"`
 	// IsOnGround tracks whether the aircraft is on ground or in the air.
 	IsOnGround bool `protobuf:"varint,60,opt,name=IsOnGround,proto3" json:"IsOnGround,omitempty"`
-	// barometric change in vertical rate (+/-) in feet per minute
-	HaveVerticalRateBarometric bool  `protobuf:"varint,70,opt,name=HaveVerticalRateBarometric,proto3" json:"HaveVerticalRateBarometric,omitempty"`
-	VerticalRateBarometric     int64 `protobuf:"varint,71,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
-	// geometric change in vertical rate (+/-) in feet per minute
-	HaveVerticalRateGeometric bool    `protobuf:"varint,75,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
-	VerticalRateGeometric     int64   `protobuf:"varint,76,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
-	HaveTrack                 bool    `protobuf:"varint,80,opt,name=HaveTrack,proto3" json:"HaveTrack,omitempty"`
-	Track                     float64 `protobuf:"fixed64,81,opt,name=Track,proto3" json:"Track,omitempty"`
-	HaveFmsAltitude           bool    `protobuf:"varint,85,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
-	FmsAltitude               int64   `protobuf:"varint,86,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
-	HaveGroundSpeed           bool    `protobuf:"varint,90,opt,name=HaveGroundSpeed,proto3" json:"HaveGroundSpeed,omitempty"`
-	GroundSpeed               float64 `protobuf:"fixed64,91,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
-	HaveCategory              bool    `protobuf:"varint,100,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
-	Category                  string  `protobuf:"bytes,101,opt,name=Category,proto3" json:"Category,omitempty"`
+	// HaveVerticalRateBarometric indicates whether VerticalRateBarometric is set.
+	HaveVerticalRateBarometric bool `protobuf:"varint,70,opt,name=HaveVerticalRateBarometric,proto3" json:"HaveVerticalRateBarometric,omitempty"`
+	// VerticalRateBarometric - barometric change in vertical rate (+/-) in feet per minute
+	VerticalRateBarometric int64 `protobuf:"varint,71,opt,name=VerticalRateBarometric,proto3" json:"VerticalRateBarometric,omitempty"`
+	// HaveVerticalRateGeometric indicates whether VerticalRateGeometric is set.
+	HaveVerticalRateGeometric bool `protobuf:"varint,75,opt,name=HaveVerticalRateGeometric,proto3" json:"HaveVerticalRateGeometric,omitempty"`
+	// VerticalRateGeometric - geometric change in vertical rate (+/-) in feet per minute
+	VerticalRateGeometric int64 `protobuf:"varint,76,opt,name=VerticalRateGeometric,proto3" json:"VerticalRateGeometric,omitempty"`
+	// HaveTrack indicates whether Track is set.
+	HaveTrack bool    `protobuf:"varint,80,opt,name=HaveTrack,proto3" json:"HaveTrack,omitempty"`
+	Track     float64 `protobuf:"fixed64,81,opt,name=Track,proto3" json:"Track,omitempty"`
+	// HaveFmsAltitude indicates whether FmsAltitude is set.
+	HaveFmsAltitude bool `protobuf:"varint,85,opt,name=HaveFmsAltitude,proto3" json:"HaveFmsAltitude,omitempty"`
+	// FmsAltitude - the target altitude set on navigation instruments
+	FmsAltitude int64 `protobuf:"varint,86,opt,name=FmsAltitude,proto3" json:"FmsAltitude,omitempty"`
+	// HaveGroundSpeed indicates whether GroundSpeed is set.
+	HaveGroundSpeed bool `protobuf:"varint,90,opt,name=HaveGroundSpeed,proto3" json:"HaveGroundSpeed,omitempty"`
+	// GroundSpeed - the ground speed in knots
+	GroundSpeed float64 `protobuf:"fixed64,91,opt,name=GroundSpeed,proto3" json:"GroundSpeed,omitempty"`
+	// HaveCategory indicates whether Category is set.
+	HaveCategory bool `protobuf:"varint,100,opt,name=HaveCategory,proto3" json:"HaveCategory,omitempty"`
+	// Category - the transponder type
+	Category string `protobuf:"bytes,101,opt,name=Category,proto3" json:"Category,omitempty"`
 }
 
 func (x *State) Reset() {
 	*x = State{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_message_proto_msgTypes[2]
+		mi := &file_message_proto_msgTypes[4]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -376,7 +563,7 @@ func (x *State) String() string {
 func (*State) ProtoMessage() {}
 
 func (x *State) ProtoReflect() protoreflect.Message {
-	mi := &file_message_proto_msgTypes[2]
+	mi := &file_message_proto_msgTypes[4]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -389,7 +576,7 @@ func (x *State) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use State.ProtoReflect.Descriptor instead.
 func (*State) Descriptor() ([]byte, []int) {
-	return file_message_proto_rawDescGZIP(), []int{2}
+	return file_message_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *State) GetIcao() string {
@@ -397,6 +584,27 @@ func (x *State) GetIcao() string {
 		return x.Icao
 	}
 	return ""
+}
+
+func (x *State) GetInfo() *AircraftInfo {
+	if x != nil {
+		return x.Info
+	}
+	return nil
+}
+
+func (x *State) GetOperatorCode() string {
+	if x != nil {
+		return x.OperatorCode
+	}
+	return ""
+}
+
+func (x *State) GetOperator() *Operator {
+	if x != nil {
+		return x.Operator
+	}
+	return nil
 }
 
 func (x *State) GetHaveAltitudeBarometric() bool {
@@ -596,7 +804,20 @@ var file_message_proto_rawDesc = []byte{
 	0x72, 0x63, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
 	0x02, 0x49, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x54, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
 	0x09, 0x52, 0x04, 0x54, 0x79, 0x70, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x55, 0x72, 0x6c, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x55, 0x72, 0x6c, 0x22, 0x8b, 0x07, 0x0a, 0x07, 0x4d, 0x65,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x55, 0x72, 0x6c, 0x22, 0x7e, 0x0a, 0x0c, 0x41, 0x69, 0x72,
+	0x63, 0x72, 0x61, 0x66, 0x74, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x22, 0x0a, 0x0c, 0x52, 0x65, 0x67,
+	0x69, 0x73, 0x74, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x0c, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1a, 0x0a,
+	0x08, 0x54, 0x79, 0x70, 0x65, 0x43, 0x6f, 0x64, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x08, 0x54, 0x79, 0x70, 0x65, 0x43, 0x6f, 0x64, 0x65, 0x12, 0x0c, 0x0a, 0x01, 0x46, 0x18, 0x03,
+	0x20, 0x01, 0x28, 0x09, 0x52, 0x01, 0x46, 0x12, 0x20, 0x0a, 0x0b, 0x44, 0x65, 0x73, 0x63, 0x72,
+	0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x04, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x44, 0x65,
+	0x73, 0x63, 0x72, 0x69, 0x70, 0x74, 0x69, 0x6f, 0x6e, 0x22, 0x4e, 0x0a, 0x08, 0x4f, 0x70, 0x65,
+	0x72, 0x61, 0x74, 0x6f, 0x72, 0x12, 0x12, 0x0a, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20,
+	0x01, 0x28, 0x09, 0x52, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x43, 0x6f, 0x75,
+	0x6e, 0x74, 0x72, 0x79, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b,
+	0x43, 0x6f, 0x75, 0x6e, 0x74, 0x72, 0x79, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x0c, 0x0a, 0x01, 0x52,
+	0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x01, 0x52, 0x22, 0x8b, 0x07, 0x0a, 0x07, 0x4d, 0x65,
 	0x73, 0x73, 0x61, 0x67, 0x65, 0x12, 0x28, 0x0a, 0x06, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x18,
 	0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x10, 0x2e, 0x61, 0x69, 0x72, 0x74, 0x72, 0x61, 0x63, 0x6b,
 	0x2e, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x52, 0x06, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x12,
@@ -653,9 +874,17 @@ var file_message_proto_rawDesc = []byte{
 	0x65, 0x67, 0x6f, 0x72, 0x79, 0x18, 0x47, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x43, 0x61, 0x74,
 	0x65, 0x67, 0x6f, 0x72, 0x79, 0x12, 0x20, 0x0a, 0x0b, 0x47, 0x72, 0x6f, 0x75, 0x6e, 0x64, 0x53,
 	0x70, 0x65, 0x65, 0x64, 0x18, 0x5a, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0b, 0x47, 0x72, 0x6f, 0x75,
-	0x6e, 0x64, 0x53, 0x70, 0x65, 0x65, 0x64, 0x22, 0xb3, 0x08, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x74,
+	0x6e, 0x64, 0x53, 0x70, 0x65, 0x65, 0x64, 0x22, 0xb3, 0x09, 0x0a, 0x05, 0x53, 0x74, 0x61, 0x74,
 	0x65, 0x12, 0x12, 0x0a, 0x04, 0x49, 0x63, 0x61, 0x6f, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x04, 0x49, 0x63, 0x61, 0x6f, 0x12, 0x36, 0x0a, 0x16, 0x48, 0x61, 0x76, 0x65, 0x41, 0x6c, 0x74,
+	0x04, 0x49, 0x63, 0x61, 0x6f, 0x12, 0x2a, 0x0a, 0x04, 0x49, 0x6e, 0x66, 0x6f, 0x18, 0x02, 0x20,
+	0x01, 0x28, 0x0b, 0x32, 0x16, 0x2e, 0x61, 0x69, 0x72, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x2e, 0x41,
+	0x69, 0x72, 0x63, 0x72, 0x61, 0x66, 0x74, 0x49, 0x6e, 0x66, 0x6f, 0x52, 0x04, 0x49, 0x6e, 0x66,
+	0x6f, 0x12, 0x22, 0x0a, 0x0c, 0x4f, 0x70, 0x65, 0x72, 0x61, 0x74, 0x6f, 0x72, 0x43, 0x6f, 0x64,
+	0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0c, 0x4f, 0x70, 0x65, 0x72, 0x61, 0x74, 0x6f,
+	0x72, 0x43, 0x6f, 0x64, 0x65, 0x12, 0x2e, 0x0a, 0x08, 0x4f, 0x70, 0x65, 0x72, 0x61, 0x74, 0x6f,
+	0x72, 0x18, 0x04, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x12, 0x2e, 0x61, 0x69, 0x72, 0x74, 0x72, 0x61,
+	0x63, 0x6b, 0x2e, 0x4f, 0x70, 0x65, 0x72, 0x61, 0x74, 0x6f, 0x72, 0x52, 0x08, 0x4f, 0x70, 0x65,
+	0x72, 0x61, 0x74, 0x6f, 0x72, 0x12, 0x36, 0x0a, 0x16, 0x48, 0x61, 0x76, 0x65, 0x41, 0x6c, 0x74,
 	0x69, 0x74, 0x75, 0x64, 0x65, 0x42, 0x61, 0x72, 0x6f, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x18,
 	0x0a, 0x20, 0x01, 0x28, 0x08, 0x52, 0x16, 0x48, 0x61, 0x76, 0x65, 0x41, 0x6c, 0x74, 0x69, 0x74,
 	0x75, 0x64, 0x65, 0x42, 0x61, 0x72, 0x6f, 0x6d, 0x65, 0x74, 0x72, 0x69, 0x63, 0x12, 0x2e, 0x0a,
@@ -738,19 +967,23 @@ func file_message_proto_rawDescGZIP() []byte {
 	return file_message_proto_rawDescData
 }
 
-var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
+var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_message_proto_goTypes = []interface{}{
-	(*Source)(nil),  // 0: airtrack.Source
-	(*Message)(nil), // 1: airtrack.Message
-	(*State)(nil),   // 2: airtrack.State
+	(*Source)(nil),       // 0: airtrack.Source
+	(*AircraftInfo)(nil), // 1: airtrack.AircraftInfo
+	(*Operator)(nil),     // 2: airtrack.Operator
+	(*Message)(nil),      // 3: airtrack.Message
+	(*State)(nil),        // 4: airtrack.State
 }
 var file_message_proto_depIdxs = []int32{
 	0, // 0: airtrack.Message.Source:type_name -> airtrack.Source
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	1, // 1: airtrack.State.Info:type_name -> airtrack.AircraftInfo
+	2, // 2: airtrack.State.Operator:type_name -> airtrack.Operator
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_message_proto_init() }
@@ -772,7 +1005,7 @@ func file_message_proto_init() {
 			}
 		}
 		file_message_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Message); i {
+			switch v := v.(*AircraftInfo); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -784,6 +1017,30 @@ func file_message_proto_init() {
 			}
 		}
 		file_message_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Operator); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_message_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*Message); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_message_proto_msgTypes[4].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*State); i {
 			case 0:
 				return &v.state
@@ -802,7 +1059,7 @@ func file_message_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_message_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   3,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

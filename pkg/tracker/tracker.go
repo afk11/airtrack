@@ -12,6 +12,7 @@ import (
 	"github.com/afk11/airtrack/pkg/kml"
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/uuid"
@@ -22,6 +23,7 @@ import (
 	"strconv"
 	"sync"
 	"time"
+	"unicode"
 )
 
 const (
@@ -55,6 +57,7 @@ type (
 
 		CountryCodes *iso3166.Store
 		Allocations  ccode.CountryAllocationSearcher
+		AircraftDb   *aircraft_db.Db
 	}
 	// GeocodeLocation contains the result of a geocode search.
 	// If ok is false, the search was unsuccessful and the other fields are empty.
@@ -141,10 +144,12 @@ type (
 		// is one of the structs filters operate on.
 		State pb.State
 		// Tags contains some meta information about the sighting.
-		Tags            SightingTags
-		firstSeen       time.Time
-		lastSeen        time.Time
-		searchedCountry bool
+		Tags             SightingTags
+		firstSeen        time.Time
+		lastSeen         time.Time
+		searchedCountry  bool
+		searchedOperator bool
+		searchedInfo     bool
 
 		a          *db.Aircraft
 		observedBy map[uint64]*ProjectObservation
@@ -1102,6 +1107,19 @@ func (t *Tracker) getSighting(icao string) *Sighting {
 
 	return s
 }
+func AirlineCodeFromCallsign(callSign string) (string, bool) {
+	csLen := len(callSign)
+	if csLen < 3 {
+		return "", false
+	} else if !(unicode.IsLetter(rune(callSign[0])) && unicode.IsLetter(rune(callSign[1])) && unicode.IsLetter(rune(callSign[2]))) {
+		return "", false
+	} else if csLen > 3 && !unicode.IsNumber(rune(callSign[3])) {
+		return "notnum", false
+	}
+
+	callSignPrefix := callSign[0:3]
+	return callSignPrefix, true
+}
 
 // UpdateStateFromMessage takes msg and applies new or updated data to the sighting.
 func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
@@ -1144,6 +1162,14 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	if msg.CallSign != "" && msg.CallSign != s.State.CallSign {
 		s.State.HaveCallsign = true
 		s.State.CallSign = msg.CallSign
+
+		code, ok := AirlineCodeFromCallsign(msg.CallSign)
+		if ok && (s.State.Operator == nil || s.State.OperatorCode != code) {
+			s.State.OperatorCode = code
+			if info, ok := t.opt.AircraftDb.GetOperator(code); ok {
+				s.State.Operator = info
+			}
+		}
 	}
 	if msg.Squawk != "" && msg.Squawk != s.State.Squawk {
 		s.State.HaveSquawk = true
@@ -1221,6 +1247,15 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 			log.Tracef("icao %s country determined: %s %s", s.State.Icao, code.String(), country.Name())
 		}
 	}
+
+	if !s.searchedInfo {
+		ac, ok := t.opt.AircraftDb.GetAircraft(s.State.Icao)
+		if ok {
+			s.State.Info = ac
+		}
+		s.searchedInfo = true
+	}
+
 	return nil
 }
 

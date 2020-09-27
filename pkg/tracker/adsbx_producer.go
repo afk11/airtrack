@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/mailru/easyjson"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
@@ -108,7 +109,7 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 		return err
 	}
 
-	err = msg.UnmarshalJSON(body)
+	err = easyjson.Unmarshal(body, msg)
 	if err != nil {
 		return &jsonDecodeError{err, body}
 	}
