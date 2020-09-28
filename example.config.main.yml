@@ -6,7 +6,8 @@ adsbx:
   apikey: ADSBX API KEY
 beast:
   # Configure a single local beast server (dump1090 or readsb)
-  - host: localhost
+  - name: home
+    host: localhost
     port: 30005
 airports:
   # Directories containing OpenAIP files for airport geocoding.

@@ -132,6 +132,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	var airportsFound int
 	useBuiltinAirports := cfg.Airports == nil || cfg.Airports.DisableBuiltInAirports == false
 	if useBuiltinAirports {
+		airportFiles += len(airports.AssetNames())
 		for _, file := range airports.AssetNames() {
 			d, err := airports.Asset(file)
 			if err != nil {
@@ -159,6 +160,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		if err != nil {
 			log.Fatalf("error scanning openaip directories: %s", err.Error())
 		}
+		airportFiles += len(files)
 		for _, file := range files {
 			openaipFile, err := openaip.ParseFile(file)
 			if err != nil {
@@ -175,13 +177,13 @@ func (c *TrackCmd) Run(ctx *Context) error {
 			log.Debugf("found %d airports in openaip file %s", len(acRecords), file)
 			airportsFound += len(acRecords)
 		}
-		airportFiles += len(files)
 	}
 	if cfg.Airports != nil && len(cfg.Airports.CupDirectories) > 0 {
 		files, err := fs.ScanDirectoriesForFiles("cup", cfg.Airports.CupDirectories)
 		if err != nil {
 			log.Fatalf("error scanning cup directories: %s", err.Error())
 		}
+		airportFiles += len(files)
 		for _, file := range files {
 			cupRecords, err := cup.ParseFile(file)
 			if err != nil {
@@ -198,7 +200,6 @@ func (c *TrackCmd) Run(ctx *Context) error {
 			log.Debugf("found %d airports in openaip file %s", len(acRecords), file)
 			airportsFound += len(acRecords)
 		}
-		airportFiles += len(files)
 	}
 	if airportFiles > 0 {
 		log.Infof("found %d airports in %d files", airportsFound, airportFiles)
