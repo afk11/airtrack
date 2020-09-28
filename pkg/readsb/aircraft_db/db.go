@@ -67,7 +67,6 @@ func (d *Db) GetOperator(code string) (*pb.Operator, bool) {
 	return &op, true
 }
 
-
 //easyjson:json
 type aircraftFile map[string][4]string
 
