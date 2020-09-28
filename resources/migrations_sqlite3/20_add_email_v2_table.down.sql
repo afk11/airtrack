@@ -1,1 +1,0 @@
-drop table `email_v2`;

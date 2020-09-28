@@ -1,1 +1,0 @@
-alter table session add with_transmission_types bool not null;
