@@ -192,7 +192,10 @@ func InitProject(cfg config.Project) (*Project, error) {
 					nil),
 				decls.NewIdent("state",
 					decls.NewObjectType("airtrack.State"),
-					nil)))
+					nil),
+				decls.NewVar("AdsbExchangeSource", decls.Int),
+				decls.NewVar("BeastSource", decls.Int),
+					))
 
 		if err != nil {
 			return nil, err

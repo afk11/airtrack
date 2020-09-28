@@ -157,6 +157,8 @@ type (
 
 	// BeastConfig contains configuration for a single BEAST server
 	BeastConfig struct {
+		// Name for this beast server
+		Name string `yaml:"name"`
 		// IP or hostname for beast server
 		Host string `yaml:"host"`
 		// Port for beast services (port 30005)

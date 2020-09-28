@@ -25,15 +25,64 @@ const (
 // of the legacy proto package is being used.
 const _ = proto.ProtoPackageIsVersion4
 
+// SourceType - enumeration of types of message producers
+type Source_SourceType int32
+
+const (
+	Source_AdsbExchange Source_SourceType = 0
+	Source_BeastServer  Source_SourceType = 1
+)
+
+// Enum value maps for Source_SourceType.
+var (
+	Source_SourceType_name = map[int32]string{
+		0: "AdsbExchange",
+		1: "BeastServer",
+	}
+	Source_SourceType_value = map[string]int32{
+		"AdsbExchange": 0,
+		"BeastServer":  1,
+	}
+)
+
+func (x Source_SourceType) Enum() *Source_SourceType {
+	p := new(Source_SourceType)
+	*p = x
+	return p
+}
+
+func (x Source_SourceType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Source_SourceType) Descriptor() protoreflect.EnumDescriptor {
+	return file_message_proto_enumTypes[0].Descriptor()
+}
+
+func (Source_SourceType) Type() protoreflect.EnumType {
+	return &file_message_proto_enumTypes[0]
+}
+
+func (x Source_SourceType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Source_SourceType.Descriptor instead.
+func (Source_SourceType) EnumDescriptor() ([]byte, []int) {
+	return file_message_proto_rawDescGZIP(), []int{0, 0}
+}
+
 // Source contains information about which receiver produced the message
 type Source struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Id   string `protobuf:"bytes,1,opt,name=Id,proto3" json:"Id,omitempty"`
-	Type string `protobuf:"bytes,2,opt,name=Type,proto3" json:"Type,omitempty"`
-	Url  string `protobuf:"bytes,3,opt,name=Url,proto3" json:"Url,omitempty"`
+	// Name - name of the producer. ADSB Exchange is 'adsbx'.
+	// Beast Servers use the name from the config entry.
+	Name string `protobuf:"bytes,1,opt,name=Name,proto3" json:"Name,omitempty"`
+	// Type - type of producer that produced this message
+	Type Source_SourceType `protobuf:"varint,2,opt,name=Type,proto3,enum=airtrack.Source_SourceType" json:"Type,omitempty"`
 }
 
 func (x *Source) Reset() {
@@ -68,25 +117,18 @@ func (*Source) Descriptor() ([]byte, []int) {
 	return file_message_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Source) GetId() string {
+func (x *Source) GetName() string {
 	if x != nil {
-		return x.Id
+		return x.Name
 	}
 	return ""
 }
 
-func (x *Source) GetType() string {
+func (x *Source) GetType() Source_SourceType {
 	if x != nil {
 		return x.Type
 	}
-	return ""
-}
-
-func (x *Source) GetUrl() string {
-	if x != nil {
-		return x.Url
-	}
-	return ""
+	return Source_AdsbExchange
 }
 
 // AircraftInfo represents an entry in the readsb database, containing
@@ -800,11 +842,15 @@ var File_message_proto protoreflect.FileDescriptor
 
 var file_message_proto_rawDesc = []byte{
 	0x0a, 0x0d, 0x6d, 0x65, 0x73, 0x73, 0x61, 0x67, 0x65, 0x2e, 0x70, 0x72, 0x6f, 0x74, 0x6f, 0x12,
-	0x08, 0x61, 0x69, 0x72, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x22, 0x3e, 0x0a, 0x06, 0x53, 0x6f, 0x75,
-	0x72, 0x63, 0x65, 0x12, 0x0e, 0x0a, 0x02, 0x49, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
-	0x02, 0x49, 0x64, 0x12, 0x12, 0x0a, 0x04, 0x54, 0x79, 0x70, 0x65, 0x18, 0x02, 0x20, 0x01, 0x28,
-	0x09, 0x52, 0x04, 0x54, 0x79, 0x70, 0x65, 0x12, 0x10, 0x0a, 0x03, 0x55, 0x72, 0x6c, 0x18, 0x03,
-	0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x55, 0x72, 0x6c, 0x22, 0x7e, 0x0a, 0x0c, 0x41, 0x69, 0x72,
+	0x08, 0x61, 0x69, 0x72, 0x74, 0x72, 0x61, 0x63, 0x6b, 0x22, 0x7e, 0x0a, 0x06, 0x53, 0x6f, 0x75,
+	0x72, 0x63, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x12, 0x2f, 0x0a, 0x04, 0x54, 0x79, 0x70, 0x65, 0x18,
+	0x02, 0x20, 0x01, 0x28, 0x0e, 0x32, 0x1b, 0x2e, 0x61, 0x69, 0x72, 0x74, 0x72, 0x61, 0x63, 0x6b,
+	0x2e, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x2e, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x54, 0x79,
+	0x70, 0x65, 0x52, 0x04, 0x54, 0x79, 0x70, 0x65, 0x22, 0x2f, 0x0a, 0x0a, 0x53, 0x6f, 0x75, 0x72,
+	0x63, 0x65, 0x54, 0x79, 0x70, 0x65, 0x12, 0x10, 0x0a, 0x0c, 0x41, 0x64, 0x73, 0x62, 0x45, 0x78,
+	0x63, 0x68, 0x61, 0x6e, 0x67, 0x65, 0x10, 0x00, 0x12, 0x0f, 0x0a, 0x0b, 0x42, 0x65, 0x61, 0x73,
+	0x74, 0x53, 0x65, 0x72, 0x76, 0x65, 0x72, 0x10, 0x01, 0x22, 0x7e, 0x0a, 0x0c, 0x41, 0x69, 0x72,
 	0x63, 0x72, 0x61, 0x66, 0x74, 0x49, 0x6e, 0x66, 0x6f, 0x12, 0x22, 0x0a, 0x0c, 0x52, 0x65, 0x67,
 	0x69, 0x73, 0x74, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
 	0x0c, 0x52, 0x65, 0x67, 0x69, 0x73, 0x74, 0x72, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x12, 0x1a, 0x0a,
@@ -967,23 +1013,26 @@ func file_message_proto_rawDescGZIP() []byte {
 	return file_message_proto_rawDescData
 }
 
+var file_message_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_message_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_message_proto_goTypes = []interface{}{
-	(*Source)(nil),       // 0: airtrack.Source
-	(*AircraftInfo)(nil), // 1: airtrack.AircraftInfo
-	(*Operator)(nil),     // 2: airtrack.Operator
-	(*Message)(nil),      // 3: airtrack.Message
-	(*State)(nil),        // 4: airtrack.State
+	(Source_SourceType)(0), // 0: airtrack.Source.SourceType
+	(*Source)(nil),         // 1: airtrack.Source
+	(*AircraftInfo)(nil),   // 2: airtrack.AircraftInfo
+	(*Operator)(nil),       // 3: airtrack.Operator
+	(*Message)(nil),        // 4: airtrack.Message
+	(*State)(nil),          // 5: airtrack.State
 }
 var file_message_proto_depIdxs = []int32{
-	0, // 0: airtrack.Message.Source:type_name -> airtrack.Source
-	1, // 1: airtrack.State.Info:type_name -> airtrack.AircraftInfo
-	2, // 2: airtrack.State.Operator:type_name -> airtrack.Operator
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	0, // 0: airtrack.Source.Type:type_name -> airtrack.Source.SourceType
+	1, // 1: airtrack.Message.Source:type_name -> airtrack.Source
+	2, // 2: airtrack.State.Info:type_name -> airtrack.AircraftInfo
+	3, // 3: airtrack.State.Operator:type_name -> airtrack.Operator
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_message_proto_init() }
@@ -1058,13 +1107,14 @@ func file_message_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_message_proto_rawDesc,
-			NumEnums:      0,
+			NumEnums:      1,
 			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},
 		GoTypes:           file_message_proto_goTypes,
 		DependencyIndexes: file_message_proto_depIdxs,
+		EnumInfos:         file_message_proto_enumTypes,
 		MessageInfos:      file_message_proto_msgTypes,
 	}.Build()
 	File_message_proto = out.File

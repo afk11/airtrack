@@ -1577,6 +1577,8 @@ func checkIfPassesFilter(prg cel.Program, msg *pb.Message, state *pb.State) (boo
 	out, _, err := prg.Eval(map[string]interface{}{
 		"msg":   msg,
 		"state": state,
+		"AdsbExchangeSource": pb.Source_AdsbExchange,
+		"BeastSource": pb.Source_BeastServer,
 	})
 	if err != nil {
 		return false, err

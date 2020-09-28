@@ -12,8 +12,8 @@ import (
 	"time"
 )
 
-var sbs1Source = &pb.Source{
-	Type: "sbs1",
+var beastSource = &pb.Source{
+	Type: pb.Source_BeastServer,
 }
 var basicOptions = Options{
 	SightingTimeout:         time.Second * 30,
@@ -79,7 +79,7 @@ func TestTracker(t *testing.T) {
 		proj, err := InitProject(projCfg)
 		assert.NoError(t, err)
 		err = doTest(opt, proj, func(tr *Tracker) error {
-			p := pb.Message{Source: sbs1Source, Icao: "444444"}
+			p := pb.Message{Source: beastSource, Icao: "444444"}
 			now := time.Now()
 			s := tr.getSighting(p.Icao)
 			defer s.mu.Unlock()

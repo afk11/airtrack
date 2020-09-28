@@ -4,9 +4,16 @@ option go_package = "github.com/afk11/airtrack/pkg/pb";
 
 // Source contains information about which receiver produced the message
 message Source {
-  string Id = 1;
-  string Type = 2;
-  string Url = 3;
+  // SourceType - enumeration of types of message producers
+  enum SourceType {
+    AdsbExchange = 0;
+    BeastServer = 1;
+  }
+  // Name - name of the producer. ADSB Exchange is 'adsbx'.
+  // Beast Servers use the name from the config entry.
+  string Name = 1;
+  // Type - type of producer that produced this message
+  SourceType Type = 2;
 };
 // AircraftInfo represents an entry in the readsb database, containing
 // information about the aircraft

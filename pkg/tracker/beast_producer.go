@@ -15,6 +15,7 @@ import (
 // This type represents a connection to a beast server.
 type BeastProducer struct {
 	host      string
+	name      string
 	port      uint16
 	decoder   *readsb.Decoder
 	messages  chan *pb.Message
@@ -23,18 +24,19 @@ type BeastProducer struct {
 }
 
 // NewBeastProducer initializes a new BeastProducer.
-func NewBeastProducer(msgs chan *pb.Message, host string, port uint16) *BeastProducer {
+func NewBeastProducer(msgs chan *pb.Message, host string, port uint16, name string) *BeastProducer {
 	return &BeastProducer{
 		messages: msgs,
 		host:     host,
 		port:     port,
+		name:     name,
 		decoder:  readsb.NewDecoder(),
 	}
 }
 
 // Name - see Producer.Name()
 func (p *BeastProducer) Name() string {
-	return fmt.Sprintf("beast(%s:%d)", p.host, p.port)
+	return p.name
 }
 
 // Start - see Producer.Start()
@@ -68,7 +70,10 @@ func (p *BeastProducer) trackPeriodicUpdate(ctx context.Context) {
 // converted and sent over the messages channel.
 func (p *BeastProducer) producer(ctx context.Context) {
 	defer p.wg.Done()
-
+	source := pb.Source{
+		Type: pb.Source_BeastServer,
+		Name: p.name,
+	}
 	for {
 		// Connect to server (with a timeout). If an error is returned,
 		// wait 30 seconds and try again.
@@ -136,6 +141,7 @@ func (p *BeastProducer) producer(ctx context.Context) {
 
 				proto := &pb.Message{
 					Icao: msg.GetIcaoHex(),
+					Source: &source,
 				}
 				if category, err := ac.GetCategory(); err == nil {
 					proto.HaveCategory = true

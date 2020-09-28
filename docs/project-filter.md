@@ -50,6 +50,22 @@ The following filter ensures only Eurocopter EC135 aircraft will be tracked:
 
     has(state.Info) && state.Info.Type == "EC35"
 
+To only process aircraft messages from ADSB Exchange:
+
+    msg.Source.Type == AdsbExchangeSource
+
+To only process messages from a home BEAST server:
+
+    msg.Source.Type == BeastSource && msg.Source.Name == "home"
+
+# Constants
+
+The following constants can be used in filter expressions:
+
+ - Type: `Source.SourceType`.
+   - `AdsbExchangeSource`: message source was ADSB Exchange
+   - `BeastSource`: message source was a BEAST server
+
 # Definitions
 
 The definition for these structures is here:
@@ -60,9 +76,16 @@ option go_package = "github.com/afk11/airtrack/pkg/pb";
 
 // Source contains information about which receiver produced the message
 message Source {
-  string Id = 1;
-  string Type = 2;
-  string Url = 3;
+  // SourceType - enumeration of types of message producers
+  enum SourceType {
+    AdsbExchange = 0;
+    BeastServer = 1;
+  }
+  // Name - name of the producer. ADSB Exchange is 'adsbx'.
+  // Beast Servers use the name from the config entry.
+  string Name = 1;
+  // Type - type of producer that produced this message
+  SourceType Type = 2;
 };
 // AircraftInfo represents an entry in the readsb database, containing
 // information about the aircraft

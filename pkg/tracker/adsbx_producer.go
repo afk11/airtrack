@@ -166,9 +166,8 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 	normalWait := time.Second * 2
 	wait := normalWait
 	src := &pb.Source{
-		Id:   "1",
-		Type: "adsbx",
-		Url:  p.url,
+		Type: pb.Source_AdsbExchange,
+		Name: "adsbx",
 	}
 	client := &http.Client{
 		Transport: &http.Transport{

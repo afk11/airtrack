@@ -255,8 +255,13 @@ func (c *TrackCmd) Run(ctx *Context) error {
 				readsb.IcaoFilterExpire()
 			}
 		}()
-		for _, bcfg := range cfg.Beast {
-			producers = append(producers, tracker.NewBeastProducer(msgs, bcfg.Host, bcfg.Port))
+		for i, bcfg := range cfg.Beast {
+			if bcfg.Name == "" {
+				return errors.Errorf("beast server %d is missing name field", i)
+			} else if bcfg.Host == "" {
+				return errors.Errorf("beast server '%s' is missing host field", bcfg.Name)
+			}
+			producers = append(producers, tracker.NewBeastProducer(msgs, bcfg.Host, bcfg.Port, bcfg.Name))
 		}
 	}
 
