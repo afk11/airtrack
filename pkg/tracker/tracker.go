@@ -504,13 +504,13 @@ func (t *Tracker) AddProject(p *Project) error {
 		return errors.Errorf("geocoder must be available for %s feature to work", GeocodeEndpoints)
 	}
 
-	site, err := t.database.LoadCollectionSite(p.Name)
+	site, err := t.database.LoadProject(p.Name)
 	if err == sql.ErrNoRows {
-		_, err := t.database.NewCollectionSite(p.Name, time.Now())
+		_, err := t.database.NewProject(p.Name, time.Now())
 		if err != nil {
 			return errors.Wrap(err, "create new project")
 		}
-		site, err = t.database.LoadCollectionSite(p.Name)
+		site, err = t.database.LoadProject(p.Name)
 		if err != nil {
 			return errors.Wrap(err, "load new project")
 		}
@@ -522,7 +522,7 @@ func (t *Tracker) AddProject(p *Project) error {
 	if err != nil {
 		return errors.Wrap(err, "failed to generate session id")
 	}
-	_, err = t.database.NewCollectionSession(site, sessId.String(),
+	_, err = t.database.NewSession(site, sessId.String(),
 		p.IsFeatureEnabled(TrackSquawks), p.IsFeatureEnabled(TrackTxTypes), p.IsFeatureEnabled(TrackCallSigns))
 	if err != nil {
 		return errors.Wrap(err, "create session record")

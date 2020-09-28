@@ -32,7 +32,7 @@ type (
 	Session struct {
 		Id                    uint64     `db:"id"`
 		Identifier            string     `db:"identifier"`
-		CollectionSiteId      uint64     `db:"project_id"`
+		ProjectId             uint64     `db:"project_id"`
 		ClosedAt              *time.Time `db:"closed_at"`
 		CreatedAt             time.Time  `db:"created_at"`
 		UpdatedAt             time.Time  `db:"updated_at"`
@@ -50,11 +50,11 @@ type (
 	}
 
 	Sighting struct {
-		Id                  uint64  `db:"id"`
-		CollectionSiteId    uint64  `db:"project_id"`
-		CollectionSessionId uint64  `db:"session_id"`
-		AircraftId          uint64  `db:"aircraft_id"`
-		CallSign            *string `db:"callsign"`
+		Id         uint64  `db:"id"`
+		ProjectId  uint64  `db:"project_id"`
+		SessionId  uint64  `db:"session_id"`
+		AircraftId uint64  `db:"aircraft_id"`
+		CallSign   *string `db:"callsign"`
 
 		CreatedAt time.Time  `db:"created_at"`
 		UpdatedAt time.Time  `db:"updated_at"`
@@ -156,9 +156,9 @@ func CheckRowsUpdated(res sql.Result, expectAffected int64) error {
 
 type Database interface {
 	Transaction(f func(tx *sqlx.Tx) error) error
-	NewCollectionSite(siteName string, now time.Time) (sql.Result, error)
-	LoadCollectionSite(siteName string) (*Project, error)
-	NewCollectionSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
+	NewProject(siteName string, now time.Time) (sql.Result, error)
+	LoadProject(siteName string) (*Project, error)
+	NewSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
 	LoadSessionByIdentifier(site *Project, identifier string) (*Session, error)
 	CloseSession(session *Session) (sql.Result, error)
 	LoadAircraftByIcao(icao string) (*Aircraft, error)
@@ -202,7 +202,7 @@ func NewDatabase(db *sqlx.DB, dialect goqu.DialectWrapper) *DatabaseImpl {
 func (d *DatabaseImpl) Transaction(f func(tx *sqlx.Tx) error) error {
 	return NewTxExecer(d.db, f).Exec()
 }
-func (d *DatabaseImpl) NewCollectionSite(siteName string, now time.Time) (sql.Result, error) {
+func (d *DatabaseImpl) NewProject(siteName string, now time.Time) (sql.Result, error) {
 	q := d.dialect.
 		Insert("project").
 		Prepared(true).
@@ -215,7 +215,7 @@ func (d *DatabaseImpl) NewCollectionSite(siteName string, now time.Time) (sql.Re
 	return d.db.Exec(s, p...)
 }
 
-func (d *DatabaseImpl) LoadCollectionSite(siteName string) (*Project, error) {
+func (d *DatabaseImpl) LoadProject(siteName string) (*Project, error) {
 	q := d.dialect.
 		From("project").
 		Prepared(true).
@@ -232,7 +232,7 @@ func (d *DatabaseImpl) LoadCollectionSite(siteName string) (*Project, error) {
 	}
 	return &site, err
 }
-func (d *DatabaseImpl) NewCollectionSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
+func (d *DatabaseImpl) NewSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
 		Insert("session").
@@ -256,7 +256,7 @@ func (d *DatabaseImpl) LoadSessionByIdentifier(site *Project, identifier string)
 		Prepared(true).
 		Where(goqu.Ex{
 			"project_id": site.Id,
-			"identifier":         identifier,
+			"identifier": identifier,
 		}).
 		ToSQL()
 	if err != nil {
@@ -345,7 +345,7 @@ func (d *DatabaseImpl) CreateSighting(session *Session, ac *Aircraft) (sql.Resul
 		Insert("sighting").
 		Prepared(true).
 		Cols("project_id", "session_id", "aircraft_id", "created_at", "updated_at").
-		Vals(goqu.Vals{session.CollectionSiteId, session.Id, ac.Id, &now, &now}).
+		Vals(goqu.Vals{session.ProjectId, session.Id, ac.Id, &now, &now}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -358,7 +358,7 @@ func (d *DatabaseImpl) CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircr
 		Insert("sighting").
 		Prepared(true).
 		Cols("project_id", "session_id", "aircraft_id", "created_at", "updated_at").
-		Vals(goqu.Vals{session.CollectionSiteId, session.Id, ac.Id, &now, &now}).
+		Vals(goqu.Vals{session.ProjectId, session.Id, ac.Id, &now, &now}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -408,8 +408,8 @@ func (d *DatabaseImpl) LoadLastSighting(session *Session, ac *Aircraft) (*Sighti
 		From("sighting").
 		Prepared(true).
 		Where(goqu.Ex{
-			"session_id": session.Id,
-			"aircraft_id":           ac.Id,
+			"session_id":  session.Id,
+			"aircraft_id": ac.Id,
 		}).
 		Order(goqu.C("id").Desc()).
 		Limit(1).
@@ -433,8 +433,8 @@ func (d *DatabaseImpl) LoadLastSightingTx(tx *sqlx.Tx, session *Session, ac *Air
 		From("sighting").
 		Prepared(true).
 		Where(goqu.Ex{
-			"session_id": session.Id,
-			"aircraft_id":           ac.Id,
+			"session_id":  session.Id,
+			"aircraft_id": ac.Id,
 		}).
 		Order(goqu.C("id").Desc()).
 		Limit(1).
