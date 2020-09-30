@@ -41,6 +41,7 @@ import (
 type TrackCmd struct {
 	Verbosity  string `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
 	CPUProfile string `help:"Write CPU profile to file"`
+	HeapProfile string `help:"Write heap profile to file"`
 }
 
 func (c *TrackCmd) Run(ctx *Context) error {
@@ -365,6 +366,23 @@ func (c *TrackCmd) Run(ctx *Context) error {
 			return err
 		}
 		defer pprof.StopCPUProfile()
+	}
+	if c.HeapProfile != "" {
+		go func() {
+			i := 0
+			for {
+				<-time.After(10*time.Second)
+				f, err := os.Create(fmt.Sprintf("%s-%d", c.HeapProfile, i))
+				if err != nil {
+					panic(err)
+				}
+				err = pprof.WriteHeapProfile(f)
+				if err != nil {
+					panic(err)
+				}
+				i++
+			}
+		}()
 	}
 
 	for _, producer := range producers {
