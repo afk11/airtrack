@@ -45,6 +45,7 @@ func (e *jsonDecodeError) Error() string {
 type AdsbxProducer struct {
 	url                 string
 	apikey              string
+	panicIfStuck        bool
 	messages            chan *pb.Message
 	wg                  sync.WaitGroup
 	numReqs             int
@@ -61,6 +62,9 @@ func NewAdsbxProducer(msgs chan *pb.Message, url string, apikey string) *AdsbxPr
 		apikey:              apikey,
 	}
 }
+func (p *AdsbxProducer) PanicIfStuck(stop bool) {
+	p.panicIfStuck = stop
+}
 
 // GetAdsbx performs a HTTP request to ADSB Exchange and sends
 // messages over the msgs channel.
@@ -69,19 +73,20 @@ func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs 
 	cancelled := make(chan bool)
 	p.numReqs++
 	numReq := p.numReqs
-	defer func() {
-		cancelled <- true
-	}()
-
-	go func() {
-		select {
-		case <-time.After(time.Minute):
-			panic(fmt.Errorf("adsbx request (%d) running after 1 minute", numReq))
-		case <-cancelled:
-			log.Debugf("adsbx request (%d) terminated normally after %s", numReq, time.Since(start))
-			break
-		}
-	}()
+	if p.panicIfStuck {
+		defer func() {
+			cancelled <- true
+		}()
+		go func() {
+			select {
+			case <-time.After(time.Minute):
+				panic(fmt.Errorf("adsbx request (%d) running after 1 minute", numReq))
+			case <-cancelled:
+				log.Debugf("adsbx request (%d) terminated normally after %s", numReq, time.Since(start))
+				break
+			}
+		}()
+	}
 
 	msg := &AdsbxAircraftResponse{}
 	var body []byte

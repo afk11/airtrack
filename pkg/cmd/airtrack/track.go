@@ -243,7 +243,10 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		if cfg.AdsbxConfig.ApiKey != "" {
 			adsbxApiKey = cfg.AdsbxConfig.ApiKey
 		}
-		producers = append(producers, tracker.NewAdsbxProducer(msgs, adsbxEndpoint, adsbxApiKey))
+		p := tracker.NewAdsbxProducer(msgs, adsbxEndpoint, adsbxApiKey)
+		v, ok := os.LookupEnv("AIRTRACK_ADSBX_PANIC_IF_STUCK")
+		p.PanicIfStuck(!ok || (v == "true" || v == "1" || v == "y" || v == "Y"))
+		producers = append(producers, p)
 	}
 	if len(cfg.Beast) > 0 {
 		// readsb library housekeeping

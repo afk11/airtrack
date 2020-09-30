@@ -100,15 +100,15 @@ func LoadAssets(db *Db, Asset func(string) ([]byte, error)) error {
 		if err != nil {
 			return errors.Wrapf(err, "unmarshal %s.json", filePrefix)
 		}
-		for icaoSuffix, ac := range tmp {
+		for icaoSuffix := range tmp {
 			if icaoSuffix == "children" {
 				continue
 			}
 			db.aircraft[filePrefix+icaoSuffix] = pb.AircraftInfo{
-				Registration: ac[0],
-				TypeCode:     ac[1],
-				F:            ac[2],
-				Description:  ac[3],
+				Registration: tmp[icaoSuffix][0],
+				TypeCode:     tmp[icaoSuffix][1],
+				F:            tmp[icaoSuffix][2],
+				Description:  tmp[icaoSuffix][3],
 			}
 		}
 	}
@@ -122,11 +122,11 @@ func LoadAssets(db *Db, Asset func(string) ([]byte, error)) error {
 	if err != nil {
 		return errors.Wrapf(err, "unmarshal operators.json")
 	}
-	for code, operator := range operators {
+	for code := range operators {
 		db.operators[code] = pb.Operator{
-			Name:        operator.Name,
-			CountryName: operator.Country,
-			R:           operator.R,
+			Name:        operators[code].Name,
+			CountryName: operators[code].Country,
+			R:           operators[code].R,
 		}
 	}
 	db.initialized = true
