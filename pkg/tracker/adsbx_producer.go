@@ -18,6 +18,8 @@ import (
 const (
 	// DefaultAdsbxEndpoint - the default URL to use
 	DefaultAdsbxEndpoint = "https://adsbexchange.com/api/aircraft/json/"
+	//curl -H 'api-auth: abcd' https://adsbexchange.com/api/aircraft/v2/all | jq -r '.ac[] | select(.hex == "4ca13f")'
+	//curl -H 'api-auth: abcd' https://adsbexchange.com/api/aircraft/json   | jq -r '.ac[] | select(.icao == "4CA13F")'
 )
 
 // jsonDecodeError is a custom error type used to indicate
