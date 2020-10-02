@@ -39,12 +39,20 @@ import (
 )
 
 type TrackCmd struct {
-	Verbosity  string `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
-	CPUProfile string `help:"Write CPU profile to file"`
-	HeapProfile string `help:"Write heap profile to file"`
+	Config      string   `help:"Configuration file path"`
+	Projects    []string `help:"Projects configuration file (may be repeated, and in addition to main configuration file)"`
+	Verbosity   string   `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
+	CPUProfile  string   `help:"Write CPU profile to file"`
+	HeapProfile string   `help:"Write heap profile to file"`
 }
 
-func (c *TrackCmd) Run(ctx *Context) error {
+func (c *TrackCmd) Run() error {
+	// Call the Run() method of the selected parsed command.
+	cfg, err := config.ReadConfigs(c.Config, c.Projects)
+	if err != nil {
+		return err
+	}
+
 	level, err := log.ParseLevel(c.Verbosity)
 	if err != nil {
 		return errors.Wrapf(err, "invalid log verbosity level")
@@ -62,7 +70,6 @@ func (c *TrackCmd) Run(ctx *Context) error {
 	var gracefulReload = make(chan os.Signal)
 	signal.Notify(gracefulReload, syscall.SIGHUP)
 
-	cfg := ctx.Config
 	loc, err := cfg.GetTimeLocation()
 	if err != nil {
 		return err
@@ -371,7 +378,7 @@ func (c *TrackCmd) Run(ctx *Context) error {
 		go func() {
 			i := 0
 			for {
-				<-time.After(10*time.Second)
+				<-time.After(10 * time.Second)
 				f, err := os.Create(fmt.Sprintf("%s-%d", c.HeapProfile, i))
 				if err != nil {
 					panic(err)

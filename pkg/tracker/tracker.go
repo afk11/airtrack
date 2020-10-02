@@ -1575,10 +1575,10 @@ func checkIfPassesFilter(prg cel.Program, msg *pb.Message, state *pb.State) (boo
 	defer filterTimer.ObserveDuration()
 
 	out, _, err := prg.Eval(map[string]interface{}{
-		"msg":   msg,
-		"state": state,
+		"msg":                msg,
+		"state":              state,
 		"AdsbExchangeSource": pb.Source_AdsbExchange,
-		"BeastSource": pb.Source_BeastServer,
+		"BeastSource":        pb.Source_BeastServer,
 	})
 	if err != nil {
 		return false, err

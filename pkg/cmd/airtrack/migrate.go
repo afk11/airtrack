@@ -24,24 +24,33 @@ import (
 
 type (
 	MigrateUpCmd struct {
-		Force bool `help:"Proceed with task without user confirmation'"`
+		Config string `help:"Configuration file path"`
+		Force  bool   `help:"Proceed with task without user confirmation'"`
 	}
 	MigrateDownCmd struct {
-		Force bool `help:"Proceed with task without user confirmation'"`
+		Config string `help:"Configuration file path"`
+		Force  bool   `help:"Proceed with task without user confirmation'"`
 	}
 	MigrateStepsCmd struct {
-		Force bool `help:"Proceed with task without user confirmation'"`
-		N     int  `help:"how many migrations up (if positive), or down (if negative)"`
+		Config string `help:"Configuration file path"`
+		Force  bool   `help:"Proceed with task without user confirmation'"`
+		N      int    `help:"how many migrations up (if positive), or down (if negative)"`
 	}
 )
 
-func (c *MigrateUpCmd) Run(ctx *Context) error {
-	loc, err := ctx.Config.GetTimeLocation()
+func (c *MigrateUpCmd) Run() error {
+	// Call the Run() method of the selected parsed command.
+	cfg, err := config.ReadConfigFromFile(c.Config)
+	if err != nil {
+		panic(err)
+	}
+
+	loc, err := cfg.GetTimeLocation()
 	if err != nil {
 		return err
 	}
 
-	m, err := initMigrations(&ctx.Config.Database, loc)
+	m, err := initMigrations(&cfg.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -60,13 +69,18 @@ func (c *MigrateUpCmd) Run(ctx *Context) error {
 	return nil
 }
 
-func (c *MigrateDownCmd) Run(ctx *Context) error {
-	loc, err := ctx.Config.GetTimeLocation()
+func (c *MigrateDownCmd) Run() error {
+	// Call the Run() method of the selected parsed command.
+	cfg, err := config.ReadConfigFromFile(c.Config)
+	if err != nil {
+		panic(err)
+	}
+	loc, err := cfg.GetTimeLocation()
 	if err != nil {
 		return err
 	}
 
-	m, err := initMigrations(&ctx.Config.Database, loc)
+	m, err := initMigrations(&cfg.Database, loc)
 	if err != nil {
 		return err
 	}
@@ -85,16 +99,21 @@ func (c *MigrateDownCmd) Run(ctx *Context) error {
 	return nil
 }
 
-func (c *MigrateStepsCmd) Run(ctx *Context) error {
+func (c *MigrateStepsCmd) Run() error {
 	if c.N == 0 {
 		return errors.Errorf("cannot set n=0 (stay where we are)")
 	}
-	loc, err := ctx.Config.GetTimeLocation()
+	// Call the Run() method of the selected parsed command.
+	cfg, err := config.ReadConfigFromFile(c.Config)
+	if err != nil {
+		panic(err)
+	}
+	loc, err := cfg.GetTimeLocation()
 	if err != nil {
 		return err
 	}
 
-	m, err := initMigrations(&ctx.Config.Database, loc)
+	m, err := initMigrations(&cfg.Database, loc)
 	if err != nil {
 		return err
 	}
