@@ -70,3 +70,17 @@ func Parse(contents io.Reader) ([][]string, error) {
 
 	return records[1:], nil
 }
+
+func ExtractCupRecords(records [][]string) ([]geo.AirportRecord, error) {
+	var airports []geo.AirportRecord
+	// we unmarshal our byteArray which contains our
+	// xmlFiles content into 'aip' which we defined above
+	for _, airport := range records {
+		acRecord, err := cup.FromCupCsvRecord(airport)
+		if err != nil {
+			return nil, err
+		}
+		airports = append(airports, *acRecord)
+	}
+	return airports, nil
+}

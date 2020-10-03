@@ -267,16 +267,16 @@ func (l *Loader) Load(c *TrackCmd) error {
 			log.Fatalf("error scanning openaip directories: %s", err.Error())
 		}
 		airportFiles += len(files)
-		for _, file := range files {
-			d, err := ioutil.ReadFile(file)
+		for i := range files {
+			d, err := ioutil.ReadFile(files[i])
 			if err != nil {
-				return errors.Wrapf(err, "loading openaip airport file: %s", file)
+				return errors.Wrapf(err, "loading openaip airport file: %s", files[i])
 			}
 			numAcRecords, err := ExtractOpenAipFile(nearestAirports, d)
 			if err != nil {
-				return errors.Wrapf(err, "processing openaip airport file: %s", file)
+				return errors.Wrapf(err, "processing openaip airport file: %s", files[i])
 			}
-			log.Debugf("found %d airports in openaip file %s", numAcRecords, file)
+			log.Debugf("found %d airports in openaip file %s", numAcRecords, files[i])
 			airportsFound += numAcRecords
 		}
 	}
@@ -286,20 +286,20 @@ func (l *Loader) Load(c *TrackCmd) error {
 			log.Fatalf("error scanning cup directories: %s", err.Error())
 		}
 		airportFiles += len(files)
-		for _, file := range files {
-			cupRecords, err := cup.ParseFile(file)
+		for i := range files {
+			cupRecords, err := cup.ParseFile(files[i])
 			if err != nil {
-				return errors.Wrapf(err, "error reading openaip file: %s", file)
+				return errors.Wrapf(err, "error reading openaip file: %s", files[i])
 			}
-			acRecords, err := openaip.ExtractCupRecords(cupRecords)
+			acRecords, err := cup.ExtractCupRecords(cupRecords)
 			if err != nil {
-				return errors.Wrapf(err, "extracting cup records: %s", file)
+				return errors.Wrapf(err, "extracting cup records: %s", files[i])
 			}
 			err = nearestAirports.Register(acRecords)
 			if err != nil {
-				return errors.Wrapf(err, "registering airports from cup file: %s", file)
+				return errors.Wrapf(err, "registering airports from cup file: %s", files[i])
 			}
-			log.Debugf("found %d airports in openaip file %s", len(acRecords), file)
+			log.Debugf("found %d airports in openaip file %s", len(acRecords), files[i])
 			airportsFound += len(acRecords)
 		}
 	}
@@ -353,9 +353,8 @@ func (l *Loader) Load(c *TrackCmd) error {
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		l.metricsServer = &http.Server{
-			Addr:    fmt.Sprintf(":%d", prometheusPort),
-			Handler: mux,
-			// Good practice: enforce timeouts for servers you create!
+			Addr:         fmt.Sprintf(":%d", prometheusPort),
+			Handler:      mux,
 			WriteTimeout: 15 * time.Second,
 			ReadTimeout:  15 * time.Second,
 		}
