@@ -2,7 +2,6 @@ package tar1090
 
 import (
 	"encoding/json"
-	"fmt"
 	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
 	"github.com/afk11/airtrack/pkg/tracker"
 	"github.com/gorilla/mux"
@@ -226,12 +225,13 @@ func (t *Map) RegisterRoutes(r *mux.Router) error {
 	}
 	return nil
 }
+
+// ReceiverJsonHandler implements the HTTP handler for receiver.json
 func (t *Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectName := vars["project"]
 	count, err := t.h.GetHistoryCount(projectName)
 	if err != nil {
-		fmt.Println("UNKNOWN PROJECT - receiver handler")
 		w.WriteHeader(404)
 		return
 	}
@@ -242,6 +242,8 @@ func (t *Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 }
+
+// AircraftJsonHandler implements the HTTP handler for aircraft.json
 func (t *Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	err := t.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JsonAircraft) error {
@@ -264,6 +266,8 @@ func (t *Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 }
+
+// HistoryJsonHandler implements the HTTP handler for history_%n.json
 func (t *Map) HistoryJsonHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectName := vars["project"]
