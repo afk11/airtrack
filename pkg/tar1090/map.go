@@ -14,20 +14,28 @@ import (
 	"time"
 )
 
+// ProjectHistory contains an in-memory store of history
+// files for a particular project.
 type ProjectHistory struct {
 	// nextIdx counts from zero to maxHistory. When nextIdx == maxHistory
-	// it gets reset to zero
-	nextIdx    int
+	// it gets reset to zero so old files are overwritten.
+	nextIdx int
+	// historyLen increases until it reaches maxHistory
 	historyLen int
-	history    [][]byte
+	// history - the list of JSON files (contains at most maxHistory)
+	history [][]byte
 }
 
+// newProjectHistory initializes the history store for a project
+// containing at most maxHistory files.
 func newProjectHistory(maxHistory int) *ProjectHistory {
 	ph := &ProjectHistory{
 		history: make([][]byte, maxHistory),
 	}
 	return ph
 }
+
+// AddNextFile takes a new history data and adds it to the store.
 func (ph *ProjectHistory) AddNextFile(maxHistory int, data []byte) error {
 	if ph.nextIdx == maxHistory {
 		ph.nextIdx = 0
@@ -40,18 +48,27 @@ func (ph *ProjectHistory) AddNextFile(maxHistory int, data []byte) error {
 	return nil
 }
 
+// History contains ProjectHistory structures for all projects
 type History struct {
+	// maxHistory - max history files to store for each project
 	maxHistory int
-	history    map[string]*ProjectHistory
-	mu         sync.RWMutex
+	// history - map of project name to ProjectHistory
+	history map[string]*ProjectHistory
+	// mu - read/write access over history map
+	mu sync.RWMutex
 }
 
+// NewHistory returns a History initialized to store maxHistory
+// files per project.
 func NewHistory(maxHistory int) *History {
 	return &History{
 		maxHistory: maxHistory,
 		history:    make(map[string]*ProjectHistory),
 	}
 }
+
+// SaveAircraftFile takes a new history data and adds it to the
+// projects history.
 func (h *History) SaveAircraftFile(project string, data []byte) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -62,6 +79,9 @@ func (h *History) SaveAircraftFile(project string, data []byte) error {
 	}
 	return hist.AddNextFile(h.maxHistory, data)
 }
+
+// GetHistoryCount returns the number of history files the project currently
+// has, or returns an error if the project is unknown.
 func (h *History) GetHistoryCount(project string) (int, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -72,65 +92,37 @@ func (h *History) GetHistoryCount(project string) (int, error) {
 	}
 	return hist.historyLen, nil
 }
-func (h *History) GetHistoryFile(project string, file int64) ([]byte, error) {
+
+// GetHistoryFile returns n'th history file for project, or returns
+// an error if the project is unknown or the history file is invalid.
+func (h *History) GetHistoryFile(project string, n int64) ([]byte, error) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	hist, ok := h.history[project]
 	if !ok {
 		return nil, errors.New("unknown project")
 	}
-	if file > int64(hist.historyLen) {
+	if n > int64(hist.historyLen) {
 		return nil, errors.New("history file is out of range")
 	}
 
-	return hist.history[file], nil
+	return hist.history[n], nil
 }
 
-type HistoryUpdateScheduler struct {
-	m tracker.MapAccess
-	h *History
-}
-
-func (s *HistoryUpdateScheduler) UpdateHistory(projects []string) error {
-	var data []byte
-	for _, project := range projects {
-		err := s.m.GetProjectAircraft(project, func(messageCount int64, fields []*tracker.JsonAircraft) error {
-			ac := jsonAircraft{
-				Now:      float64(time.Now().Unix()),
-				Messages: messageCount,
-				Aircraft: fields,
-			}
-			var err error
-			data, err = json.Marshal(ac)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		if err == tracker.UnknownProject {
-			panic(err)
-		} else if err != nil {
-			panic(err)
-		}
-		err = s.h.SaveAircraftFile(project, data)
-		if err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
+// jsonAircraft defines the JSON structure returned for aircraft.json
 type jsonAircraft struct {
 	Now      float64                 `json:"now"`
 	Messages int64                   `json:"messages"`
 	Aircraft []*tracker.JsonAircraft `json:"aircraft"`
 }
 
+// assetResponseHandler provides a HTTP handler to serve a static asset
 type assetResponseHandler struct {
 	name   string
 	loader func(string) ([]byte, error)
 }
 
+// responseHandler responds with the asset
 func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
 	dat, err := h.loader(h.name)
 	if err != nil {
@@ -152,6 +144,7 @@ func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// NewTar1090Map returns a new Map.
 func NewTar1090Map(ma tracker.MapAccess, maxHistory int) *Map {
 	return &Map{
 		m: ma,
@@ -159,18 +152,49 @@ func NewTar1090Map(ma tracker.MapAccess, maxHistory int) *Map {
 	}
 }
 
+// Map - provides the tar1090 map. Implements MapService.
 type Map struct {
 	m tracker.MapAccess
 	h *History
 }
 
+// MapService returns the name of the map service. See MapService.MapService.
 func (t *Map) MapService() string {
 	return "tar1090"
 }
-func (t *Map) UpdateScheduler() tracker.MapHistoryUpdateScheduler {
-	return &HistoryUpdateScheduler{t.m, t.h}
+
+// UpdateHistory generates a new history file for each project in projNames.
+// See MapService.UpdateHistory.
+func (t *Map) UpdateHistory(projNames []string) error {
+	var data []byte
+	for i := range projNames {
+		err := t.m.GetProjectAircraft(projNames[i], func(messageCount int64, fields []*tracker.JsonAircraft) error {
+			ac := jsonAircraft{
+				Now:      float64(time.Now().Unix()),
+				Messages: messageCount,
+				Aircraft: fields,
+			}
+			var err error
+			data, err = json.Marshal(ac)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		if err == tracker.UnknownProject {
+			panic(err)
+		} else if err != nil {
+			panic(err)
+		}
+		err = t.h.SaveAircraftFile(projNames[i], data)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
+// RegisterRoutes registers handler functions for tar1090 routes on r.
 func (t *Map) RegisterRoutes(r *mux.Router) error {
 	r.HandleFunc("/{project}/data/aircraft.json", t.AircraftJsonHandler)
 	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJsonHandler)

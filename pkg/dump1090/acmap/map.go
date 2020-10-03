@@ -10,13 +10,26 @@ import (
 	"time"
 )
 
-type HistoryUpdateScheduler struct {
+// NewDump1090Map returns a new Dump1090Map.
+func NewDump1090Map(ma tracker.MapAccess) *Dump1090Map {
+	return &Dump1090Map{m: ma}
+}
+
+// Dump1090Map. Implements tracker.MapService.
+type Dump1090Map struct {
 	m tracker.MapAccess
 }
 
-func (s *HistoryUpdateScheduler) UpdateHistory(projects []string) error {
-	for _, project := range projects {
-		err := s.m.GetProjectAircraft(project, func(messageCount int64, fields []*tracker.JsonAircraft) error {
+// MapService returns the name of this map service. See MapService.MapService.
+func (d *Dump1090Map) MapService() string {
+	return "dump1090"
+}
+
+// UpdateHistory generates a new history file the provided projNames.
+// See MapService.UpdateHistory.
+func (d *Dump1090Map) UpdateHistory(projNames []string) error {
+	for i := range projNames {
+		err := d.m.GetProjectAircraft(projNames[i], func(messageCount int64, fields []*tracker.JsonAircraft) error {
 			ac := jsonAircraft{
 				Now:      float64(time.Now().Unix()),
 				Messages: messageCount,
@@ -29,6 +42,7 @@ func (s *HistoryUpdateScheduler) UpdateHistory(projects []string) error {
 			return nil
 		})
 		if err == tracker.UnknownProject {
+			// todo: should this bubble up?
 		} else if err != nil {
 			panic(err)
 		}
@@ -36,20 +50,7 @@ func (s *HistoryUpdateScheduler) UpdateHistory(projects []string) error {
 	return nil
 }
 
-func NewDump1090Map(ma tracker.MapAccess) *Dump1090Map {
-	return &Dump1090Map{m: ma}
-}
-
-type Dump1090Map struct {
-	m tracker.MapAccess
-}
-
-func (d *Dump1090Map) MapService() string {
-	return "dump1090"
-}
-func (d *Dump1090Map) UpdateScheduler() tracker.MapHistoryUpdateScheduler {
-	return &HistoryUpdateScheduler{d.m}
-}
+// statics is a list of all the assets to serve
 func (d *Dump1090Map) statics() []string {
 	return []string{"planeObject.js",
 		"style.css",
@@ -598,8 +599,10 @@ func (d *Dump1090Map) statics() []string {
 	}
 }
 
+// assetResponseHandler provides a HTTP handler for serving static assets
 type assetResponseHandler string
 
+// responseHandler implements a HTTP handler for the configured file name.
 func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Request) {
 	dat, err := Asset(string(h))
 	if err != nil {
@@ -617,9 +620,11 @@ func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Req
 		log.Infof("error writing response: %s", err.Error())
 	}
 }
+
+// RegisterRoutes registers the routes for dump1090 on r.
 func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
-	r.HandleFunc("/{project}/data/aircraft.json", d.JsonHandler)
-	r.HandleFunc("/{project}/data/receiver.json", d.ReceiverHandler)
+	r.HandleFunc("/{project}/data/aircraft.json", d.AircraftJsonHandler)
+	r.HandleFunc("/{project}/data/receiver.json", d.ReceiverJsonHandler)
 	for _, file := range d.statics() {
 		_, err := Asset(file)
 		if err != nil {
@@ -630,14 +635,18 @@ func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
 	}
 	return nil
 }
-func (d *Dump1090Map) ReceiverHandler(w http.ResponseWriter, r *http.Request) {
+
+// ReceiverJsonHandler implements the HTTP handler for receiver.json
+func (d *Dump1090Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := w.Write([]byte("{ \"version\" : \"v3.8.3\", \"refresh\" : 1000, \"history\" : 32 }"))
 	if err != nil {
 		w.WriteHeader(500)
 		panic(err)
 	}
 }
-func (d *Dump1090Map) JsonHandler(w http.ResponseWriter, r *http.Request) {
+
+// AircraftJsonHandler implements the HTTP handler for aircraft.json
+func (d *Dump1090Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	err := d.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JsonAircraft) error {
 		ac := jsonAircraft{
@@ -660,6 +669,7 @@ func (d *Dump1090Map) JsonHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// jsonAircraft defines the JSON structure for aircraft.json
 type jsonAircraft struct {
 	Now      float64                 `json:"now"`
 	Messages int64                   `json:"messages"`
