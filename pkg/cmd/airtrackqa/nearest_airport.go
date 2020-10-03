@@ -9,11 +9,17 @@ import (
 	"github.com/pkg/errors"
 )
 
+// NearestAirport - takes lat and lon and tries to find the
+// nearest airport to that location
 type NearestAirport struct {
+	// Lat - the latitude
 	Lat float64 `help:"latitude"`
+	// Lon - the longitude
 	Lon float64 `help:"longitude"`
 }
 
+// Run takes the ctx, parses location files, and attempts to reverse
+// geocode the location
 func (na *NearestAirport) Run(ctx *Context) error {
 	fmt.Printf("%f %f\n", na.Lat, na.Lon)
 
@@ -40,7 +46,7 @@ func (na *NearestAirport) Run(ctx *Context) error {
 		fmt.Printf("found %d openaipFile in file %s\n", len(acRecords), file)
 	}
 
-	place, distance, err := nearestAirports.ReverseGeocode(na.Lat, na.Lon)
+	place, distance := nearestAirports.ReverseGeocode(na.Lat, na.Lon)
 	if err != nil {
 		return err
 	} else if place == "" {

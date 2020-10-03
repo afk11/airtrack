@@ -856,10 +856,8 @@ func (t *Tracker) doLostAircraftCheck() error {
 // within 'NearestAirportMaxDistance' in range
 func (t *Tracker) reverseGeocode(lat float64, lon float64) (*GeocodeLocation, float64, error) {
 	location := &GeocodeLocation{}
-	addr, distance, err := t.opt.AirportGeocoder.ReverseGeocode(lat, lon)
-	if err != nil {
-		return nil, 0.0, errors.Wrap(err, "reverse geocoding location")
-	} else if addr == "" || distance > t.opt.NearestAirportMaxDistance {
+	addr, distance := t.opt.AirportGeocoder.ReverseGeocode(lat, lon)
+	if addr == "" || distance > t.opt.NearestAirportMaxDistance {
 		if addr != "" {
 			log.Debugf("nearest airport %s is too away (%f is over limit %f)", addr, distance, t.opt.NearestAirportMaxDistance)
 		}

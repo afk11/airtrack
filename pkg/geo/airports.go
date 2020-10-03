@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+// AirportRecord - defines an airport and information about
+// its location
 type AirportRecord struct {
 	// Name of airport, eg, Dublin
 	Name string
@@ -22,42 +24,52 @@ type AirportRecord struct {
 	Style string
 }
 
+// NearestAirportGeocoder - implements Geocoder.
+// Shards locations based on a geohash.
 type NearestAirportGeocoder struct {
-	geoBuckets   map[string][]AirportRecord
+	// geoBuckets maps a geohash to a list of airports in that region
+	geoBuckets map[string][]AirportRecord
+	// geoHashChars sets out how many characters to use in geohashes.
 	geoHashChars uint
-	mu           sync.RWMutex
+	// mu - mutex for read/write access to geoBuckets
+	mu sync.RWMutex
 }
 
+// Register adds a list of AirportRecords to the Geocoder.
 func (g *NearestAirportGeocoder) Register(locs []AirportRecord) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	for _, loc := range locs {
-		gh := geohash.EncodeWithPrecision(loc.Latitude, loc.Longitude, g.geoHashChars)
+	for i := range locs {
+		gh := geohash.EncodeWithPrecision(locs[i].Latitude, locs[i].Longitude, g.geoHashChars)
 		_, ok := g.geoBuckets[gh]
 		if !ok {
 			g.geoBuckets[gh] = make([]AirportRecord, 0)
 		}
-		g.geoBuckets[gh] = append(g.geoBuckets[gh], loc)
+		g.geoBuckets[gh] = append(g.geoBuckets[gh], locs[i])
 	}
 	return nil
 }
+
+// findNearbyLocations takes a geohash, and returns airports in that bucket,
+// plus any airports in neighbour geohashes.
 func (g *NearestAirportGeocoder) findNearbyLocations(gh string) []AirportRecord {
 	var airports []AirportRecord
 	if inBucket, ok := g.geoBuckets[gh]; ok {
-		for _, airport := range inBucket {
-			airports = append(airports, airport)
-		}
+		airports = append(airports, inBucket...)
 	}
 	for _, ngh := range geohash.Neighbors(gh) {
 		if inBucket, ok := g.geoBuckets[ngh]; ok {
-			for _, airport := range inBucket {
-				airports = append(airports, airport)
-			}
+			airports = append(airports, inBucket...)
 		}
 	}
 	return airports
 }
-func (g *NearestAirportGeocoder) ReverseGeocode(lat float64, lon float64) (string, float64, error) {
+
+// ReverseGeocode - see Geocoder.ReverseGeocode
+// Converts location to geohash, finds nearby locations, and returns
+// the location with the shortest distance to (lat, lon) if there was
+// any airports nearby.
+func (g *NearestAirportGeocoder) ReverseGeocode(lat float64, lon float64) (string, float64) {
 	g.mu.RLock()
 	defer g.mu.RUnlock()
 
@@ -74,8 +86,10 @@ func (g *NearestAirportGeocoder) ReverseGeocode(lat float64, lon float64) (strin
 			nearestAirportDistance = distance
 		}
 	}
-	return nearestAirport, nearestAirportDistance, nil
+	return nearestAirport, nearestAirportDistance
 }
+
+// NewNearestAirportGeocoder takes ghlen and returns an initialized NearestAirportGeocoder
 func NewNearestAirportGeocoder(ghlen uint) *NearestAirportGeocoder {
 	return &NearestAirportGeocoder{
 		geoHashChars: ghlen,
