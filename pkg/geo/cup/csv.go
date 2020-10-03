@@ -13,6 +13,8 @@ import (
 	"strings"
 )
 
+// FromCupCsvRecord converts a CUP file CSV row into a geo.AirportRecord.
+// If successful, the record is returned. Otherwise an error is returned.
 func FromCupCsvRecord(c []string) (*geo.AirportRecord, error) {
 	if len(c) != 11 {
 		fmt.Println(c)
@@ -45,6 +47,8 @@ func FromCupCsvRecord(c []string) (*geo.AirportRecord, error) {
 	return r, nil
 }
 
+// ParseFile reads file from disk and parses it. It returns
+// the CSV rows if successful, and otherwise returns an error.
 func ParseFile(file string) ([][]string, error) {
 	contents, err := ioutil.ReadFile(file)
 	if err != nil {
@@ -56,6 +60,8 @@ func ParseFile(file string) ([][]string, error) {
 	}
 	return f, nil
 }
+
+// Parse decodes contents into a list of CSV rows.
 func Parse(contents io.Reader) ([][]string, error) {
 	r := csv.NewReader(contents)
 	r.Comment = '*'
@@ -71,12 +77,14 @@ func Parse(contents io.Reader) ([][]string, error) {
 	return records[1:], nil
 }
 
+// ExtractCupRecords converts the list of CSV rows into a list of geo.AirportRecords,
+// and returns the list, or an error if unsuccessful.
 func ExtractCupRecords(records [][]string) ([]geo.AirportRecord, error) {
 	var airports []geo.AirportRecord
 	// we unmarshal our byteArray which contains our
 	// xmlFiles content into 'aip' which we defined above
 	for _, airport := range records {
-		acRecord, err := cup.FromCupCsvRecord(airport)
+		acRecord, err := FromCupCsvRecord(airport)
 		if err != nil {
 			return nil, err
 		}
