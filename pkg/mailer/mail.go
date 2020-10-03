@@ -171,7 +171,7 @@ func (m *Mailer) processMails() error {
 		if len(finishedEmails) > 0 {
 			err = m.database.Transaction(func(tx *sqlx.Tx) error {
 				for i := range finishedEmails {
-					_, err = m.database.DeleteCompletedEmail(tx, finishedEmails[i])
+					_, err = m.database.DeleteCompletedEmailTx(tx, finishedEmails[i])
 					if err != nil {
 						return errors.Wrapf(err, "deleting completed email %d", finishedEmails[i].Id)
 					}
@@ -192,7 +192,7 @@ func (m *Mailer) processMails() error {
 							return errors.Wrapf(err, "marking email failed %d", failedEmails[i].Id)
 						}
 					} else {
-						_, err = m.database.RetryEmailAfter(tx, failedEmails[i], time.Now().Add(time.Minute*2))
+						_, err = m.database.RetryEmailAfterTx(tx, failedEmails[i], time.Now().Add(time.Minute*2))
 						if err != nil {
 							return errors.Wrapf(err, "updating email retry information %d", failedEmails[i].Id)
 						}
