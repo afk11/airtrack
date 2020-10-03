@@ -40,14 +40,22 @@ import (
 	"time"
 )
 
+// TrackCmd - aircraft tracking task
 type TrackCmd struct {
-	Config      string   `help:"Configuration file path"`
-	Projects    []string `help:"Projects configuration file (may be repeated, and in addition to main configuration file)"`
-	Verbosity   string   `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
-	CPUProfile  string   `help:"Write CPU profile to file"`
-	HeapProfile string   `help:"Write heap profile to file"`
+	// Config - aircraft configuration file path
+	Config string `help:"Configuration file path"`
+	// Projects - List of project configuration files
+	Projects []string `help:"Projects configuration file (may be repeated, and in addition to main configuration file)"`
+	// Verbosity - log level to use
+	Verbosity string `help:"Log level panic, fatal, error, warn, info, debug, trace)" default:"warn"`
+	// CPUProfile - will start CPU profile and write result to this file path
+	CPUProfile string `help:"Write CPU profile to file"`
+	// HeapProfile - will run heap profiler every 10 seconds and write results to
+	// files with this prefix suffixed by a counter.
+	HeapProfile string `help:"Write heap profile to file"`
 }
 
+// Run - the command line entry point for TrackCmd
 func (c *TrackCmd) Run() error {
 	var stopSignal = make(chan os.Signal)
 	var reloadSignal = make(chan os.Signal)
@@ -121,6 +129,8 @@ func (l *Loader) loadCleanup() error {
 	}
 	return nil
 }
+
+// ExtractOpenAipFile takes an .aip files data and registers the airports
 func ExtractOpenAipFile(nearestAirports *geo.NearestAirportGeocoder, d []byte) (int, error) {
 	openaipFile, err := openaip.Parse(d)
 	if err != nil {
@@ -136,6 +146,8 @@ func ExtractOpenAipFile(nearestAirports *geo.NearestAirportGeocoder, d []byte) (
 	}
 	return len(acRecords), nil
 }
+
+// Load loads and processes the configuration sets everything up
 func (l *Loader) Load(c *TrackCmd) error {
 	var err error
 	defer func() {
@@ -147,7 +159,7 @@ func (l *Loader) Load(c *TrackCmd) error {
 			panic(err)
 		}
 	}()
-	// Call the Run() method of the selected parsed command.
+
 	l.cfg, err = config.ReadConfigs(c.Config, c.Projects)
 	if err != nil {
 		return err
@@ -166,16 +178,16 @@ func (l *Loader) Load(c *TrackCmd) error {
 
 	l.location, err = l.cfg.GetTimeLocation()
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "loading timezone")
 	}
 
 	dbUrl, err := l.cfg.Database.DataSource(l.location)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "creating database connection parameters")
 	}
 	l.dbConn, err = sqlx.Connect(l.cfg.Database.Driver, dbUrl)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "creating database connection")
 	}
 	if l.cfg.Database.Driver == config.DatabaseDriverSqlite3 {
 		l.dbConn.SetMaxOpenConns(1)
@@ -233,17 +245,18 @@ func (l *Loader) Load(c *TrackCmd) error {
 	var airportsFound int
 	useBuiltinAirports := l.cfg.Airports == nil || l.cfg.Airports.DisableBuiltInAirports == false
 	if useBuiltinAirports {
-		airportFiles += len(airports.AssetNames())
-		for _, file := range airports.AssetNames() {
-			d, err := airports.Asset(file)
+		airportAssetFiles := airports.AssetNames()
+		airportFiles += len(airportAssetFiles)
+		for i := range airportAssetFiles {
+			d, err := airports.Asset(airportAssetFiles[i])
 			if err != nil {
-				return errors.Wrapf(err, "loading built-in airport file: %s", file)
+				return errors.Wrapf(err, "loading built-in airport file: %s", airportAssetFiles[i])
 			}
 			numAcRecords, err := ExtractOpenAipFile(nearestAirports, d)
 			if err != nil {
-				return errors.Wrapf(err, "processing built-in airport file: %s", file)
+				return errors.Wrapf(err, "processing built-in airport file: %s", airportAssetFiles[i])
 			}
-			log.Debugf("found %d airports in built-in airport file %s", numAcRecords, file)
+			log.Debugf("found %d airports in built-in airport file %s", numAcRecords, airportAssetFiles[i])
 			airportsFound += numAcRecords
 		}
 	}
@@ -324,7 +337,7 @@ func (l *Loader) Load(c *TrackCmd) error {
 	if c.CPUProfile != "" {
 		l.cpuProfileFile, err = os.Create(c.CPUProfile)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "creating cpu profile file: %s", c.CPUProfile)
 		}
 	}
 
@@ -382,7 +395,7 @@ func (l *Loader) Load(c *TrackCmd) error {
 	}
 	l.t, err = tracker.New(database, opt)
 	if err != nil {
-		return err
+		return errors.Wrapf(err, "initializing tracker")
 	}
 
 	if l.cfg.MapSettings != nil && l.cfg.MapSettings.Disabled == false {
@@ -392,7 +405,7 @@ func (l *Loader) Load(c *TrackCmd) error {
 		}
 		l.mapServer, err = tracker.NewAircraftMap(l.cfg.MapSettings)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "initializing map")
 		}
 		mapsToUse := tracker.DefaultMapServices
 		if l.cfg.MapSettings.Services != nil {
@@ -413,11 +426,11 @@ func (l *Loader) Load(c *TrackCmd) error {
 		}
 		err = l.t.RegisterProjectStatusListener(tracker.NewMapProjectStatusListener(l.mapServer))
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "registering map ProjectStatusListener")
 		}
 		err = l.t.RegisterProjectAircraftUpdateListener(tracker.NewMapProjectAircraftUpdateListener(l.mapServer))
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "registering map ProjectAircraftUpdateListener")
 		}
 	}
 
@@ -443,6 +456,7 @@ func (l *Loader) Load(c *TrackCmd) error {
 	return nil
 }
 
+// Start launches all the configured services
 func (l *Loader) Start() error {
 	if l.usingBeast {
 		l.initBeast()
@@ -482,6 +496,7 @@ func (l *Loader) Start() error {
 	return nil
 }
 
+// initBeast triggers the readsb init and background routines
 func (l *Loader) initBeast() {
 	// readsb library housekeeping
 	readsb.IcaoFilterInitOnce()
@@ -494,6 +509,9 @@ func (l *Loader) initBeast() {
 
 	go l.readsbIcaoFilterExpiration(ctx)
 }
+
+// readsbIcaoFilterExpiration is a goroutine which perioidcally expires aircraft
+// from the readsb icao filter
 func (l *Loader) readsbIcaoFilterExpiration(ctx context.Context) {
 	for {
 		select {
@@ -506,6 +524,9 @@ func (l *Loader) readsbIcaoFilterExpiration(ctx context.Context) {
 		}
 	}
 }
+
+// periodicallyWriteHeapProfile is a goroutine which writes a heap profile
+// file every 10 seconds to l.heapProfileFileName suffixed by the heap profile counter
 func (l *Loader) periodicallyWriteHeapProfile(ctx context.Context) {
 	i := 0
 	running := true
@@ -526,6 +547,8 @@ func (l *Loader) periodicallyWriteHeapProfile(ctx context.Context) {
 		i++
 	}
 }
+
+// Stop ends aircraft tracking and brings down running services
 func (l *Loader) Stop() error {
 	for _, producer := range l.producers {
 		log.Debugf("stopping %s producer..", producer.Name())
