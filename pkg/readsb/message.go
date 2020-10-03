@@ -253,8 +253,8 @@ var (
 
 	// private state, for *Once functions
 	doneIcaoFilterInit bool
-	doneModeAcInit bool
-	doneChecksumInit bool
+	doneModeAcInit     bool
+	doneChecksumInit   bool
 )
 
 const (
