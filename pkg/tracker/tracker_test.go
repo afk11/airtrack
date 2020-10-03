@@ -1,9 +1,11 @@
 package tracker
 
 import (
+	"database/sql"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/test"
 	"github.com/pkg/errors"
 	assert "github.com/stretchr/testify/require"
 
@@ -29,7 +31,7 @@ func startTracker(database db.Database, c chan *pb.Message, opt Options) *Tracke
 	return tr
 }
 func doTest(opt Options, proj *Project, testFunc func(tr *Tracker) error) error {
-	dbConn, dialect, _, closer := initDBUp()
+	dbConn, dialect, _, closer := test.InitDBUp()
 	defer closer()
 
 	c := make(chan *pb.Message)
@@ -59,7 +61,7 @@ func doTest(opt Options, proj *Project, testFunc func(tr *Tracker) error) error 
 }
 func TestTracker(t *testing.T) {
 	t.Run("startstop", func(t *testing.T) {
-		dbConn, dialect, _, closer := initDBUp()
+		dbConn, dialect, _, closer := test.InitDBUp()
 		defer closer()
 		c := make(chan *pb.Message)
 		database := db.NewDatabase(dbConn, dialect)
@@ -105,7 +107,7 @@ func TestTracker(t *testing.T) {
 
 			// no sighting yet (until db processing takes place)
 			ourSighting, err := tr.database.LoadLastSighting(proj.Session, ac)
-			assert.NoError(t, err, "expected last sighting, not error")
+			assert.Error(t, sql.ErrNoRows, err, "expected last sighting, not error")
 			assert.Nil(t, ourSighting, "last sighting should be nil")
 
 			ob, ok := s.observedBy[proj.Session.Id]

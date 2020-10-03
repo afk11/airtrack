@@ -16,7 +16,7 @@ import (
 type TestEmail struct {
 	To       string `help:"send test email to"`
 	Type     string `help:"notification type"`
-	Sighting int64  `help:"sighting ID"`
+	Sighting uint64 `help:"sighting ID"`
 }
 
 func (e *TestEmail) Run(ctx *Context) error {

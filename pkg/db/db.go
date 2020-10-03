@@ -23,12 +23,13 @@ type (
 	// Project database record. Created the first time
 	// a project is used.
 	Project struct {
-		Id         uint64     `db:"id"`
-		Identifier string     `db:"identifier"`
-		Label      *string    `db:"label"`
-		CreatedAt  time.Time  `db:"created_at"`
-		UpdatedAt  time.Time  `db:"updated_at"`
-		DeletedAt  *time.Time `db:"deleted_at"`
+		Id         uint64    `db:"id"`
+		Identifier string    `db:"identifier"`
+		Label      *string   `db:"label"`
+		CreatedAt  time.Time `db:"created_at"`
+		UpdatedAt  time.Time `db:"updated_at"`
+		// todo: why is project here? should it be deleted?
+		DeletedAt *time.Time `db:"deleted_at"`
 	}
 	// Session database record. Created each time a project
 	// is used.
@@ -121,6 +122,7 @@ type (
 		Contents    []byte `json:"contents"`
 	}
 	// EmailJob. JSON structure for email.Job field.
+	// todo: review moving this to email, cycle when email depends on DB for this..
 	EmailJob struct {
 		To          string            `json:"to"`
 		Subject     string            `json:"subject"`
@@ -133,8 +135,9 @@ type (
 func (k *SightingKml) UpdateKml(kml []byte) error {
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
-	_, err := w.Write(kml)
-	if err != nil {
+	if _, err := w.Write(kml); err != nil {
+		return err
+	} else if err := w.Close(); err != nil {
 		return err
 	}
 	k.ContentType = KmlGzipContentType
@@ -184,7 +187,7 @@ type Database interface {
 	LoadProject(projectName string) (*Project, error)
 
 	// NewSession creates a new Session for a particular project.
-	NewSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
+	NewSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
 	// LoadSessionByIdentifier searches for a Session belonging to the provided project.
 	// If the Session exists it will be returned. Otherwise an error is returned.
 	LoadSessionByIdentifier(site *Project, identifier string) (*Session, error)
@@ -210,11 +213,11 @@ type Database interface {
 	CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (sql.Result, error)
 	// LoadSightingById searches for a Sighting with the provided ID. The Sighting is returned
 	// if one was found. Otherwise an error is returned.
-	LoadSightingById(sightingId int64) (*Sighting, error)
+	LoadSightingById(sightingId uint64) (*Sighting, error)
 	// LoadSightingById searches for a Sighting with the provided ID, executing the query
 	// with the provided transaction. The Sighting is returned if one was found. Otherwise
 	// an error is returned.
-	LoadSightingByIdTx(tx *sqlx.Tx, sightingId int64) (*Sighting, error)
+	LoadSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error)
 	// LoadLastSighting searches for a Sighting for ac in the provided Session. The Sighting
 	// is returned if one was found. Otherwise an error is returned.
 	LoadLastSighting(session *Session, ac *Aircraft) (*Sighting, error)
@@ -292,10 +295,10 @@ type Database interface {
 	DeleteCompletedEmailTx(tx *sqlx.Tx, job Email) (sql.Result, error)
 	// MarkEmailFailedTx sets job's status to failed, executing the query on the provided tx.
 	// A sql.Result is returned if the query was successful, otherwise an error is returned.
-	MarkEmailFailedTx(tx *sqlx.Tx, job Email) (sql.Result, error)
+	MarkEmailFailedTx(tx *sqlx.Tx, job *Email) (sql.Result, error)
 	// RetryEmailAfterTx updates the job records retryAfter to the provided retryAfter value.
 	// A sql.Result is returned if the query was successful, otherwise an error is returned.
-	RetryEmailAfterTx(tx *sqlx.Tx, job Email, retryAfter time.Time) (sql.Result, error)
+	RetryEmailAfterTx(tx *sqlx.Tx, job *Email, retryAfter time.Time) (sql.Result, error)
 }
 
 // DatabaseImpl - Implements Database.
@@ -348,14 +351,15 @@ func (d *DatabaseImpl) LoadProject(siteName string) (*Project, error) {
 }
 
 // NewSession - see Database.NewSession
-func (d *DatabaseImpl) NewSession(site *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
+// todo: pass in current time
+func (d *DatabaseImpl) NewSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
 		Insert("session").
 		Prepared(true).
 		Cols("project_id", "identifier", "with_squawks", "with_transmission_types",
 			"with_callsigns", "created_at", "updated_at", "closed_at").
-		Vals(goqu.Vals{site.Id, identifier, withSquawks, withTxTypes, withCallSigns, now, now, nil}).
+		Vals(goqu.Vals{project.Id, identifier, withSquawks, withTxTypes, withCallSigns, now, now, nil}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -390,6 +394,7 @@ func (d *DatabaseImpl) LoadSessionByIdentifier(site *Project, identifier string)
 }
 
 // CloseSession - see Database.CloseSession
+// todo: pass in time.Now()
 func (d *DatabaseImpl) CloseSession(session *Session) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
@@ -405,10 +410,9 @@ func (d *DatabaseImpl) CloseSession(session *Session) (sql.Result, error) {
 	}
 	res, err := d.db.Exec(s, p...)
 	if err != nil {
-		// todo: why here? why not after this block?
-		session.ClosedAt = &now
 		return nil, err
 	}
+	session.ClosedAt = &now
 	return res, nil
 }
 
@@ -451,6 +455,7 @@ func (d *DatabaseImpl) LoadAircraftById(id int64) (*Aircraft, error) {
 }
 
 // CreateAircraft - see Database.CreateAircraft
+// todo: pass in current time
 func (d *DatabaseImpl) CreateAircraft(icao string) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
@@ -466,6 +471,7 @@ func (d *DatabaseImpl) CreateAircraft(icao string) (sql.Result, error) {
 }
 
 // CreateSighting - see Database.CreateSighting
+// todo: pass in current time
 func (d *DatabaseImpl) CreateSighting(session *Session, ac *Aircraft) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
@@ -481,6 +487,7 @@ func (d *DatabaseImpl) CreateSighting(session *Session, ac *Aircraft) (sql.Resul
 }
 
 // CreateSightingTx - see Database.CreateSightingTx
+// todo: pass in current time
 func (d *DatabaseImpl) CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
@@ -555,9 +562,7 @@ func (d *DatabaseImpl) LoadLastSighting(session *Session, ac *Aircraft) (*Sighti
 	row := d.db.QueryRowx(s, p...)
 	sighting := &Sighting{}
 	err = row.StructScan(sighting)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 	return sighting, nil
@@ -581,9 +586,7 @@ func (d *DatabaseImpl) LoadLastSightingTx(tx *sqlx.Tx, session *Session, ac *Air
 	row := tx.QueryRowx(s, p...)
 	sighting := &Sighting{}
 	err = row.StructScan(sighting)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 	return sighting, nil
@@ -602,7 +605,12 @@ func (d *DatabaseImpl) UpdateSightingCallsignTx(tx *sqlx.Tx, sighting *Sighting,
 	if err != nil {
 		return nil, err
 	}
-	return tx.Exec(s, p...)
+	res, err := tx.Exec(s, p...)
+	if err != nil {
+		return nil, err
+	}
+	sighting.CallSign = &callsign
+	return res, nil
 }
 
 // UpdateSightingSquawkTx - see Database.UpdateSightingSquawkTx
@@ -618,7 +626,12 @@ func (d *DatabaseImpl) UpdateSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, s
 	if err != nil {
 		return nil, err
 	}
-	return tx.Exec(s, p...)
+	res, err := tx.Exec(s, p...)
+	if err != nil {
+		return nil, err
+	}
+	sighting.Squawk = &squawk
+	return res, nil
 }
 
 // CloseSightingBatch - see Database.CloseSightingBatch
@@ -661,7 +674,7 @@ func (d *DatabaseImpl) CloseSightingBatch(sightings []*Sighting) error {
 }
 
 // LoadSightingById - see Database.LoadSightingById
-func (d *DatabaseImpl) LoadSightingById(sightingId int64) (*Sighting, error) {
+func (d *DatabaseImpl) LoadSightingById(sightingId uint64) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From("sighting").
 		Prepared(true).
@@ -682,7 +695,7 @@ func (d *DatabaseImpl) LoadSightingById(sightingId int64) (*Sighting, error) {
 }
 
 // LoadSightingByIdTx - see Database.LoadSightingByIdTx
-func (d *DatabaseImpl) LoadSightingByIdTx(tx *sqlx.Tx, sightingId int64) (*Sighting, error) {
+func (d *DatabaseImpl) LoadSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From("sighting").
 		Prepared(true).
@@ -761,9 +774,7 @@ func (d *DatabaseImpl) GetLocationHistory(sighting *Sighting, lastId int64, batc
 		return nil, err
 	}
 	res, err := d.db.Queryx(s, p...)
-	if err == sql.ErrNoRows {
-		return nil, nil
-	} else if err != nil {
+	if err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -879,7 +890,7 @@ func (d *DatabaseImpl) CreateSightingKml(sighting *Sighting, kmlData []byte) (sq
 	if err != nil {
 		return nil, err
 	}
-	err = w.Flush()
+	err = w.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -911,6 +922,7 @@ func (d *DatabaseImpl) CreateEmailJobTx(tx *sqlx.Tx, createdAt time.Time, conten
 }
 
 // GetPendingEmailJobs - see Database.GetPendingEmailJobs
+// Does not return sql.ErrNoRows
 func (d *DatabaseImpl) GetPendingEmailJobs(now time.Time) ([]Email, error) {
 	s, p, err := d.dialect.
 		From("email").
@@ -956,7 +968,7 @@ func (d *DatabaseImpl) DeleteCompletedEmailTx(tx *sqlx.Tx, job Email) (sql.Resul
 }
 
 // MarkEmailFailedTx - see Database.MarkEmailFailedTx
-func (d *DatabaseImpl) MarkEmailFailedTx(tx *sqlx.Tx, job Email) (sql.Result, error) {
+func (d *DatabaseImpl) MarkEmailFailedTx(tx *sqlx.Tx, job *Email) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Update("email").
 		Prepared(true).
@@ -969,11 +981,18 @@ func (d *DatabaseImpl) MarkEmailFailedTx(tx *sqlx.Tx, job Email) (sql.Result, er
 	if err != nil {
 		return nil, err
 	}
-	return tx.Exec(s, p...)
+	res, err := tx.Exec(s, p...)
+	if err != nil {
+		return nil, err
+	}
+	ts := time.Unix(0, 0)
+	job.RetryAfter = &ts
+	job.Status = EmailFailed
+	return res, nil
 }
 
 // RetryEmailAfterTx - see Database.RetryEmailAfterTx
-func (d *DatabaseImpl) RetryEmailAfterTx(tx *sqlx.Tx, job Email, retryAfter time.Time) (sql.Result, error) {
+func (d *DatabaseImpl) RetryEmailAfterTx(tx *sqlx.Tx, job *Email, retryAfter time.Time) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Update("email").
 		Prepared(true).
@@ -986,5 +1005,11 @@ func (d *DatabaseImpl) RetryEmailAfterTx(tx *sqlx.Tx, job Email, retryAfter time
 	if err != nil {
 		return nil, err
 	}
-	return tx.Exec(s, p...)
+	res, err := tx.Exec(s, p...)
+	if err != nil {
+		return nil, err
+	}
+	job.RetryAfter = &retryAfter
+	job.Retries = job.Retries + 1
+	return res, nil
 }

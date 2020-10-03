@@ -62,7 +62,7 @@ func LoadCountryAllocations(r io.Reader, store *iso3166.Store) (CountryAllocatio
 			}
 		}
 		if keyLen == -1 {
-			panic("invalid start/end ")
+			return nil, errors.New("invalid start/end")
 		}
 		key := begin[0:keyLen]
 
@@ -89,7 +89,7 @@ type RadixCountryAllocationSearcher struct {
 func (cc *RadixCountryAllocationSearcher) DetermineCountryCode(k string) (*iso3166.AlphaTwoCountryCode, error) {
 	icao, err := icaoToInt(k)
 	if err != nil {
-		panic(err)
+		return nil, errors.Wrapf(err, "icaoToInt")
 	}
 	var country *iso3166.AlphaTwoCountryCode
 	kb := []byte(k)

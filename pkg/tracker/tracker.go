@@ -1525,7 +1525,7 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 // initProjectSighting creates or reopens a sighting for the aircraft in the provided project
 func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) (*db.Sighting, bool, error) {
 	s, err := t.database.LoadLastSightingTx(tx, p.Session, ac)
-	if err != nil {
+	if err != nil && err != sql.ErrNoRows {
 		return nil, false, err
 	}
 

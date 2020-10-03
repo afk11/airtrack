@@ -187,12 +187,12 @@ func (m *Mailer) processMails() error {
 			err = m.database.Transaction(func(tx *sqlx.Tx) error {
 				for i := range failedEmails {
 					if failedEmails[i].Retries == 4 {
-						_, err = m.database.MarkEmailFailedTx(tx, failedEmails[i])
+						_, err = m.database.MarkEmailFailedTx(tx, &failedEmails[i])
 						if err != nil {
 							return errors.Wrapf(err, "marking email failed %d", failedEmails[i].Id)
 						}
 					} else {
-						_, err = m.database.RetryEmailAfterTx(tx, failedEmails[i], time.Now().Add(time.Minute*2))
+						_, err = m.database.RetryEmailAfterTx(tx, &failedEmails[i], time.Now().Add(time.Minute*2))
 						if err != nil {
 							return errors.Wrapf(err, "updating email retry information %d", failedEmails[i].Id)
 						}
