@@ -3,7 +3,7 @@ package email
 import (
 	"bytes"
 	"fmt"
-	"github.com/afk11/airtrack/pkg/db"
+	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/pkg/errors"
 	"text/template"
 	"time"
@@ -156,8 +156,8 @@ func LoadMailTemplates(templates ...Email) (*MailTemplates, error) {
 }
 
 // buildEmail loads and builds the template specified by `email`,
-// and returns a db.EmailJob payload
-func buildEmail(templates *MailTemplates, email Email, to string, subject string, params interface{}) (*db.EmailJob, error) {
+// and returns a mailer.EmailJob payload
+func buildEmail(templates *MailTemplates, email Email, to string, subject string, params interface{}) (*mailer.EmailJob, error) {
 	tpl, err := templates.Get(email)
 	if err != nil {
 		return nil, err
@@ -168,7 +168,7 @@ func buildEmail(templates *MailTemplates, email Email, to string, subject string
 	if err != nil {
 		return nil, err
 	}
-	job := &db.EmailJob{
+	job := &mailer.EmailJob{
 		To:      to,
 		Subject: subject,
 		Body:    buf.String(),
@@ -177,8 +177,8 @@ func buildEmail(templates *MailTemplates, email Email, to string, subject string
 }
 
 // buildEmailWithAttachment loads and builds the template specified
-// by `email`, and returns a db.EmailJob payload including attachments.
-func buildEmailWithAttachment(templates *MailTemplates, email Email, to string, subject string, params interface{}, attachments []db.EmailAttachment) (*db.EmailJob, error) {
+// by `email`, and returns a mailer.EmailJob payload including attachments.
+func buildEmailWithAttachment(templates *MailTemplates, email Email, to string, subject string, params interface{}, attachments []mailer.EmailAttachment) (*mailer.EmailJob, error) {
 	tpl, err := templates.Get(email)
 	if err != nil {
 		return nil, err
@@ -189,7 +189,7 @@ func buildEmailWithAttachment(templates *MailTemplates, email Email, to string, 
 	if err != nil {
 		return nil, err
 	}
-	job := &db.EmailJob{
+	job := &mailer.EmailJob{
 		To:          to,
 		Subject:     subject,
 		Body:        buf.String(),
@@ -198,9 +198,9 @@ func buildEmailWithAttachment(templates *MailTemplates, email Email, to string, 
 	return job, nil
 }
 
-// PrepareSpottedInFlightEmail creates an SpottedInFlight and returns a db.EmailJob
+// PrepareSpottedInFlightEmail creates an SpottedInFlight and returns a mailer.EmailJob
 // for the email
-func PrepareSpottedInFlightEmail(templates *MailTemplates, to string, params SpottedInFlightParameters) (*db.EmailJob, error) {
+func PrepareSpottedInFlightEmail(templates *MailTemplates, to string, params SpottedInFlightParameters) (*mailer.EmailJob, error) {
 	var callsign string
 	if params.CallSign != "" {
 		callsign = " (" + params.CallSign + ")"
@@ -210,9 +210,9 @@ func PrepareSpottedInFlightEmail(templates *MailTemplates, to string, params Spo
 	return buildEmail(templates, SpottedInFlight, to, subject, params)
 }
 
-// PrepareMapProducedEmail creates an MapProducedEmail and returns a db.EmailJob
+// PrepareMapProducedEmail creates an MapProducedEmail and returns a mailer.EmailJob
 // for the email with the KML attachment.
-func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile []byte, params MapProducedParameters) (*db.EmailJob, error) {
+func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile []byte, params MapProducedParameters) (*mailer.EmailJob, error) {
 	action := "created"
 	var callsign string
 	if params.MapUpdated {
@@ -223,7 +223,7 @@ func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile []byte
 	}
 
 	subject := fmt.Sprintf("[%s] %s%s: flight map %s", params.Project, params.Icao, callsign, action)
-	return buildEmailWithAttachment(templates, MapProducedEmail, to, subject, params, []db.EmailAttachment{
+	return buildEmailWithAttachment(templates, MapProducedEmail, to, subject, params, []mailer.EmailAttachment{
 		{
 			Contents: kmlFile,
 			FileName: fmt.Sprintf("%s-%s.kml",
@@ -233,9 +233,9 @@ func PrepareMapProducedEmail(templates *MailTemplates, to string, kmlFile []byte
 	})
 }
 
-// PrepareTakeoffFromAirport creates an TakeoffFromAirport and returns a db.EmailJob
+// PrepareTakeoffFromAirport creates an TakeoffFromAirport and returns a mailer.EmailJob
 // for the email
-func PrepareTakeoffFromAirport(templates *MailTemplates, to string, params TakeoffParams) (*db.EmailJob, error) {
+func PrepareTakeoffFromAirport(templates *MailTemplates, to string, params TakeoffParams) (*mailer.EmailJob, error) {
 	var callsign string
 	if params.CallSign != "" {
 		callsign = " (" + params.CallSign + ")"
@@ -246,9 +246,9 @@ func PrepareTakeoffFromAirport(templates *MailTemplates, to string, params Takeo
 	return buildEmail(templates, TakeoffFromAirport, to, subject, params)
 }
 
-// PrepareTakeoffUnknownAirport creates an TakeoffUnknownAirport and returns a db.EmailJob
+// PrepareTakeoffUnknownAirport creates an TakeoffUnknownAirport and returns a mailer.EmailJob
 // for the email
-func PrepareTakeoffUnknownAirport(templates *MailTemplates, to string, params TakeoffUnknownAirportParams) (*db.EmailJob, error) {
+func PrepareTakeoffUnknownAirport(templates *MailTemplates, to string, params TakeoffUnknownAirportParams) (*mailer.EmailJob, error) {
 	var callsign string
 	if params.CallSign != "" {
 		callsign = " (" + params.CallSign + ")"
@@ -259,9 +259,9 @@ func PrepareTakeoffUnknownAirport(templates *MailTemplates, to string, params Ta
 	return buildEmail(templates, TakeoffUnknownAirport, to, subject, params)
 }
 
-// PrepareTakeoffComplete creates an TakeoffComplete and returns a db.EmailJob
+// PrepareTakeoffComplete creates an TakeoffComplete and returns a mailer.EmailJob
 // for the email
-func PrepareTakeoffComplete(templates *MailTemplates, to string, params TakeoffCompleteParams) (*db.EmailJob, error) {
+func PrepareTakeoffComplete(templates *MailTemplates, to string, params TakeoffCompleteParams) (*mailer.EmailJob, error) {
 	var callsign string
 	if params.CallSign != "" {
 		callsign = " (" + params.CallSign + ")"

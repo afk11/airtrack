@@ -17,25 +17,40 @@ import (
 	"time"
 )
 
-// MailSender - public interface for queuing emails to be sent.
-type MailSender interface {
-	Queue(msg db.EmailJob) error
-}
-
-// Mailer manages background services for sending email.
-// New emails are queued in queued until the processing
-// coroutine saves them to the database in a batch. The
-// processing routine also searches for new emails to send
-// Implements MailSender
-type Mailer struct {
-	database  db.Database
-	from      string
-	dialer    *mail.Dialer
-	queued    []db.EmailJob
-	canceller func()
-	mu        sync.RWMutex
-	wg        sync.WaitGroup
-}
+type (
+	// EmailAttachment. JSON structure for an email attachment in
+	// encoded job.
+	EmailAttachment struct {
+		ContentType string `json:"content_type"`
+		FileName    string `json:"filename"`
+		Contents    []byte `json:"contents"`
+	}
+	// EmailJob. JSON structure for db.Email Job field.
+	EmailJob struct {
+		To          string            `json:"to"`
+		Subject     string            `json:"subject"`
+		Body        string            `json:"body"`
+		Attachments []EmailAttachment `json:"attachments"`
+	}
+	// MailSender - public interface for queuing emails to be sent.
+	MailSender interface {
+		Queue(msg EmailJob) error
+	}
+	// Mailer manages background services for sending email.
+	// New emails are queued in queued until the processing
+	// coroutine saves them to the database in a batch. The
+	// processing routine also searches for new emails to send
+	// Implements MailSender
+	Mailer struct {
+		database  db.Database
+		from      string
+		dialer    *mail.Dialer
+		queued    []EmailJob
+		canceller func()
+		mu        sync.RWMutex
+		wg        sync.WaitGroup
+	}
+)
 
 // NewMailer creates a new Mailer
 func NewMailer(database db.Database, from string, dialer *mail.Dialer) *Mailer {
@@ -43,13 +58,13 @@ func NewMailer(database db.Database, from string, dialer *mail.Dialer) *Mailer {
 		database: database,
 		dialer:   dialer,
 		from:     from,
-		queued:   make([]db.EmailJob, 0),
+		queued:   make([]EmailJob, 0),
 	}
 }
 
 // Queue adds job to the queue so it can be persisted later.
 // See MailSender.Queue
-func (m *Mailer) Queue(job db.EmailJob) error {
+func (m *Mailer) Queue(job EmailJob) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.queued = append(m.queued, job)
@@ -128,7 +143,7 @@ func (m *Mailer) processMails() error {
 	}
 	log.Debugf("mailer: processing %d jobs", len(records))
 
-	jobs := make([]db.EmailJob, 0, len(records))
+	jobs := make([]EmailJob, 0, len(records))
 	for _, record := range records {
 		job, err := decodeJob(record.Job)
 		if err != nil {
@@ -210,7 +225,7 @@ func (m *Mailer) processMails() error {
 }
 
 // addMailsToDb encodes and persist queued jobs.
-func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
+func (m *Mailer) addMailsToDb(now time.Time, queued []EmailJob) error {
 	return m.database.Transaction(func(tx *sqlx.Tx) error {
 		for idx := range queued {
 			encoded, err := encodeJob(&queued[idx])
@@ -237,7 +252,7 @@ func (m *Mailer) Stop() {
 }
 
 // encodeJob takes a job and encodes it into a compressed payload
-func encodeJob(job *db.EmailJob) ([]byte, error) {
+func encodeJob(job *EmailJob) ([]byte, error) {
 	// make json
 	raw, err := json.Marshal(job)
 	if err != nil {
@@ -255,23 +270,23 @@ func encodeJob(job *db.EmailJob) ([]byte, error) {
 	return compressed.Bytes(), nil
 }
 
-// decodeJob takes a compressed job and decodes it into a db.EmailJob.
-func decodeJob(compressed []byte) (db.EmailJob, error) {
+// decodeJob takes a compressed job and decodes it into a EmailJob.
+func decodeJob(compressed []byte) (EmailJob, error) {
 	// decompress
 	r, err := gzip.NewReader(bytes.NewBuffer(compressed))
 	if err != nil {
-		return db.EmailJob{}, errors.Wrapf(err, "creating gzip reader for kml")
+		return EmailJob{}, errors.Wrapf(err, "creating gzip reader for kml")
 	}
 	raw, err := ioutil.ReadAll(r)
 	if err != nil {
-		return db.EmailJob{}, errors.Wrapf(err, "decompressing gzipped kml")
+		return EmailJob{}, errors.Wrapf(err, "decompressing gzipped kml")
 	}
 
 	// parse json
-	job := db.EmailJob{}
+	job := EmailJob{}
 	err = json.Unmarshal(raw, &job)
 	if err != nil {
-		return db.EmailJob{}, err
+		return EmailJob{}, err
 	}
 	return job, nil
 }

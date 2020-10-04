@@ -71,7 +71,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return err
 	}
 
-	var job *db.EmailJob
+	var job *mailer.EmailJob
 	switch notifyType {
 	case tracker.MapProduced:
 		w := kml.NewWriter(kml.WriterOptions{

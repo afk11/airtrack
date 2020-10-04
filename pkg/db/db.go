@@ -114,21 +114,6 @@ type (
 		UpdatedAt  time.Time  `db:"updated_at"`
 		Job        []byte
 	}
-	// EmailAttachment. JSON structure for an email attachment in
-	// encoded job.
-	EmailAttachment struct {
-		ContentType string `json:"content_type"`
-		FileName    string `json:"filename"`
-		Contents    []byte `json:"contents"`
-	}
-	// EmailJob. JSON structure for email.Job field.
-	// todo: review moving this to email, cycle when email depends on DB for this..
-	EmailJob struct {
-		To          string            `json:"to"`
-		Subject     string            `json:"subject"`
-		Body        string            `json:"body"`
-		Attachments []EmailAttachment `json:"attachments"`
-	}
 )
 
 // UpdateKml - updates the sighting_kml record
