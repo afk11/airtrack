@@ -84,7 +84,7 @@ func (m *Mailer) Start() {
 // If errors arise, an extra delay is used.
 func (m *Mailer) periodicallyProcessMails(ctx context.Context) {
 	defer m.wg.Done()
-	normalDelay := time.Second * 5
+	normalDelay := time.Second * 30
 	delay := normalDelay
 	for {
 		select {
