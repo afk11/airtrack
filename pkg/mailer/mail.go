@@ -2,16 +2,17 @@ package mailer
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/db"
-	"github.com/afk11/airtrack/pkg/zlib"
 	"github.com/afk11/mail"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"sync"
 	"time"
 )
@@ -242,21 +243,30 @@ func encodeJob(job *db.EmailJob) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	// compress
-	compressed, err := zlib.Encode(raw)
-	if err != nil {
-		return nil, errors.Wrap(err, "zlib decode email")
+
+	var compressed bytes.Buffer
+	w := gzip.NewWriter(&compressed)
+	if _, err := w.Write(raw); err != nil {
+		return nil, err
+	} else if err := w.Close(); err != nil {
+		return nil, err
 	}
-	return compressed, nil
+
+	return compressed.Bytes(), nil
 }
 
 // decodeJob takes a compressed job and decodes it into a db.EmailJob.
 func decodeJob(compressed []byte) (db.EmailJob, error) {
 	// decompress
-	raw, err := zlib.Decode(compressed)
+	r, err := gzip.NewReader(bytes.NewBuffer(compressed))
 	if err != nil {
-		return db.EmailJob{}, errors.Wrap(err, "zlib decode email")
+		return db.EmailJob{}, errors.Wrapf(err, "creating gzip reader for kml")
 	}
+	raw, err := ioutil.ReadAll(r)
+	if err != nil {
+		return db.EmailJob{}, errors.Wrapf(err, "decompressing gzipped kml")
+	}
+
 	// parse json
 	job := db.EmailJob{}
 	err = json.Unmarshal(raw, &job)
