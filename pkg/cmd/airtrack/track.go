@@ -470,7 +470,7 @@ func (l *Loader) Start() error {
 	if l.cfg.Metrics != nil && l.cfg.Metrics.Enabled {
 		go func() {
 			err := l.metricsServer.ListenAndServe()
-			if err != nil {
+			if err != nil && err != http.ErrServerClosed {
 				panic(err)
 			}
 		}()
