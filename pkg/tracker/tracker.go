@@ -504,34 +504,34 @@ func (t *Tracker) AddProject(p *Project) error {
 		return errors.Errorf("geocoder must be available for %s feature to work", GeocodeEndpoints)
 	}
 
-	site, err := t.database.GetProject(p.Name)
+	project, err := t.database.GetProject(p.Name)
 	if err == sql.ErrNoRows {
 		_, err := t.database.CreateProject(p.Name, time.Now())
 		if err != nil {
 			return errors.Wrap(err, "create new project")
 		}
-		site, err = t.database.GetProject(p.Name)
+		project, err = t.database.GetProject(p.Name)
 		if err != nil {
 			return errors.Wrap(err, "load new project")
 		}
 	} else if err != nil {
-		return errors.Wrap(err, "query collection site")
+		return errors.Wrap(err, "query project")
 	}
 
 	sessId, err := uuid.NewUUID()
 	if err != nil {
 		return errors.Wrap(err, "failed to generate session id")
 	}
-	_, err = t.database.CreateSession(site, sessId.String(),
+	_, err = t.database.CreateSession(project, sessId.String(),
 		p.IsFeatureEnabled(TrackSquawks), p.IsFeatureEnabled(TrackTxTypes), p.IsFeatureEnabled(TrackCallSigns))
 	if err != nil {
 		return errors.Wrap(err, "create session record")
 	}
-	session, err := t.database.GetSessionByIdentifier(site, sessId.String())
+	session, err := t.database.GetSessionByIdentifier(project, sessId.String())
 	if err != nil {
 		return errors.Wrap(err, "load session record")
 	}
-	p.Site = site
+	p.Project = project
 	p.Session = session
 	t.projects = append(t.projects, p)
 

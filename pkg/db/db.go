@@ -175,7 +175,7 @@ type Database interface {
 	CreateSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
 	// GetSessionByIdentifier searches for a Session belonging to the provided project.
 	// If the Session exists it will be returned. Otherwise an error is returned.
-	GetSessionByIdentifier(site *Project, identifier string) (*Session, error)
+	GetSessionByIdentifier(project *Project, identifier string) (*Session, error)
 	// CloseSession marks the Session as closed. The sql.Result is returned
 	// if the query was successful, otherwise an error is returned.
 	CloseSession(session *Session) (sql.Result, error)
@@ -303,12 +303,12 @@ func (d *DatabaseImpl) Transaction(f func(tx *sqlx.Tx) error) error {
 }
 
 // CreateProject - see Database.CreateProject
-func (d *DatabaseImpl) CreateProject(siteName string, now time.Time) (sql.Result, error) {
+func (d *DatabaseImpl) CreateProject(name string, now time.Time) (sql.Result, error) {
 	q := d.dialect.
 		Insert("project").
 		Prepared(true).
 		Cols("identifier", "created_at", "updated_at").
-		Vals(goqu.Vals{siteName, now, now})
+		Vals(goqu.Vals{name, now, now})
 	s, p, err := q.ToSQL()
 	if err != nil {
 		return nil, err
@@ -317,22 +317,22 @@ func (d *DatabaseImpl) CreateProject(siteName string, now time.Time) (sql.Result
 }
 
 // GetProject - see Database.GetProject
-func (d *DatabaseImpl) GetProject(siteName string) (*Project, error) {
+func (d *DatabaseImpl) GetProject(name string) (*Project, error) {
 	q := d.dialect.
 		From("project").
 		Prepared(true).
-		Where(goqu.C("identifier").Eq(siteName))
+		Where(goqu.C("identifier").Eq(name))
 	s, p, err := q.ToSQL()
 	if err != nil {
 		return nil, err
 	}
 	row := d.db.QueryRowx(s, p...)
-	site := Project{}
-	err = row.StructScan(&site)
+	project := Project{}
+	err = row.StructScan(&project)
 	if err != nil {
 		return nil, err
 	}
-	return &site, err
+	return &project, err
 }
 
 // CreateSession - see Database.CreateSession
@@ -357,12 +357,12 @@ func (d *DatabaseImpl) CreateSession(project *Project, identifier string, withSq
 }
 
 // GetSessionByIdentifier - see Database.GetSessionByIdentifier
-func (d *DatabaseImpl) GetSessionByIdentifier(site *Project, identifier string) (*Session, error) {
+func (d *DatabaseImpl) GetSessionByIdentifier(project *Project, identifier string) (*Session, error) {
 	s, p, err := d.dialect.
 		From("session").
 		Prepared(true).
 		Where(goqu.Ex{
-			"project_id": site.Id,
+			"project_id": project.Id,
 			"identifier": identifier,
 		}).
 		ToSQL()
