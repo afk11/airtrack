@@ -132,6 +132,11 @@ func TestSomething(t *testing.T) {
 		assert.NotNil(t, a)
 		assert.Equal(t, icao, a.Icao)
 		// todo: test value of aircraft created_at
+
+		a, err = database.LoadAircraftById(a.Id)
+		assert.NoError(t, err)
+		assert.NotNil(t, a)
+		assert.Equal(t, icao, a.Icao)
 	})
 	t.Run("Sighting", func(t *testing.T) {
 		dbConn, dialect, _, closer := test.InitDBUp()

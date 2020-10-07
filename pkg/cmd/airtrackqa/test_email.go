@@ -61,7 +61,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 	if err != nil {
 		return err
 	}
-	ac, err := database.LoadAircraftById(int64(sighting.AircraftId))
+	ac, err := database.LoadAircraftById(sighting.AircraftId)
 	if err != nil {
 		return err
 	}

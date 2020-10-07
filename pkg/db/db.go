@@ -185,7 +185,7 @@ type Database interface {
 	LoadAircraftByIcao(icao string) (*Aircraft, error)
 	// LoadAircraftById searches for an Aircraft using it's ID. If the
 	// Aircraft exists it will be returned. Otherwise an error is returned.
-	LoadAircraftById(id int64) (*Aircraft, error)
+	LoadAircraftById(id uint64) (*Aircraft, error)
 	// CreateAircraft creates an Aircraft for the specified icao.
 	CreateAircraft(icao string) (sql.Result, error)
 
@@ -421,7 +421,7 @@ func (d *DatabaseImpl) LoadAircraftByIcao(icao string) (*Aircraft, error) {
 }
 
 // LoadAircraftById - see Database.LoadAircraftById
-func (d *DatabaseImpl) LoadAircraftById(id int64) (*Aircraft, error) {
+func (d *DatabaseImpl) LoadAircraftById(id uint64) (*Aircraft, error) {
 	s, p, err := d.dialect.
 		From("aircraft").
 		Prepared(true).
