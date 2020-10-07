@@ -57,11 +57,11 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return err
 	}
 
-	sighting, err := database.LoadSightingById(e.Sighting)
+	sighting, err := database.GetSightingById(e.Sighting)
 	if err != nil {
 		return err
 	}
-	ac, err := database.LoadAircraftById(sighting.AircraftId)
+	ac, err := database.GetAircraftById(sighting.AircraftId)
 	if err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 
 		var numPoints int
 		var firstLocation, lastLocation *db.SightingLocation
-		err := database.GetLocationHistoryWalkBatch(sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
+		err := database.WalkLocationHistoryBatch(sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
 			w.Write(location)
 			if firstLocation == nil {
 				firstLocation = &location[0]

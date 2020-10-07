@@ -165,27 +165,27 @@ type Database interface {
 	// If the function returns an error, the transaction is rolled back.
 	Transaction(f func(tx *sqlx.Tx) error) error
 
-	// NewProject creates a Project record.
-	NewProject(projectName string, now time.Time) (sql.Result, error)
-	// LoadProject searches for a Project by its name. If the project exists
+	// CreateProject creates a Project record.
+	CreateProject(projectName string, now time.Time) (sql.Result, error)
+	// GetProject searches for a Project by its name. If the project exists
 	// it will be returned. Otherwise an error will be returned.
-	LoadProject(projectName string) (*Project, error)
+	GetProject(projectName string) (*Project, error)
 
-	// NewSession creates a new Session for a particular project.
-	NewSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
-	// LoadSessionByIdentifier searches for a Session belonging to the provided project.
+	// CreateSession creates a new Session for a particular project.
+	CreateSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error)
+	// GetSessionByIdentifier searches for a Session belonging to the provided project.
 	// If the Session exists it will be returned. Otherwise an error is returned.
-	LoadSessionByIdentifier(site *Project, identifier string) (*Session, error)
+	GetSessionByIdentifier(site *Project, identifier string) (*Session, error)
 	// CloseSession marks the Session as closed. The sql.Result is returned
 	// if the query was successful, otherwise an error is returned.
 	CloseSession(session *Session) (sql.Result, error)
 
-	// LoadAircraftByIcao searches for an Aircraft using it's hex ICAO. If the
+	// GetAircraftByIcao searches for an Aircraft using it's hex ICAO. If the
 	// Aircraft exists it will be returned. Otherwise an error is returned.
-	LoadAircraftByIcao(icao string) (*Aircraft, error)
-	// LoadAircraftById searches for an Aircraft using it's ID. If the
+	GetAircraftByIcao(icao string) (*Aircraft, error)
+	// GetAircraftById searches for an Aircraft using it's ID. If the
 	// Aircraft exists it will be returned. Otherwise an error is returned.
-	LoadAircraftById(id uint64) (*Aircraft, error)
+	GetAircraftById(id uint64) (*Aircraft, error)
 	// CreateAircraft creates an Aircraft for the specified icao.
 	CreateAircraft(icao string) (sql.Result, error)
 
@@ -196,20 +196,20 @@ type Database interface {
 	// the query with the provided transaction. A sql.Result is returned if the query
 	// was successful. Otherwise an error is returned.
 	CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (sql.Result, error)
-	// LoadSightingById searches for a Sighting with the provided ID. The Sighting is returned
+	// GetSightingById searches for a Sighting with the provided ID. The Sighting is returned
 	// if one was found. Otherwise an error is returned.
-	LoadSightingById(sightingId uint64) (*Sighting, error)
-	// LoadSightingById searches for a Sighting with the provided ID, executing the query
+	GetSightingById(sightingId uint64) (*Sighting, error)
+	// GetSightingById searches for a Sighting with the provided ID, executing the query
 	// with the provided transaction. The Sighting is returned if one was found. Otherwise
 	// an error is returned.
-	LoadSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error)
-	// LoadLastSighting searches for a Sighting for ac in the provided Session. The Sighting
+	GetSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error)
+	// GetLastSighting searches for a Sighting for ac in the provided Session. The Sighting
 	// is returned if one was found. Otherwise an error is returned.
-	LoadLastSighting(session *Session, ac *Aircraft) (*Sighting, error)
-	// LoadLastSightingTx searches for a Sighting for ac in the provided Session, executing
+	GetLastSighting(session *Session, ac *Aircraft) (*Sighting, error)
+	// GetLastSightingTx searches for a Sighting for ac in the provided Session, executing
 	// the query with the provided transaction. The Sighting is returned if one was found.
 	// Otherwise an error is returned.
-	LoadLastSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (*Sighting, error)
+	GetLastSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (*Sighting, error)
 	// ReopenSighting updates the provided Sighting to mark it as open. A sql.Result
 	// is returned if the query was successful. Otherwise an error is returned.
 	ReopenSighting(sighting *Sighting) (sql.Result, error)
@@ -236,37 +236,37 @@ type Database interface {
 	// Otherwise an error is returned.
 	CreateNewSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, squawk string, observedAt time.Time) (sql.Result, error)
 
-	// InsertSightingLocation inserts a new SightingCallSign for a sighting. A sql.Result is
+	// CreateSightingLocation inserts a new SightingCallSign for a sighting. A sql.Result is
 	// returned if the query was successful. Otherwise an error is returned.
-	InsertSightingLocation(sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
-	// InsertSightingLocationTx inserts a new SightingLocation for a sighting, executing
+	CreateSightingLocation(sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
+	// CreateSightingLocationTx inserts a new SightingLocation for a sighting, executing
 	// the query on the provided tx. A sql.Result is returned if the query was successful.
 	// Otherwise an error is returned.
-	InsertSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
-	// GetLocationHistory searches for SightingLocation records for the provided Sighting.
+	CreateSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
+	// LoadLocationHistory searches for SightingLocation records for the provided Sighting.
 	// lastId should initially be zero, and in subsequent calls the ID of the last processed
 	// row should be used instead. At most batchSize results will be returned. If the query
 	// succeeds, the rows are returned (and must be closed by the caller). If unsuccessful
 	// an error is returned.
-	GetLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error)
-	// GetLocationHistoryWalkBatch searches for SightingLocation records by loading at most
+	LoadLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error)
+	// WalkLocationHistoryBatch searches for SightingLocation records by loading at most
 	// batchSize results at a time, invoking f with each batch of results. An error is returned
 	// if we were unsuccessful.
-	GetLocationHistoryWalkBatch(sighting *Sighting, batchSize int64, f func([]SightingLocation)) error
+	WalkLocationHistoryBatch(sighting *Sighting, batchSize int64, f func([]SightingLocation)) error
 	// GetFullLocationHistory queries for all SightingLocation records. Internally, use batchSize
 	// to limit the number of rows returned by each query. If successful, the full location history
 	// is returned. Otherwise, an error will be returned.
 	GetFullLocationHistory(sighting *Sighting, batchSize int64) ([]SightingLocation, error)
 
-	// LoadSightingKml queries for a SightingKml record for the provided Sighting. The SightingKml
+	// GetSightingKml queries for a SightingKml record for the provided Sighting. The SightingKml
 	// is returned if found, otherwise an error is returned.
-	LoadSightingKml(sighting *Sighting) (*SightingKml, error)
+	GetSightingKml(sighting *Sighting) (*SightingKml, error)
 	// UpdateSightingKml commits an updated KML field to the database. A sql.Result is returned
 	// if the query was successful, otherwise an error is returned.
 	UpdateSightingKml(sightingKml *SightingKml) (sql.Result, error)
-	// CreateSightingKml creates a SightingKml record for the provided Sighting. A sql.Result is
+	// CreateSightingKmlContent creates a SightingKml record for the provided Sighting. A sql.Result is
 	// returned if the query was successful, otherwise an error is returned.
-	CreateSightingKml(sighting *Sighting, kmlData []byte) (sql.Result, error)
+	CreateSightingKmlContent(sighting *Sighting, kmlData []byte) (sql.Result, error)
 
 	// CreateEmailJobTx inserts a new Email record, executing the query on the provided tx. A
 	// sql.Result is returned if the query was successful, otherwise an error is returned.
@@ -302,8 +302,8 @@ func (d *DatabaseImpl) Transaction(f func(tx *sqlx.Tx) error) error {
 	return NewTxExecer(d.db, f).Exec()
 }
 
-// NewProject - see Database.NewProject
-func (d *DatabaseImpl) NewProject(siteName string, now time.Time) (sql.Result, error) {
+// CreateProject - see Database.CreateProject
+func (d *DatabaseImpl) CreateProject(siteName string, now time.Time) (sql.Result, error) {
 	q := d.dialect.
 		Insert("project").
 		Prepared(true).
@@ -316,8 +316,8 @@ func (d *DatabaseImpl) NewProject(siteName string, now time.Time) (sql.Result, e
 	return d.db.Exec(s, p...)
 }
 
-// LoadProject - see Database.LoadProject
-func (d *DatabaseImpl) LoadProject(siteName string) (*Project, error) {
+// GetProject - see Database.GetProject
+func (d *DatabaseImpl) GetProject(siteName string) (*Project, error) {
 	q := d.dialect.
 		From("project").
 		Prepared(true).
@@ -335,9 +335,9 @@ func (d *DatabaseImpl) LoadProject(siteName string) (*Project, error) {
 	return &site, err
 }
 
-// NewSession - see Database.NewSession
+// CreateSession - see Database.CreateSession
 // todo: pass in current time
-func (d *DatabaseImpl) NewSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
+func (d *DatabaseImpl) CreateSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
 		Insert("session").
@@ -356,8 +356,8 @@ func (d *DatabaseImpl) NewSession(project *Project, identifier string, withSquaw
 	return res, nil
 }
 
-// LoadSessionByIdentifier - see Database.LoadSessionByIdentifier
-func (d *DatabaseImpl) LoadSessionByIdentifier(site *Project, identifier string) (*Session, error) {
+// GetSessionByIdentifier - see Database.GetSessionByIdentifier
+func (d *DatabaseImpl) GetSessionByIdentifier(site *Project, identifier string) (*Session, error) {
 	s, p, err := d.dialect.
 		From("session").
 		Prepared(true).
@@ -401,8 +401,8 @@ func (d *DatabaseImpl) CloseSession(session *Session) (sql.Result, error) {
 	return res, nil
 }
 
-// LoadAircraftByIcao - see Database.LoadAircraftByIcao
-func (d *DatabaseImpl) LoadAircraftByIcao(icao string) (*Aircraft, error) {
+// GetAircraftByIcao - see Database.GetAircraftByIcao
+func (d *DatabaseImpl) GetAircraftByIcao(icao string) (*Aircraft, error) {
 	s, p, err := d.dialect.
 		From("aircraft").
 		Prepared(true).
@@ -420,8 +420,8 @@ func (d *DatabaseImpl) LoadAircraftByIcao(icao string) (*Aircraft, error) {
 	return aircraft, nil
 }
 
-// LoadAircraftById - see Database.LoadAircraftById
-func (d *DatabaseImpl) LoadAircraftById(id uint64) (*Aircraft, error) {
+// GetAircraftById - see Database.GetAircraftById
+func (d *DatabaseImpl) GetAircraftById(id uint64) (*Aircraft, error) {
 	s, p, err := d.dialect.
 		From("aircraft").
 		Prepared(true).
@@ -529,8 +529,8 @@ func (d *DatabaseImpl) ReopenSightingTx(tx *sqlx.Tx, sighting *Sighting) (sql.Re
 	return res, nil
 }
 
-// LoadLastSighting - see Database.LoadLastSighting
-func (d *DatabaseImpl) LoadLastSighting(session *Session, ac *Aircraft) (*Sighting, error) {
+// GetLastSighting - see Database.GetLastSighting
+func (d *DatabaseImpl) GetLastSighting(session *Session, ac *Aircraft) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From("sighting").
 		Prepared(true).
@@ -553,8 +553,8 @@ func (d *DatabaseImpl) LoadLastSighting(session *Session, ac *Aircraft) (*Sighti
 	return sighting, nil
 }
 
-// LoadLastSightingTx - see Database.LoadLastSightingTx
-func (d *DatabaseImpl) LoadLastSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (*Sighting, error) {
+// GetLastSightingTx - see Database.GetLastSightingTx
+func (d *DatabaseImpl) GetLastSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From("sighting").
 		Prepared(true).
@@ -658,8 +658,8 @@ func (d *DatabaseImpl) CloseSightingBatch(sightings []*Sighting) error {
 	return nil
 }
 
-// LoadSightingById - see Database.LoadSightingById
-func (d *DatabaseImpl) LoadSightingById(sightingId uint64) (*Sighting, error) {
+// GetSightingById - see Database.GetSightingById
+func (d *DatabaseImpl) GetSightingById(sightingId uint64) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From("sighting").
 		Prepared(true).
@@ -679,8 +679,8 @@ func (d *DatabaseImpl) LoadSightingById(sightingId uint64) (*Sighting, error) {
 	return sighting, nil
 }
 
-// LoadSightingByIdTx - see Database.LoadSightingByIdTx
-func (d *DatabaseImpl) LoadSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error) {
+// GetSightingByIdTx - see Database.GetSightingByIdTx
+func (d *DatabaseImpl) GetSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From("sighting").
 		Prepared(true).
@@ -714,8 +714,8 @@ func (d *DatabaseImpl) CreateNewSightingCallSignTx(tx *sqlx.Tx, sighting *Sighti
 	return tx.Exec(s, p...)
 }
 
-// InsertSightingLocation - see Database.InsertSightingLocation
-func (d *DatabaseImpl) InsertSightingLocation(sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
+// CreateSightingLocation - see Database.CreateSightingLocation
+func (d *DatabaseImpl) CreateSightingLocation(sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert("sighting_location").
 		Prepared(true).
@@ -729,8 +729,8 @@ func (d *DatabaseImpl) InsertSightingLocation(sightingId uint64, t time.Time, al
 	return d.db.Exec(s, p...)
 }
 
-// InsertSightingLocationTx - see Database.InsertSightingLocationTx
-func (d *DatabaseImpl) InsertSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
+// CreateSightingLocationTx - see Database.CreateSightingLocationTx
+func (d *DatabaseImpl) CreateSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert("sighting_location").
 		Prepared(true).
@@ -744,8 +744,8 @@ func (d *DatabaseImpl) InsertSightingLocationTx(tx *sqlx.Tx, sightingId uint64, 
 	return tx.Exec(s, p...)
 }
 
-// GetLocationHistory - see Database.GetLocationHistory
-func (d *DatabaseImpl) GetLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error) {
+// LoadLocationHistory - see Database.LoadLocationHistory
+func (d *DatabaseImpl) LoadLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error) {
 	s, p, err := d.dialect.
 		From("sighting_location").
 		Prepared(true).
@@ -765,13 +765,13 @@ func (d *DatabaseImpl) GetLocationHistory(sighting *Sighting, lastId int64, batc
 	return res, nil
 }
 
-// GetLocationHistoryWalkBatch - see Database.GetLocationHistoryWalkBatch
-func (d *DatabaseImpl) GetLocationHistoryWalkBatch(sighting *Sighting, batchSize int64, f func([]SightingLocation)) error {
+// WalkLocationHistoryBatch - see Database.WalkLocationHistoryBatch
+func (d *DatabaseImpl) WalkLocationHistoryBatch(sighting *Sighting, batchSize int64, f func([]SightingLocation)) error {
 	lastId := int64(-1)
 	batch := make([]SightingLocation, 0, batchSize)
 	for {
 		// res - needs closing
-		res, err := d.GetLocationHistory(sighting, lastId, batchSize)
+		res, err := d.LoadLocationHistory(sighting, lastId, batchSize)
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch location history")
 		}
@@ -800,7 +800,7 @@ func (d *DatabaseImpl) GetLocationHistoryWalkBatch(sighting *Sighting, batchSize
 // GetFullLocationHistory - see Database.GetFullLocationHistory
 func (d *DatabaseImpl) GetFullLocationHistory(sighting *Sighting, batchSize int64) ([]SightingLocation, error) {
 	var h []SightingLocation
-	err := d.GetLocationHistoryWalkBatch(sighting, batchSize, func(location []SightingLocation) {
+	err := d.WalkLocationHistoryBatch(sighting, batchSize, func(location []SightingLocation) {
 		h = append(h, location...)
 	})
 	if err != nil {
@@ -823,8 +823,8 @@ func (d *DatabaseImpl) CreateNewSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting
 	return tx.Exec(s, p...)
 }
 
-// LoadSightingKml - see Database.LoadSightingKml
-func (d *DatabaseImpl) LoadSightingKml(sighting *Sighting) (*SightingKml, error) {
+// GetSightingKml - see Database.GetSightingKml
+func (d *DatabaseImpl) GetSightingKml(sighting *Sighting) (*SightingKml, error) {
 	s, p, err := d.dialect.
 		From("sighting_kml").
 		Prepared(true).
@@ -867,8 +867,8 @@ func (d *DatabaseImpl) UpdateSightingKml(sightingKml *SightingKml) (sql.Result, 
 	return res, nil
 }
 
-// CreateSightingKml - see Database.CreateSightingKml
-func (d *DatabaseImpl) CreateSightingKml(sighting *Sighting, kmlData []byte) (sql.Result, error) {
+// CreateSightingKmlContent - see Database.CreateSightingKmlContent
+func (d *DatabaseImpl) CreateSightingKmlContent(sighting *Sighting, kmlData []byte) (sql.Result, error) {
 	var b bytes.Buffer
 	w := gzip.NewWriter(&b)
 	_, err := w.Write(kmlData)

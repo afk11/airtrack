@@ -99,14 +99,14 @@ func TestTracker(t *testing.T) {
 			assert.Equal(t, p.Icao, s.a.Icao)
 
 			// aircraft in DB matches expected values
-			ac, err := tr.database.LoadAircraftByIcao(p.Icao)
+			ac, err := tr.database.GetAircraftByIcao(p.Icao)
 			assert.NoError(t, err, "expecting aircraft to exist")
 			assert.NotNil(t, ac, "expecting aircraft to be returned")
 			assert.Equal(t, p.Icao, ac.Icao)
 			assert.Equal(t, s.a.Id, ac.Id)
 
 			// no sighting yet (until db processing takes place)
-			ourSighting, err := tr.database.LoadLastSighting(proj.Session, ac)
+			ourSighting, err := tr.database.GetLastSighting(proj.Session, ac)
 			assert.Error(t, sql.ErrNoRows, err, "expected last sighting, not error")
 			assert.Nil(t, ourSighting, "last sighting should be nil")
 

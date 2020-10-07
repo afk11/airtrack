@@ -19,16 +19,16 @@ func TestSomething(t *testing.T) {
 
 		projName := "testProj"
 		database := NewDatabase(dbConn, dialect)
-		p, err := database.LoadProject(projName)
+		p, err := database.GetProject(projName)
 		assert.Error(t, err, "error is expected")
 		assert.Nil(t, p, "project not expected")
 		assert.Equal(t, sql.ErrNoRows, err, "expected SQL ErrNoRows")
 
 		createdAt := time.Now().In(loc.Tz)
-		_, err = database.NewProject(projName, createdAt)
+		_, err = database.CreateProject(projName, createdAt)
 		assert.NoError(t, err)
 
-		p, err = database.LoadProject(projName)
+		p, err = database.GetProject(projName)
 		assert.NoError(t, err)
 		assert.NotNil(t, p)
 		assert.Equal(t, projName, p.Identifier)
@@ -46,10 +46,10 @@ func TestSomething(t *testing.T) {
 		database := NewDatabase(dbConn, dialect)
 
 		createdAt := time.Now().In(loc.Tz)
-		_, err := database.NewProject(projName, createdAt)
+		_, err := database.CreateProject(projName, createdAt)
 		assert.NoError(t, err)
 
-		p, err := database.LoadProject(projName)
+		p, err := database.GetProject(projName)
 		assert.NoError(t, err)
 		assert.NotNil(t, p)
 
@@ -57,14 +57,14 @@ func TestSomething(t *testing.T) {
 		assert.NoError(t, err)
 		ident := identUuid.String()
 
-		sess, err := database.LoadSessionByIdentifier(p, ident)
+		sess, err := database.GetSessionByIdentifier(p, ident)
 		assert.Error(t, err, "error is expected")
 		assert.Nil(t, sess)
 		assert.Equal(t, sql.ErrNoRows, err, "expected SQL ErrNoRows")
 
-		_, err = database.NewSession(p, ident, false, false, false)
+		_, err = database.CreateSession(p, ident, false, false, false)
 		assert.NoError(t, err)
-		sess, err = database.LoadSessionByIdentifier(p, ident)
+		sess, err = database.GetSessionByIdentifier(p, ident)
 		assert.NoError(t, err)
 		assert.NotNil(t, sess)
 		assert.Equal(t, ident, sess.Identifier)
@@ -72,27 +72,27 @@ func TestSomething(t *testing.T) {
 		assert.False(t, sess.WithSquawks)
 		assert.False(t, sess.WithTransmissionTypes)
 
-		_, err = database.NewSession(p, ident+"1", true, false, false)
+		_, err = database.CreateSession(p, ident+"1", true, false, false)
 		assert.NoError(t, err)
-		sess1, err := database.LoadSessionByIdentifier(p, ident+"1")
+		sess1, err := database.GetSessionByIdentifier(p, ident+"1")
 		assert.NoError(t, err)
 		assert.NotNil(t, sess1)
 		assert.True(t, sess1.WithSquawks)
 		assert.False(t, sess1.WithTransmissionTypes)
 		assert.False(t, sess1.WithCallSigns)
 
-		_, err = database.NewSession(p, ident+"2", false, true, false)
+		_, err = database.CreateSession(p, ident+"2", false, true, false)
 		assert.NoError(t, err)
-		sess2, err := database.LoadSessionByIdentifier(p, ident+"2")
+		sess2, err := database.GetSessionByIdentifier(p, ident+"2")
 		assert.NoError(t, err)
 		assert.NotNil(t, sess2)
 		assert.False(t, sess2.WithSquawks)
 		assert.True(t, sess2.WithTransmissionTypes)
 		assert.False(t, sess2.WithCallSigns)
 
-		_, err = database.NewSession(p, ident+"3", false, false, true)
+		_, err = database.CreateSession(p, ident+"3", false, false, true)
 		assert.NoError(t, err)
-		sess3, err := database.LoadSessionByIdentifier(p, ident+"3")
+		sess3, err := database.GetSessionByIdentifier(p, ident+"3")
 		assert.NoError(t, err)
 		assert.NotNil(t, sess3)
 		assert.False(t, sess3.WithSquawks)
@@ -120,20 +120,20 @@ func TestSomething(t *testing.T) {
 		database := NewDatabase(dbConn, dialect)
 
 		icao := "7f80ff"
-		_, err := database.LoadAircraftByIcao(icao)
+		_, err := database.GetAircraftByIcao(icao)
 		assert.Error(t, err)
 		assert.Equal(t, sql.ErrNoRows, err)
 
 		_, err = database.CreateAircraft(icao)
 		assert.NoError(t, err)
 
-		a, err := database.LoadAircraftByIcao(icao)
+		a, err := database.GetAircraftByIcao(icao)
 		assert.NoError(t, err)
 		assert.NotNil(t, a)
 		assert.Equal(t, icao, a.Icao)
 		// todo: test value of aircraft created_at
 
-		a, err = database.LoadAircraftById(a.Id)
+		a, err = database.GetAircraftById(a.Id)
 		assert.NoError(t, err)
 		assert.NotNil(t, a)
 		assert.Equal(t, icao, a.Icao)
@@ -149,14 +149,14 @@ func TestSomething(t *testing.T) {
 		_, err := database.CreateAircraft(icao)
 		assert.NoError(t, err)
 
-		a, err := database.LoadAircraftByIcao(icao)
+		a, err := database.GetAircraftByIcao(icao)
 		assert.NoError(t, err)
 		assert.NotNil(t, a)
 		assert.Equal(t, icao, a.Icao)
 
-		_, err = database.NewProject(projName, createdAt)
+		_, err = database.CreateProject(projName, createdAt)
 		assert.NoError(t, err)
-		p, err := database.LoadProject(projName)
+		p, err := database.GetProject(projName)
 		assert.NoError(t, err)
 		assert.NotNil(t, p)
 
@@ -164,19 +164,19 @@ func TestSomething(t *testing.T) {
 		assert.NoError(t, err)
 		ident := identUuid.String()
 
-		_, err = database.NewSession(p, ident, false, false, false)
+		_, err = database.CreateSession(p, ident, false, false, false)
 		assert.NoError(t, err)
-		sess, err := database.LoadSessionByIdentifier(p, ident)
+		sess, err := database.GetSessionByIdentifier(p, ident)
 		assert.NoError(t, err)
 		assert.NotNil(t, sess)
 
-		sighting, err := database.LoadLastSighting(sess, a)
+		sighting, err := database.GetLastSighting(sess, a)
 		assert.Error(t, sql.ErrNoRows, err)
 		assert.Nil(t, sighting)
 
 		_, err = database.CreateSighting(sess, a)
 		assert.NoError(t, err)
-		sighting, err = database.LoadLastSighting(sess, a)
+		sighting, err = database.GetLastSighting(sess, a)
 		assert.NoError(t, err)
 		assert.NotNil(t, sighting)
 		assert.Nil(t, sighting.ClosedAt)
@@ -187,12 +187,12 @@ func TestSomething(t *testing.T) {
 		assert.Equal(t, uint8(0), sighting.TransmissionTypes)
 
 		// again
-		sightingById, err := database.LoadSightingById(sighting.Id)
+		sightingById, err := database.GetSightingById(sighting.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, sighting.Id, sightingById.Id)
 		// again
 		assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-			s, err := database.LoadSightingByIdTx(tx, sighting.Id)
+			s, err := database.GetSightingByIdTx(tx, sighting.Id)
 			assert.NoError(t, err)
 			assert.NotNil(t, s)
 			assert.Equal(t, sighting.Id, s.Id)
@@ -200,13 +200,13 @@ func TestSomething(t *testing.T) {
 		}))
 		// again
 		assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-			s, err := database.LoadLastSightingTx(tx, sess, a)
+			s, err := database.GetLastSightingTx(tx, sess, a)
 			assert.NoError(t, err)
 			assert.NotNil(t, s)
 			assert.Equal(t, sighting.Id, s.Id)
 			return nil
 		}))
-		// todo: test LoadLastSighting with multiple sightings
+		// todo: test GetLastSighting with multiple sightings
 
 		now := time.Now()
 		callsign := "UPS1234"
@@ -273,14 +273,14 @@ func TestSomething(t *testing.T) {
 		_, err := database.CreateAircraft(icao)
 		assert.NoError(t, err)
 
-		a, err := database.LoadAircraftByIcao(icao)
+		a, err := database.GetAircraftByIcao(icao)
 		assert.NoError(t, err)
 		assert.NotNil(t, a)
 		assert.Equal(t, icao, a.Icao)
 
-		_, err = database.NewProject(projName, createdAt)
+		_, err = database.CreateProject(projName, createdAt)
 		assert.NoError(t, err)
-		p, err := database.LoadProject(projName)
+		p, err := database.GetProject(projName)
 		assert.NoError(t, err)
 		assert.NotNil(t, p)
 
@@ -288,20 +288,20 @@ func TestSomething(t *testing.T) {
 		assert.NoError(t, err)
 		ident := identUuid.String()
 
-		_, err = database.NewSession(p, ident, false, false, false)
+		_, err = database.CreateSession(p, ident, false, false, false)
 		assert.NoError(t, err)
-		sess, err := database.LoadSessionByIdentifier(p, ident)
+		sess, err := database.GetSessionByIdentifier(p, ident)
 		assert.NoError(t, err)
 		assert.NotNil(t, sess)
 
 		_, err = database.CreateSighting(sess, a)
 		assert.NoError(t, err)
-		sighting, err := database.LoadLastSighting(sess, a)
+		sighting, err := database.GetLastSighting(sess, a)
 		assert.NoError(t, err)
 		assert.NotNil(t, sighting)
 
 		// expect
-		empty, err := database.GetLocationHistory(sighting, 0, 100)
+		empty, err := database.LoadLocationHistory(sighting, 0, 100)
 		assert.NoError(t, err)
 		assert.NotNil(t, empty)
 		assert.False(t, empty.Next())
@@ -310,13 +310,13 @@ func TestSomething(t *testing.T) {
 		lat1 := 1.9876523
 		lon1 := 1.234789
 		alt1 := int64(10000)
-		_, err = database.InsertSightingLocation(sighting.Id, now, alt1, lat1, lon1)
+		_, err = database.CreateSightingLocation(sighting.Id, now, alt1, lat1, lon1)
 		assert.NoError(t, err)
 
 		lat2 := 1.9899523
 		lon2 := 1.238889
 		alt2 := int64(10015)
-		_, err = database.InsertSightingLocation(sighting.Id, now, alt2, lat2, lon2)
+		_, err = database.CreateSightingLocation(sighting.Id, now, alt2, lat2, lon2)
 		assert.NoError(t, err)
 
 		history, err := database.GetFullLocationHistory(sighting, 100)
@@ -330,16 +330,16 @@ func TestSomething(t *testing.T) {
 		assert.Equal(t, lon2, history[1].Longitude)
 		assert.Equal(t, alt2, history[1].Altitude)
 
-		sightingKml, err := database.LoadSightingKml(sighting)
+		sightingKml, err := database.GetSightingKml(sighting)
 		assert.Error(t, err)
 		assert.Equal(t, sql.ErrNoRows, err)
 		assert.Nil(t, sightingKml)
 
 		kStr := []byte("not-quite-kml")
 
-		_, err = database.CreateSightingKml(sighting, kStr)
+		_, err = database.CreateSightingKmlContent(sighting, kStr)
 		assert.NoError(t, err)
-		sightingKml, err = database.LoadSightingKml(sighting)
+		sightingKml, err = database.GetSightingKml(sighting)
 		assert.NoError(t, err)
 		assert.NotNil(t, sightingKml)
 		assert.Equal(t, sighting.Id, sightingKml.SightingId)
@@ -354,7 +354,7 @@ func TestSomething(t *testing.T) {
 		_, err = database.UpdateSightingKml(sightingKml)
 		assert.NoError(t, err)
 
-		sightingKml, err = database.LoadSightingKml(sighting)
+		sightingKml, err = database.GetSightingKml(sighting)
 		assert.NoError(t, err)
 		assert.NotNil(t, sightingKml)
 		decoded, err = sightingKml.DecodedKml()
