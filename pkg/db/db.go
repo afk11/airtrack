@@ -708,10 +708,33 @@ func (d *DatabaseImpl) CreateNewSightingCallSignTx(tx *sqlx.Tx, sighting *Sighti
 		Cols("sighting_id", "callsign", "observed_at").
 		Vals(goqu.Vals{sighting.Id, callsign, observedAt}).
 		ToSQL()
+	//fmt.Println(s)
+	//fmt.Println(p)
 	if err != nil {
 		return nil, err
 	}
 	return tx.Exec(s, p...)
+}
+
+// GetLastSightingCallSignTx - see Database.GetLastSightingCallSignTx
+func (d *DatabaseImpl) GetLastSightingCallSignTx(tx *sqlx.Tx, sighting *Sighting) (*SightingCallSign, error) {
+	s, p, err := d.dialect.
+		From("sighting_callsign").
+		Prepared(true).
+		Where(goqu.C("sighting_id").Eq(sighting.Id)).
+		Order(goqu.C("id").Desc()).
+		Limit(1).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	callsign := SightingCallSign{}
+	row := tx.QueryRowx(s, p...)
+	if err = row.StructScan(&callsign); err != nil {
+		return nil, err
+	}
+	return &callsign, nil
 }
 
 // CreateSightingLocation - see Database.CreateSightingLocation
@@ -821,6 +844,27 @@ func (d *DatabaseImpl) CreateNewSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting
 		return nil, err
 	}
 	return tx.Exec(s, p...)
+}
+
+// GetLastSightingSquawkTx - see Database.GetLastSightingSquawkTx
+func (d *DatabaseImpl) GetLastSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting) (*SightingSquawk, error) {
+	s, p, err := d.dialect.
+		From("sighting_squawk").
+		Prepared(true).
+		Where(goqu.C("sighting_id").Eq(sighting.Id)).
+		Order(goqu.C("id").Desc()).
+		Limit(1).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	squawk := SightingSquawk{}
+	row := tx.QueryRowx(s, p...)
+	if err = row.StructScan(&squawk); err != nil {
+		return nil, err
+	}
+	return &squawk, nil
 }
 
 // GetSightingKml - see Database.GetSightingKml

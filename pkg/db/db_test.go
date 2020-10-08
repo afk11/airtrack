@@ -139,6 +139,8 @@ func TestSomething(t *testing.T) {
 		assert.Equal(t, icao, a.Icao)
 	})
 	t.Run("Sighting", func(t *testing.T) {
+		loc := test.MustLoadTestTimeZone()
+
 		dbConn, dialect, _, closer := test.InitDBUp()
 		defer closer()
 		database := NewDatabase(dbConn, dialect)
@@ -186,6 +188,7 @@ func TestSomething(t *testing.T) {
 		assert.Nil(t, sighting.Squawk)
 		assert.Equal(t, uint8(0), sighting.TransmissionTypes)
 
+
 		// again
 		sightingById, err := database.GetSightingById(sighting.Id)
 		assert.NoError(t, err)
@@ -208,7 +211,7 @@ func TestSomething(t *testing.T) {
 		}))
 		// todo: test GetLastSighting with multiple sightings
 
-		now := time.Now()
+		now := time.Now().In(loc.Tz)
 		callsign := "UPS1234"
 		assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
 			_, err := database.UpdateSightingCallsignTx(tx, sighting, callsign)
@@ -220,9 +223,14 @@ func TestSomething(t *testing.T) {
 		assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
 			_, err := database.CreateNewSightingCallSignTx(tx, sighting, callsign, now)
 			assert.NoError(t, err)
+			cs, err := database.GetLastSightingCallSignTx(tx, sighting)
+			assert.NoError(t, err)
+			assert.NotNil(t, cs)
+			assert.Equal(t, callsign, cs.CallSign)
+			assert.Equal(t, now, cs.ObservedAt)
+			assert.Equal(t, sighting.Id, cs.SightingId)
 			return nil
 		}))
-		// todo: should load and check callsign
 
 		squawk := "7700"
 		assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
@@ -235,9 +243,14 @@ func TestSomething(t *testing.T) {
 		assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
 			_, err := database.CreateNewSightingSquawkTx(tx, sighting, squawk, now)
 			assert.NoError(t, err)
+			sk, err := database.GetLastSightingSquawkTx(tx, sighting)
+			assert.NoError(t, err)
+			assert.NotNil(t, sk)
+			assert.Equal(t, squawk, sk.Squawk)
+			assert.Equal(t, now, sk.ObservedAt)
+			assert.Equal(t, sighting.Id, sk.SightingId)
 			return nil
 		}))
-		// todo: should load and check squawk
 
 		// close and reopen
 		err = database.CloseSightingBatch([]*Sighting{sighting})
@@ -316,8 +329,11 @@ func TestSomething(t *testing.T) {
 		lat2 := 1.9899523
 		lon2 := 1.238889
 		alt2 := int64(10015)
-		_, err = database.CreateSightingLocation(sighting.Id, now, alt2, lat2, lon2)
-		assert.NoError(t, err)
+		assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
+			_, err = database.CreateSightingLocationTx(tx, sighting.Id, now, alt2, lat2, lon2)
+			assert.NoError(t, err)
+			return nil
+		}))
 
 		history, err := database.GetFullLocationHistory(sighting, 100)
 		assert.NoError(t, err)
