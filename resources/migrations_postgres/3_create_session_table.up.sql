@@ -9,5 +9,5 @@ create table session (
     with_squawks bool not null,
     with_callsigns bool not null,
     with_transmission_types bool not null
-    );
-create index session_closed_at on session(project_id);
+);
+create unique index unique_project_identifier on session(project_id, identifier);

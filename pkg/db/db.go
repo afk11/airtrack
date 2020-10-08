@@ -5,8 +5,11 @@ import (
 	"compress/gzip"
 	"database/sql"
 	"github.com/doug-martin/goqu/v9"
+	"github.com/go-sql-driver/mysql"
 	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+	"github.com/mattn/go-sqlite3"
 	"github.com/pkg/errors"
 	"io/ioutil"
 	"time"
@@ -157,6 +160,22 @@ func CheckRowsUpdated(res sql.Result, expectAffected int64) error {
 		return errors.Errorf("expected %d rows affected, got %d", expectAffected, affected)
 	}
 	return nil
+}
+
+// IsUniqueConstraintViolation returns whether the query failed
+// due to violating a unique constraint. It returns an error
+// if err is not one of the supported SQL driver error types.
+func IsUniqueConstraintViolation(err error) (bool, error) {
+	switch e := err.(type) {
+	case *mysql.MySQLError:
+		return e.Number == 1062, nil
+	case *pq.Error:
+		return e.Code == "23505", nil
+	case sqlite3.Error:
+		return e.Code == sqlite3.ErrConstraint, nil
+	default:
+		return false, errors.New("unsupported error type")
+	}
 }
 
 // Database - interface for the database queries

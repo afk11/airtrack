@@ -11,4 +11,4 @@ create table `session` (
     `with_transmission_types` tinyint not null
 );
 
-create index closed_at on session(`project_id`);
+create unique index unique_project_identifier on session(`project_id`,`identifier`);

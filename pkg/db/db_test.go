@@ -37,6 +37,24 @@ func TestSomething(t *testing.T) {
 		assert.Equal(t, createdAt, p.UpdatedAt)
 		assert.Nil(t, p.DeletedAt)
 	})
+	t.Run("ProjectDuplicateName", func(t *testing.T) {
+		loc := test.MustLoadTestTimeZone()
+		dbConn, dialect, _, closer := test.InitDBUp()
+		defer closer()
+
+		projName := "testProj"
+		database := NewDatabase(dbConn, dialect)
+
+		createdAt := time.Now().In(loc.Tz)
+		_, err := database.CreateProject(projName, createdAt)
+		assert.NoError(t, err)
+
+		_, err = database.CreateProject(projName, createdAt)
+		assert.Error(t, err)
+		isUniqueViolation, err := IsUniqueConstraintViolation(err)
+		assert.NoError(t, err)
+		assert.True(t, isUniqueViolation)
+	})
 	t.Run("Session", func(t *testing.T) {
 		loc := test.MustLoadTestTimeZone()
 		dbConn, dialect, _, closer := test.InitDBUp()
@@ -114,6 +132,34 @@ func TestSomething(t *testing.T) {
 		assert.NotNil(t, sess2.ClosedAt)
 		assert.NotNil(t, sess3.ClosedAt)
 	})
+	t.Run("SessionDuplicateIdentifier", func(t *testing.T) {
+		loc := test.MustLoadTestTimeZone()
+		dbConn, dialect, _, closer := test.InitDBUp()
+		defer closer()
+
+		projName := "testProj"
+		database := NewDatabase(dbConn, dialect)
+
+		createdAt := time.Now().In(loc.Tz)
+		_, err := database.CreateProject(projName, createdAt)
+		assert.NoError(t, err)
+
+		p, err := database.GetProject(projName)
+		assert.NoError(t, err)
+		assert.NotNil(t, p)
+
+		identUuid, err := uuid.NewRandom()
+		assert.NoError(t, err)
+		ident := identUuid.String()
+
+		_, err = database.CreateSession(p, ident, false, false, true)
+		assert.NoError(t, err)
+		_, err = database.CreateSession(p, ident, false, false, true)
+		assert.Error(t, err)
+		isUniqueViolation, err := IsUniqueConstraintViolation(err)
+		assert.NoError(t, err)
+		assert.True(t, isUniqueViolation)
+	})
 	t.Run("Aircraft", func(t *testing.T) {
 		dbConn, dialect, _, closer := test.InitDBUp()
 		defer closer()
@@ -187,7 +233,6 @@ func TestSomething(t *testing.T) {
 		assert.Nil(t, sighting.CallSign)
 		assert.Nil(t, sighting.Squawk)
 		assert.Equal(t, uint8(0), sighting.TransmissionTypes)
-
 
 		// again
 		sightingById, err := database.GetSightingById(sighting.Id)

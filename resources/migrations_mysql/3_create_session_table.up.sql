@@ -9,4 +9,4 @@ create table `session` (
     `with_squawks` tinyint not null,
     `with_callsigns` tinyint not null,
     `with_transmission_types` tinyint not null) default character set utf8mb4 collate 'utf8mb4_unicode_ci';
-alter table `session` add index `closed_at`(`project_id`);
+alter table `session` add unique index `unique_project_identifier`(`project_id`,`identifier`);
