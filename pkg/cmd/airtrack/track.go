@@ -347,13 +347,17 @@ func (l *Loader) Load(c *TrackCmd) error {
 
 	if l.cfg.Metrics != nil && l.cfg.Metrics.Enabled {
 		var prometheusPort = 9206
+		var prometheusIface = "0.0.0.0"
 		if l.cfg.Metrics.Port != 0 {
 			prometheusPort = l.cfg.Metrics.Port
+		}
+		if l.cfg.Metrics.Interface != "" {
+			prometheusIface = l.cfg.Metrics.Interface
 		}
 		mux := http.NewServeMux()
 		mux.Handle("/metrics", promhttp.Handler())
 		l.metricsServer = &http.Server{
-			Addr:         fmt.Sprintf(":%d", prometheusPort),
+			Addr:         fmt.Sprintf("%s:%d", prometheusIface, prometheusPort),
 			Handler:      mux,
 			WriteTimeout: 15 * time.Second,
 			ReadTimeout:  15 * time.Second,
