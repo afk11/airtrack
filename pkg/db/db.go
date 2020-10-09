@@ -238,7 +238,7 @@ type Database interface {
 	ReopenSightingTx(tx *sqlx.Tx, sighting *Sighting) (sql.Result, error)
 	// CloseSightingBatch takes a list of sightings and marks them as closed in a batch.
 	// If successful, nil is returned. Otherwise an error is returned.
-	CloseSightingBatch(sightings []*Sighting) error
+	CloseSightingBatch(sightings []*Sighting, closedAt time.Time) error
 	// UpdateSightingCallsignTx updates the Sighting.Callsign to the provided callsign.
 	// A sql.Result is returned if the query is successful. Otherwise an error is returned.
 	UpdateSightingCallsignTx(tx *sqlx.Tx, sighting *Sighting, callsign string) (sql.Result, error)
@@ -639,12 +639,11 @@ func (d *DatabaseImpl) UpdateSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, s
 }
 
 // CloseSightingBatch - see Database.CloseSightingBatch
-func (d *DatabaseImpl) CloseSightingBatch(sightings []*Sighting) error {
+func (d *DatabaseImpl) CloseSightingBatch(sightings []*Sighting, closedAt time.Time) error {
 	if len(sightings) == 0 {
 		return nil
 	}
 	n := len(sightings)
-	closedAt := time.Now()
 	err := d.Transaction(func(tx *sqlx.Tx) error {
 		var ids []uint64
 		for i := 0; i < n; i++ {
@@ -1021,8 +1020,7 @@ func (d *DatabaseImpl) MarkEmailFailedTx(tx *sqlx.Tx, job *Email) (sql.Result, e
 		Update("email").
 		Prepared(true).
 		Set(goqu.Ex{
-			"retry_after": 0,
-			"status":      EmailFailed,
+			"status": EmailFailed,
 		}).
 		Where(goqu.C("id").Eq(job.Id)).
 		ToSQL()

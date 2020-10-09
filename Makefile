@@ -61,7 +61,7 @@ build-airtrack-qa-linux-amd64: delete-build-dir resources/readsb-src build-deps
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 
 test: test-cleanup delete-build-dir resources/readsb-src build-deps
-	go test -coverprofile=./coverage/tests.out ./... \
+	go test -p 1 -coverprofile=./coverage/tests.out ./... \
 	$(TESTARGS)
 
 # test cleanup, remove old coverage

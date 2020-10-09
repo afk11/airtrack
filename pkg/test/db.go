@@ -3,9 +3,14 @@ package test
 import (
 	"database/sql"
 	"fmt"
+	"github.com/afk11/airtrack/pkg/config"
+	"github.com/afk11/airtrack/pkg/db/migrations"
 	"github.com/afk11/airtrack/pkg/db/migrations_mysql"
 	"github.com/afk11/airtrack/pkg/db/migrations_sqlite3"
 	"github.com/doug-martin/goqu/v9"
+	_ "github.com/doug-martin/goqu/v9/dialect/mysql"
+	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
+	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
 	"github.com/golang-migrate/migrate"
 	"github.com/golang-migrate/migrate/database/mysql"
 	"github.com/golang-migrate/migrate/database/sqlite3"
@@ -54,22 +59,23 @@ type TestDbConfig struct {
 	NumDbs      int
 }
 
-func MustLoadTestDbConfig() *TestDbConfig {
+func MustLoadTestDbConfig() *config.Database {
 	c, err := LoadTestDbConfig()
 	if err != nil {
 		panic(err)
 	}
 	return c
 }
-func LoadTestDbConfig() (*TestDbConfig, error) {
-	cfg := &TestDbConfig{
-		Driver:      "mysql",
-		DatabaseFmt: "airtrack_test_%d",
-		Username:    "root",
-		Password:    "",
-		Host:        "127.0.0.1",
-		Port:        3306,
-		NumDbs:      1,
+func LoadTestDbConfig() (*config.Database, error) {
+	cfg := &config.Database{
+		Driver:   "mysql",
+		Username: "root",
+		Password: "",
+		Host:     "127.0.0.1",
+		Port:     3306,
+	}
+	if v, found := os.LookupEnv("AIRTRACK_TEST_DB_DRIVER"); found {
+		cfg.Driver = v
 	}
 	if v, found := os.LookupEnv("AIRTRACK_TEST_DB_USER"); found {
 		cfg.Username = v
@@ -86,13 +92,6 @@ func LoadTestDbConfig() (*TestDbConfig, error) {
 			return nil, err
 		}
 		cfg.Port = p
-	}
-	if v, found := os.LookupEnv("AIRTRACK_TEST_DB_NUM_DBS"); found {
-		n, err := strconv.Atoi(v)
-		if err != nil {
-			return nil, err
-		}
-		cfg.NumDbs = n
 	}
 	return cfg, nil
 }
@@ -168,7 +167,7 @@ func init() {
 	dbs = make([]*TestDB, 4)
 	for i := 0; i < 4; i++ {
 		dbs[i] = &TestDB{
-			db:    fmt.Sprintf("airtrack_%d", i),
+			db:    fmt.Sprintf("airtrack_test_%d", i),
 			tz:    tz.Tz,
 			inUse: false}
 	}
@@ -190,6 +189,34 @@ func ClaimNextDB() *TestDB {
 	return nil
 }
 
+func DropTablesPostgres(db *sqlx.DB) error {
+	rows, err := db.Query(`SELECT table_name
+FROM information_schema.tables
+WHERE table_schema='public'
+AND table_type='BASE TABLE';`)
+	if err != nil {
+		return errors.Wrapf(err, "querying for tables")
+	}
+
+	defer rows.Close()
+	var tables []string
+	for rows.Next() {
+		var table string
+		err = rows.Scan(&table)
+		if err != nil {
+			return err
+		}
+		tables = append(tables, table)
+	}
+
+	for _, table := range tables {
+		_, err = db.Exec("DROP TABLE " + table)
+		if err != nil {
+			return errors.Wrapf(err, "drop table")
+		}
+	}
+	return nil
+}
 func DropTables(db *sqlx.DB) error {
 	rows, err := db.Query(`SHOW TABLES`)
 	if err != nil {
@@ -207,52 +234,71 @@ func DropTables(db *sqlx.DB) error {
 		tables = append(tables, table)
 	}
 
-	tx, err := db.Begin()
-	if err != nil {
-		return nil
-	}
-	defer tx.Rollback()
 	for _, table := range tables {
-		_, err = tx.Exec("DROP TABLE " + table)
+		_, err = db.Exec("DROP TABLE " + table)
 		if err != nil {
 			return errors.Wrapf(err, "drop table")
 		}
 	}
-	err = tx.Commit()
-	if err != nil {
-		rerr := tx.Rollback()
-		if rerr != nil {
-			return rerr
-		}
-		return err
-	}
 	return nil
 }
 
+func sqliteTempFile(testDB *TestDB) string {
+	return "/tmp/" + testDB.db + ".sqlite3"
+}
 func InitDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 	testDB := ClaimNextDB()
-
-	tmpFile := "/tmp/" + testDB.db + ".sqlite3"
-	if _, err := os.Stat(tmpFile); err == nil {
-		err = os.Remove(tmpFile)
+	_, ok := os.LookupEnv("AIRTRACK_TEST_DB_DRIVER")
+	var dbConf *config.Database
+	var err error
+	if ok {
+		dbConf, err = LoadTestDbConfig()
 		if err != nil {
 			panic(err)
 		}
+		dbConf.Database = testDB.db
+	} else {
+		dbConf = &config.Database{
+			Driver:   "sqlite3",
+			Database: sqliteTempFile(testDB),
+		}
 	}
 
-	dbUrl := fmt.Sprintf("file:" + tmpFile)
-	sqlConn, err := sql.Open("sqlite3", dbUrl)
-	dbConn := sqlx.NewDb(sqlConn, "sqlite3")
-	if err != nil {
-		panic(fmt.Sprintf("error creating database connection %s", err.Error()))
+	dbUrl, err := dbConf.DataSource(testDB.tz)
+	if dbConf.Driver == config.DatabaseDriverSqlite3 {
+		if _, err := os.Stat(dbConf.Database); err == nil {
+			err = os.Remove(dbConf.Database)
+			if err != nil {
+				panic(err)
+			}
+		}
 	}
+
+	sqlConn, err := sql.Open(dbConf.Driver, dbUrl)
+	if err != nil {
+		panic(err)
+	}
+	dbConn := sqlx.NewDb(sqlConn, dbConf.Driver)
 
 	err = dbConn.Ping()
 	if err != nil {
 		panic(err)
 	}
 
-	m, err := InitSqliteMigration(testDB.db, tmpFile, dbConn.DB)
+	switch dbConf.Driver {
+	case config.DatabaseDriverMySQL:
+		err = DropTables(dbConn)
+		if err != nil {
+			panic(err)
+		}
+	case config.DatabaseDriverPostgresql:
+		err = DropTablesPostgres(dbConn)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	m, err := migrations.InitMigrations(dbConf, testDB.tz)
 	if err != nil {
 		panic(err)
 	}
@@ -266,7 +312,8 @@ func InitDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 		dbConn.Close()
 		testDB.inUse = false
 	}
-	dialect := goqu.Dialect("sqlite3")
+	dialect := goqu.Dialect(dbConf.Driver)
+
 	return dbConn, dialect, testDB.db, closeFn
 }
 

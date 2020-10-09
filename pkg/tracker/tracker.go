@@ -464,10 +464,11 @@ func (t *Tracker) Stop() error {
 	log.Infof("closed with %d aircraft being monitored", pAircraft)
 
 	t.sighting = make(map[string]*Sighting)
+	now := time.Now()
 	// Split this into batches, full list can cause too many variables sqlite error
 	limit := 100
 	for i := 0; i < len(pSightings); i += limit {
-		err := t.database.CloseSightingBatch(pSightings[i:min(i+limit, len(pSightings))])
+		err := t.database.CloseSightingBatch(pSightings[i:min(i+limit, len(pSightings))], now)
 		if err != nil {
 			return errors.Wrapf(err, "closing batch of sightings")
 		}
@@ -833,9 +834,10 @@ func (t *Tracker) doLostAircraftCheck() error {
 	}()
 
 	// Do this in batches, ensure we don't get too many variables error from sqlite
+	now := time.Now()
 	limit := 100
 	for i := 0; i < len(lostDbSightings); i += limit {
-		err := t.database.CloseSightingBatch(lostDbSightings[i:min(i+limit, len(lostDbSightings))])
+		err := t.database.CloseSightingBatch(lostDbSightings[i:min(i+limit, len(lostDbSightings))], now)
 		if err != nil {
 			return errors.Wrapf(err, "closing batch of sightings")
 		}
