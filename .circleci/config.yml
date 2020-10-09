@@ -1,20 +1,5 @@
 version: 2 # use CircleCI 2.0
 jobs: # basic units of work in a run
-  docs:
-    docker:
-      - image: circleci/golang:1.15
-    steps:
-      - checkout
-
-#      - run:
-#          name: "Test Markdown Files"
-#          command: |
-#            wget https://github.com/felicianotech/md-proofer/releases/download/v0.1.0/md-proofer-v0.1.0-linux-amd64.tar.gz
-#            tar xfz md-proofer-v*.tar.gz
-#            sudo chmod +x ./md-proofer
-#            echo "Test Airtrack documentation Markdown files"
-#            echo "===================================================================================="
-#            ./md-proofer lint docs/
 
   build: # runs not using Workflows must have a `build` job as entry point
     docker: # run the steps with Docker
@@ -31,7 +16,6 @@ jobs: # basic units of work in a run
       - run:
           name: Install build tools
           command: sudo apt install autoconf libtool libprotobuf-dev libprotoc-dev libncurses-dev protobuf-compiler librrd-dev build-essential
-
       - run:
           name: Install go-bindata and easyjson and protobuf tools
           command: make install-protobuf-c install-protoc-gen-go install-go-bindata install-easyjson
@@ -64,7 +48,6 @@ jobs: # basic units of work in a run
       - run:
           name: Install build tools
           command: sudo apt install autoconf libtool libprotobuf-dev libprotoc-dev libncurses-dev protobuf-compiler librrd-dev build-essential
-
       - run:
           name: Install go-bindata and easyjson and protobuf tools
           command: make install-protobuf-c install-protoc-gen-go install-go-bindata install-easyjson
@@ -78,10 +61,43 @@ jobs: # basic units of work in a run
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+  build-mysql: # runs not using Workflows must have a `build` job as entry point
+    docker: # run the steps with Docker
+      # CircleCI Go images available at: https://hub.docker.com/r/circleci/golang/
+      - image: circleci/golang:1.15
+      - image: circleci/mariadb:10.5
+        environment:
+          MYSQL_USER: airtrack_user
+          MYSQL_PASSWORD: airtrack_pass
+          MYSQL_DATABASE: airtrack_test_0
+
+    steps: # steps that comprise the `build` job
+      - checkout # check out source code to working directory
+
+      - restore_cache: # restores saved cache if no changes are detected since last run
+          keys:
+            - go-mod-v4-{{ checksum "go.sum" }}
+
+      - run:
+          name: Install build tools
+          command: sudo apt install autoconf libtool libprotobuf-dev libprotoc-dev libncurses-dev protobuf-compiler librrd-dev build-essential
+      - run:
+          name: Install go-bindata and easyjson and protobuf tools
+          command: make install-protobuf-c install-protoc-gen-go install-go-bindata install-easyjson
+
+      - run:
+          name: Run unit tests
+          # store the results of our tests in the $TEST_RESULTS directory
+          command: AIRTRACK_TEST_DB_DRIVER=mysql AIRTRACK_TEST_DB_PORT=3306 AIRTRACK_TEST_DB_USER=airtrack_user AIRTRACK_TEST_DB_PASS=airtrack_pass TESTOPTIONS="-v " make test
+
+      - save_cache:
+          key: go-mod-v4-{{ checksum "go.sum" }}
+          paths:
+            - "/go/pkg/mod"
 workflows:
   version: 2
   build-workflow:
     jobs:
       - build
       - build-postgres
-      - docs
+      - build-mysql
