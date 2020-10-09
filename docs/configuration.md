@@ -21,6 +21,7 @@ Placeholders for certain types of data:
  * `<host>`: a valid hostname or IP address
  * `<int>`: an integer value
  * `<secret>`: a secret sequence of characters. passwords/apikeys etc
+ * `<ip_address>`: an IP address
  * `<http_url>`: a valid URL with an HTTP or HTTPS schema
  * `<dirpath>`: a valid path to a directory on the filesystem (absolute or relative)
  * `<email>`: a valid email address 
@@ -60,6 +61,9 @@ database: <database_config>
 # Configuration for the HTTP server with maps
 [ map: <map_config> | default = none ]
 
+# Configuration for prometheus metrics
+[ metrics: <metrics_config> | default = none ]
+
 # Project configurations
 projects:
 [ - <project_config> | default = none ]
@@ -96,6 +100,8 @@ apikey: <secret>
 BEAST format messages are produced by dump1090 on port 30005 by default.
 
 ```yaml
+# Name for this data source
+name: <string>
 # Hostname or IP for server
 host: <host>
 # Port for connection (probably 30005)
@@ -189,7 +195,7 @@ the following defaults:
 
 ```yaml
 # Interface the HTTP server will listen on
-[ host: <string> | default = "0.0.0.0" ]
+[ host: <ip_address> | default = "0.0.0.0" ]
 # Port for the HTTP server. Default is 8080
 [ port: <int> | default = 8080 ]
 # Disable map server. Default is false.
@@ -205,9 +211,24 @@ services:
 [ - <mapservice> | default = "tar1090", "dump1090" ]
 ```
 
+### `<metrics_config>`
+
+The `<metrics_config>` section contains confirmation for prometheus metrics about the golang internals and airtrack operations.
+
+If the section is missing or `enabled` is false the metrics server will be disabled.
+
+```yaml
+# Whether to enable metrics server.
+[ enabled: <boolean> | default = false ]
+# Interface the metrics HTTP server will listen on.
+[ interface: <ip_address> | default = "0.0.0.0" ]
+# Port the metrics HTTP server will listen on.
+[ port: <int> | default = 9206 ]
+```
+
 ### `<database_config>`
 
-A database section is required for airtrack to run. The supported engines are:
+A `<database_config>` section is required for airtrack to run. The supported engines are:
  * [MySQL](#mysql)
  * [PostgreSQL](#postresql)
  * [SQLite Version 3](#sqlite)  

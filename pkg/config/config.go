@@ -142,7 +142,9 @@ type (
 	Metrics struct {
 		// Enabled - control whether to enable metrics. Default to off.
 		Enabled bool `yaml:"enabled"`
-		// Port - port to listen for metrics HTTP server
+		// Interface - interface to bind on. If empty, default is "0.0.0.0"
+		Interface string `yaml:"interface"`
+		// Port - port to listen for metrics HTTP server. If empty, default is 8080.
 		Port int `yaml:"port"`
 	}
 
