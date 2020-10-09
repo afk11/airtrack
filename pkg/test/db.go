@@ -272,6 +272,9 @@ func InitDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 				panic(err)
 			}
 		}
+	} else if dbConf.Driver == config.DatabaseDriverPostgresql {
+		// only need this for circleci really
+		dbUrl = dbUrl + " sslmode=disable"
 	}
 
 	sqlConn, err := sql.Open(dbConf.Driver, dbUrl)
