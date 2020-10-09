@@ -3,7 +3,7 @@
 The airtrack project provides software to aid in monitoring of aircraft.
 
  - the adsbexchange api (if you're a feeder or pay for one)
- - TODO: dump1090 support
+ - Support for BEAST format TCP stream
  - Multiple project support: The configuration file lets you specify multiple projects, each with its own configuration for logging/reporting flight information
  - Filtering language: Projects can define filters to only focus on aircraft that meet specified conditions
  - Database storage: Projects save some minimal information about sighting open and close times, and the aircraft ICAO, as well as other data points about the flight.
