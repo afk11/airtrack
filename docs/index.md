@@ -21,3 +21,5 @@ key stages in flight tracking.
 ## Run Airtrack
 
 [Click here](./running-airtrack.html) to see how to setup and run airtrack.
+
+[Click here](./changelog.html) to see the changelog.
