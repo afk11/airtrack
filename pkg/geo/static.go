@@ -4,6 +4,7 @@ import (
 	"math"
 )
 
+// Geocoder interface specifies methods to find a name for a location
 type Geocoder interface {
 	// ReverseGeocode takes a lat/lon and tries to return a location
 	// name, and the distance to the location from the input point.
@@ -13,12 +14,12 @@ type Geocoder interface {
 	ReverseGeocode(lat float64, lon float64) (string, float64, error)
 }
 
-// haversin(θ) function
+// hsin - the haversin(θ) function
 func hsin(theta float64) float64 {
 	return math.Pow(math.Sin(theta/2), 2)
 }
 
-// distance between points in meters
+// Distance distance between points in meters
 func Distance(lat1, lon1, lat2, lon2 float64) float64 {
 	// convert to radians
 	// must cast radius as float to multiply later

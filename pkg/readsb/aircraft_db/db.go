@@ -24,34 +24,31 @@ var OperatorCountryFixupMap = map[string]string{
 	"PerÃº":                   "Peru",
 }
 
-type Aircraft struct {
-	Registration string `json:"r"`
-	TypeCode     string `json:"t"`
-	F            string `json:"f"`
-	Description  string `json:"d"`
-}
-
+// Operator contains information about an airline operator
 type Operator struct {
 	Name    string `json:"n"`
 	Country string `json:"c"`
 	R       string `json:"r"`
 }
 
-type aircraftMap map[string]pb.AircraftInfo
-type operatorMap map[string]pb.Operator
-
+// Db provides access to the readsb aircraft database
 type Db struct {
 	initialized bool
-	aircraft    aircraftMap
-	operators   operatorMap
+	aircraft    map[string]pb.AircraftInfo
+	operators   map[string]pb.Operator
 }
 
+// New returns an initialized (but empty) Db
 func New() *Db {
 	return &Db{
-		aircraft:  aircraftMap{},
-		operators: operatorMap{},
+		aircraft:  make(map[string]pb.AircraftInfo),
+		operators: make(map[string]pb.Operator),
 	}
 }
+
+// GetAircraft searches for aircraft information using icao. The second return
+// argument indicates whether the search was successful. If its false
+// the aircraft info will be nil.
 func (d *Db) GetAircraft(icao string) (*pb.AircraftInfo, bool) {
 	ac, ok := d.aircraft[icao]
 	if !ok {
@@ -59,6 +56,10 @@ func (d *Db) GetAircraft(icao string) (*pb.AircraftInfo, bool) {
 	}
 	return &ac, true
 }
+
+// GetOperator searches for operator information using code. The second return
+// argument indicates whether the search was successful. If its false
+// the operator info will be nil.
 func (d *Db) GetOperator(code string) (*pb.Operator, bool) {
 	op, ok := d.operators[code]
 	if !ok {
@@ -76,6 +77,7 @@ type operatorFile map[string]Operator
 //easyjson:json
 type shardFile []string
 
+// LoadAssets loads the readsb database from internal files into Db.
 func LoadAssets(db *Db, Asset func(string) ([]byte, error)) error {
 	if db.initialized {
 		return nil

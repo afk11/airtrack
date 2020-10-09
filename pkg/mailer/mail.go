@@ -2,82 +2,107 @@ package mailer
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
 	"github.com/afk11/airtrack/pkg/db"
-	"github.com/afk11/airtrack/pkg/zlib"
 	"github.com/afk11/mail"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
+	"io/ioutil"
 	"sync"
 	"time"
 )
 
-type MailSender interface {
-	Queue(msg db.EmailJob) error
+type (
+	// EmailAttachment. JSON structure for an email attachment in
+	// encoded job.
+	EmailAttachment struct {
+		ContentType string `json:"content_type"`
+		FileName    string `json:"filename"`
+		Contents    []byte `json:"contents"`
+	}
+	// EmailJob. JSON structure for db.Email Job field.
+	EmailJob struct {
+		To          string            `json:"to"`
+		Subject     string            `json:"subject"`
+		Body        string            `json:"body"`
+		Attachments []EmailAttachment `json:"attachments"`
+	}
+	// MailSender - public interface for queuing emails to be sent.
+	MailSender interface {
+		Queue(msg EmailJob) error
+	}
+	// Mailer manages background services for sending email.
+	// New emails are queued in queued until the processing
+	// coroutine saves them to the database in a batch. The
+	// processing routine also searches for new emails to send
+	// Implements MailSender
+	Mailer struct {
+		database  db.Database
+		from      string
+		dialer    *mail.Dialer
+		queued    []EmailJob
+		canceller func()
+		mu        sync.RWMutex
+		wg        sync.WaitGroup
+	}
+)
+
+// NewMailer creates a new Mailer
+func NewMailer(database db.Database, from string, dialer *mail.Dialer) *Mailer {
+	return &Mailer{
+		database: database,
+		dialer:   dialer,
+		from:     from,
+		queued:   make([]EmailJob, 0),
+	}
 }
 
-type Mailer struct {
-	database  db.Database
-	from      string
-	dialer    *mail.Dialer
-	queued    []db.EmailJob
-	canceller func()
-	mu        sync.RWMutex
-	wg        sync.WaitGroup
-}
-
-func (m *Mailer) Queue(msg db.EmailJob) error {
+// Queue adds job to the queue so it can be persisted later.
+// See MailSender.Queue
+func (m *Mailer) Queue(job EmailJob) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	m.queued = append(m.queued, msg)
+	m.queued = append(m.queued, job)
 	return nil
 }
-func encodeJob(job *db.EmailJob) ([]byte, error) {
-	// make json
-	raw, err := json.Marshal(job)
-	if err != nil {
-		return nil, err
-	}
-	// compress
-	compressed, err := zlib.Encode(raw)
-	if err != nil {
-		return nil, errors.Wrap(err, "zlib decode email")
-	}
-	return compressed, nil
+
+// Start invokes the processing goroutine
+func (m *Mailer) Start() {
+	ctx, canceller := context.WithCancel(context.Background())
+	m.canceller = canceller
+	m.wg.Add(1)
+	go m.periodicallyProcessMails(ctx)
 }
-func decodeJob(compressed []byte) (db.EmailJob, error) {
-	// decompress
-	raw, err := zlib.Decode(compressed)
-	if err != nil {
-		return db.EmailJob{}, errors.Wrap(err, "zlib decode email")
-	}
-	// parse json
-	job := db.EmailJob{}
-	err = json.Unmarshal(raw, &job)
-	if err != nil {
-		return db.EmailJob{}, err
-	}
-	return job, nil
-}
-func (m *Mailer) addMailsToDb(now time.Time, queued []db.EmailJob) error {
-	return m.database.Transaction(func(tx *sqlx.Tx) error {
-		for _, job := range queued {
-			ciphertext, err := encodeJob(&job)
+
+// periodicallyProcessEmails runs in a loop until the shutdown
+// signal is received. In each iteration it calls processMails.
+// If errors arise, an extra delay is used.
+func (m *Mailer) periodicallyProcessMails(ctx context.Context) {
+	defer m.wg.Done()
+	normalDelay := time.Second * 30
+	delay := normalDelay
+	for {
+		select {
+		case <-time.After(delay):
+			err := m.processMails()
 			if err != nil {
-				return err
+				delay = time.Minute
+			} else {
+				delay = normalDelay
 			}
-			_, err = m.database.CreateEmailJobTx(tx, now, ciphertext)
-			if err != nil {
-				return err
-			}
+		case <-ctx.Done():
+			return
 		}
-		return nil
-	})
+	}
 }
+
+// processMails is called periodically to save persist new emails
+// and to send emails that need to be sent.
 func (m *Mailer) processMails() error {
 	start := time.Now()
 	cancelled := make(chan bool)
@@ -118,7 +143,7 @@ func (m *Mailer) processMails() error {
 	}
 	log.Debugf("mailer: processing %d jobs", len(records))
 
-	jobs := make([]db.EmailJob, 0, len(records))
+	jobs := make([]EmailJob, 0, len(records))
 	for _, record := range records {
 		job, err := decodeJob(record.Job)
 		if err != nil {
@@ -134,23 +159,23 @@ func (m *Mailer) processMails() error {
 			return err
 		}
 
-		failed := make([]db.Email, 0)
-		finished := make([]db.Email, 0)
-		for i, job := range jobs {
+		failedEmails := make([]db.Email, 0)
+		finishedEmails := make([]db.Email, 0)
+		for i := range jobs {
 			msg := mail.NewMessage()
 			msg.SetHeader("Sender", m.from)
-			msg.SetHeader("To", job.To, job.To)
-			msg.SetHeader("Subject", job.Subject)
-			msg.SetBody("text/html", job.Body)
-			for _, attach := range job.Attachments {
+			msg.SetHeader("To", jobs[i].To, jobs[i].To)
+			msg.SetHeader("Subject", jobs[i].Subject)
+			msg.SetBody("text/html", jobs[i].Body)
+			for _, attach := range jobs[i].Attachments {
 				msg.AttachReader(attach.ContentType, bytes.NewBuffer(attach.Contents), mail.Rename(attach.FileName))
 			}
 			err := mail.Send(sendCloser, msg)
 			if err != nil {
 				log.Warnf("failed to send email: %s", err.Error())
-				failed = append(failed, records[i])
+				failedEmails = append(failedEmails, records[i])
 			} else {
-				finished = append(finished, records[i])
+				finishedEmails = append(finishedEmails, records[i])
 			}
 		}
 
@@ -159,12 +184,12 @@ func (m *Mailer) processMails() error {
 			log.Warnf("failed to close SMTP dialer")
 		}
 
-		if len(finished) > 0 {
+		if len(finishedEmails) > 0 {
 			err = m.database.Transaction(func(tx *sqlx.Tx) error {
-				for _, email := range finished {
-					_, err = m.database.DeleteCompletedEmail(tx, email)
+				for i := range finishedEmails {
+					_, err = m.database.DeleteCompletedEmailTx(tx, finishedEmails[i])
 					if err != nil {
-						return errors.Wrapf(err, "deleting completed email %d", email.Id)
+						return errors.Wrapf(err, "deleting completed email %d", finishedEmails[i].Id)
 					}
 				}
 				return nil
@@ -174,18 +199,18 @@ func (m *Mailer) processMails() error {
 			}
 		}
 
-		if len(failed) > 0 {
+		if len(failedEmails) > 0 {
 			err = m.database.Transaction(func(tx *sqlx.Tx) error {
-				for _, email := range failed {
-					if email.Retries == 4 {
-						_, err = m.database.MarkEmailFailedTx(tx, email)
+				for i := range failedEmails {
+					if failedEmails[i].Retries == 4 {
+						_, err = m.database.MarkEmailFailedTx(tx, &failedEmails[i])
 						if err != nil {
-							return errors.Wrapf(err, "marking email failed %d", email.Id)
+							return errors.Wrapf(err, "marking email failed %d", failedEmails[i].Id)
 						}
 					} else {
-						_, err = m.database.RetryEmailAfter(tx, email, time.Now().Add(time.Minute*2))
+						_, err = m.database.RetryEmailAfterTx(tx, &failedEmails[i], time.Now().Add(time.Minute*2))
 						if err != nil {
-							return errors.Wrapf(err, "updating email retry information %d", email.Id)
+							return errors.Wrapf(err, "updating email retry information %d", failedEmails[i].Id)
 						}
 					}
 				}
@@ -198,30 +223,25 @@ func (m *Mailer) processMails() error {
 	}
 	return nil
 }
-func (m *Mailer) Start() {
-	ctx, canceller := context.WithCancel(context.Background())
-	m.canceller = canceller
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
-		normalDelay := time.Second * 5
-		delay := normalDelay
-		for {
-			select {
-			case <-time.After(delay):
-				err := m.processMails()
-				if err != nil {
-					delay = time.Minute
-				} else {
-					delay = normalDelay
-				}
-			case <-ctx.Done():
-				return
+
+// addMailsToDb encodes and persist queued jobs.
+func (m *Mailer) addMailsToDb(now time.Time, queued []EmailJob) error {
+	return m.database.Transaction(func(tx *sqlx.Tx) error {
+		for idx := range queued {
+			encoded, err := encodeJob(&queued[idx])
+			if err != nil {
+				return err
+			}
+			_, err = m.database.CreateEmailJobTx(tx, now, encoded)
+			if err != nil {
+				return err
 			}
 		}
-	}()
+		return nil
+	})
 }
 
+// Stop cancels the processing goroutine and waits for it to finish
 func (m *Mailer) Stop() {
 	m.canceller()
 	m.wg.Wait()
@@ -230,11 +250,43 @@ func (m *Mailer) Stop() {
 		panic(err)
 	}
 }
-func NewMailer(database db.Database, from string, dialer *mail.Dialer) *Mailer {
-	return &Mailer{
-		database: database,
-		dialer:   dialer,
-		from:     from,
-		queued:   make([]db.EmailJob, 0),
+
+// encodeJob takes a job and encodes it into a compressed payload
+func encodeJob(job *EmailJob) ([]byte, error) {
+	// make json
+	raw, err := json.Marshal(job)
+	if err != nil {
+		return nil, err
 	}
+
+	var compressed bytes.Buffer
+	w := gzip.NewWriter(&compressed)
+	if _, err := w.Write(raw); err != nil {
+		return nil, err
+	} else if err := w.Close(); err != nil {
+		return nil, err
+	}
+
+	return compressed.Bytes(), nil
+}
+
+// decodeJob takes a compressed job and decodes it into a EmailJob.
+func decodeJob(compressed []byte) (EmailJob, error) {
+	// decompress
+	r, err := gzip.NewReader(bytes.NewBuffer(compressed))
+	if err != nil {
+		return EmailJob{}, errors.Wrapf(err, "creating gzip reader for kml")
+	}
+	raw, err := ioutil.ReadAll(r)
+	if err != nil {
+		return EmailJob{}, errors.Wrapf(err, "decompressing gzipped kml")
+	}
+
+	// parse json
+	job := EmailJob{}
+	err = json.Unmarshal(raw, &job)
+	if err != nil {
+		return EmailJob{}, err
+	}
+	return job, nil
 }

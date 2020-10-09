@@ -140,7 +140,7 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				ac := readsb.TrackUpdateFromMessage(p.decoder, msg)
 
 				proto := &pb.Message{
-					Icao: msg.GetIcaoHex(),
+					Icao:   msg.GetIcaoHex(),
 					Source: &source,
 				}
 				if category, err := ac.GetCategory(); err == nil {

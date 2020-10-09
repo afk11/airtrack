@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 )
 
+// ScanDirectoriesForFiles walks the file trees for each entry in directories,
+// and returns a list of all files with the ext for an extension, or an error
+// if one is encountered
 func ScanDirectoriesForFiles(ext string, directories []string) ([]string, error) {
 	var files []string
 	extLen := len(ext)

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	assert "github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func TestReadProjectsConfig(t *testing.T) {
@@ -216,6 +217,163 @@ projects:
 		assert.Equal(t, "track_callsigns", cfg.Projects[1].Features[0])
 		assert.Equal(t, "track_squawks", cfg.Projects[1].Features[1])
 		assert.Equal(t, "track_takeoff", cfg.Projects[1].Features[2])
+	})
+
+	t.Run("default timezone", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+projects:
+  - name: German aircraft
+    filter: state.CountryCode == "DE"
+    disabled: true
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+		assert.Nil(t, cfg.TimeZone)
+
+		myTimezone := time.Now().Location()
+		cfgTz, err := cfg.GetTimeLocation()
+		assert.NoError(t, err)
+		assert.Equal(t, myTimezone, cfgTz)
+	})
+
+	t.Run("custom timezone", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+timezone: Europe/Berlin
+projects:
+  - name: German aircraft
+    filter: state.CountryCode == "DE"
+    disabled: true
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+		assert.NotNil(t, cfg.TimeZone)
+		assert.Equal(t, "Europe/Berlin", *cfg.TimeZone, "parsed timezone should match")
+
+		myTimezone, err := time.LoadLocation("Europe/Berlin")
+		assert.NoError(t, err)
+
+		cfgTz, err := cfg.GetTimeLocation()
+		assert.NoError(t, err)
+		assert.Equal(t, myTimezone, cfgTz)
+	})
+	t.Run("unknown timezone", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+timezone: UNKNOWN
+projects:
+  - name: German aircraft
+    filter: state.CountryCode == "DE"
+    disabled: true
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+
+		tz, err := cfg.GetTimeLocation()
+		assert.Error(t, err)
+		assert.Nil(t, tz)
+		assert.EqualError(t, err, "unknown time zone UNKNOWN")
+	})
+	t.Run("database mysql", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+timezone: Europe/Berlin
+database:
+  driver: mysql
+  host: server.local
+  port: 3306
+  username: airtrackuser
+  password: password
+  database: airtrackdb
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+
+		tz, err := cfg.GetTimeLocation()
+		assert.NoError(t, err)
+		str, err := cfg.Database.DataSource(tz)
+		assert.NoError(t, err)
+		assert.Equal(t, "airtrackuser:password@tcp(server.local:3306)/airtrackdb?parseTime=true&loc=Europe%2FBerlin", str)
+	})
+	t.Run("database sqlite3", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+timezone: Europe/Berlin
+database:
+  driver: sqlite3
+  database: ./airtrack.sqlite3
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+
+		tz, err := cfg.GetTimeLocation()
+		assert.NoError(t, err)
+		str, err := cfg.Database.DataSource(tz)
+		assert.NoError(t, err)
+		assert.Equal(t, "file:./airtrack.sqlite3?parseTime=true&loc=Europe%2FBerlin", str)
+	})
+	t.Run("database postgres", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+timezone: Europe/Berlin
+database:
+  driver: postgres
+  host: server.local
+  port: 3306
+  username: airtrackuser
+  password: password
+  database: airtrackdb
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+
+		tz, err := cfg.GetTimeLocation()
+		assert.NoError(t, err)
+		str, err := cfg.Database.DataSource(tz)
+		assert.NoError(t, err)
+		assert.Equal(t, "host=server.local port=3306 user=airtrackuser password=password dbname=airtrackdb", str)
+	})
+	t.Run("database unknown", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+timezone: Europe/Berlin
+database:
+  driver: unknown
+  host: server.local
+  port: 3306
+  username: airtrackuser
+  password: password
+  database: airtrackdb
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+
+		tz, err := cfg.GetTimeLocation()
+		assert.NoError(t, err)
+		_, err = cfg.Database.DataSource(tz)
+		assert.Error(t, err)
+		assert.EqualError(t, err, "unsupported database driver `unknown`")
+	})
+	t.Run("database driver missing", func(t *testing.T) {
+		buf := bytes.NewBufferString(`
+timezone: Europe/Berlin
+database:
+  host: server.local
+  port: 3306
+  username: airtrackuser
+  password: password
+  database: airtrackdb
+`)
+		cfg, err := ReadConfig(buf)
+		assert.NoError(t, err)
+		assert.NotNil(t, cfg)
+
+		tz, err := cfg.GetTimeLocation()
+		assert.NoError(t, err)
+		_, err = cfg.Database.DataSource(tz)
+		assert.Error(t, err)
+		assert.EqualError(t, err, "no database driver configured")
 	})
 }
 

@@ -20,7 +20,9 @@ require (
 	github.com/gorilla/mux v1.7.4
 	github.com/hashicorp/go-immutable-radix v1.2.0
 	github.com/jmoiron/sqlx v1.2.0
+	github.com/lib/pq v1.2.0
 	github.com/mailru/easyjson v0.7.6
+	github.com/mattn/go-sqlite3 v1.11.0
 	github.com/mmcloughlin/geohash v0.9.0
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect

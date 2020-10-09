@@ -53,9 +53,8 @@ type MapService interface {
 	// RegisterRoutes allows the MapService to add
 	// it's map related routes to the router
 	RegisterRoutes(r *mux.Router) error
-	// UpdateScheduler returns a MapHistoryUpdateScheduler
-	// for this map service for history purposes
-	UpdateScheduler() MapHistoryUpdateScheduler
+	// UpdateHistory is used to
+	UpdateHistory(projNames []string) error
 }
 
 // MapProjectStatusListener implements the ProjectStatusListener
@@ -527,11 +526,14 @@ func (m *AircraftMap) updateJson(ctx context.Context) {
 
 			m.projMu.RLock()
 			projects := make([]string, 0, len(m.projects))
-			for pk := range m.projects {
-				projects = append(projects, m.projects[pk].name)
+			for projName := range m.projects {
+				projects = append(projects, projName)
 			}
 			for sk := range m.services {
-				m.services[sk].UpdateScheduler().UpdateHistory(projects)
+				err := m.services[sk].UpdateHistory(projects)
+				if err != nil {
+					panic(err)
+				}
 			}
 			m.projMu.RUnlock()
 			lastHistoryUpdate = time.Now()

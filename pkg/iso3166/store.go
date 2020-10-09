@@ -9,12 +9,16 @@ type countryCodes struct {
 	alpha2 AlphaTwoCountryCode
 	alpha3 AlphaThreeCountryCode
 }
+
+// Store contains indexes allowing countries to be searched by
+// their alpha2 or alpha3 code.
 type Store struct {
 	countries map[string]countryCodes
 	alpha2    map[AlphaTwoCountryCode]*Country
 	alpha3    map[AlphaThreeCountryCode]*Country
 }
 
+// GetAlphaTwoCodes returns a list of all alpha-2 codes.
 func (s *Store) GetAlphaTwoCodes() []AlphaTwoCountryCode {
 	codes := make([]AlphaTwoCountryCode, 0, len(s.alpha2))
 	for code := range s.alpha2 {
@@ -23,6 +27,8 @@ func (s *Store) GetAlphaTwoCodes() []AlphaTwoCountryCode {
 	return codes
 }
 
+// GetCountryCode searches for country info using the alpha-2 code cc.
+// The second argument indicates whether the search was successful.
 func (s *Store) GetCountryCode(cc AlphaTwoCountryCode) (*Country, bool) {
 	code, ok := s.alpha2[cc]
 	if !ok {
@@ -31,6 +37,7 @@ func (s *Store) GetCountryCode(cc AlphaTwoCountryCode) (*Country, bool) {
 	return code, true
 }
 
+// emptyStore initializes an empty Store
 func emptyStore() *Store {
 	return &Store{
 		countries: make(map[string]countryCodes),
@@ -38,6 +45,8 @@ func emptyStore() *Store {
 		alpha3:    make(map[AlphaThreeCountryCode]*Country),
 	}
 }
+
+// New creates a Store initialized with the parsed country file in list.
 func New(list [][3]string) (*Store, error) {
 	s := emptyStore()
 	for _, v := range list {

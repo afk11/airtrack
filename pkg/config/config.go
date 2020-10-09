@@ -210,7 +210,7 @@ func (c *Config) GetTimeLocation() (*time.Location, error) {
 	var err error
 	loc, err := time.LoadLocation(tz)
 	if err != nil {
-		return nil, errors.Wrapf(err, "Invalid timezone `%s`", tz)
+		return nil, err
 	}
 	return loc, nil
 }
@@ -224,7 +224,7 @@ func (d *Database) DataSource(loc *time.Location) (string, error) {
 		return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?parseTime=true&loc=%s",
 			d.Username, d.Password, d.Host, d.Port, d.Database, url.PathEscape(loc.String())), nil
 	case DatabaseDriverPostgresql:
-		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s ",
+		return fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s",
 			d.Host, d.Port, d.Username, d.Password, d.Database), nil
 	case DatabaseDriverSqlite3:
 		return fmt.Sprintf("file:%s?parseTime=true&loc=%s",

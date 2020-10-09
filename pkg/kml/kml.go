@@ -8,11 +8,11 @@ import (
 )
 
 const (
-	OpenDoc = `<?xml version="1.0" encoding="UTF-8"?>
+	openDoc = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2" xmlns:gx="http://www.google.com/kml/ext/2.2">
 <Document>`
 
-	CloseDoc = `
+	closeDoc = `
     <ScreenOverlay>
         <name>FlightAware</name>
         <Icon>
@@ -26,6 +26,7 @@ const (
 </kml>`
 )
 
+// locationPlacemark generates XML for a location placemark
 func locationPlacemark(name, desc string, altitude int64, latitude, longitude float64) string {
 	// coordinates line: long, lat, alt
 	return fmt.Sprintf(`
@@ -38,17 +39,8 @@ func locationPlacemark(name, desc string, altitude int64, latitude, longitude fl
     </Placemark>`, name, desc, longitude, latitude, altitude)
 }
 
-func buildPlacemarkFragment(locationData []db.SightingLocation) (string, string) {
-	when := ""
-	coord := ""
-	for _, row := range locationData {
-		stamp := row.TimeStamp
-		when = when + "            <when>" + stamp.Format(time.RFC3339) + "</when>\n"
-		coord = coord + fmt.Sprintf("            <gx:coord>%f %f %d</gx:coord>\n", row.Longitude, row.Latitude, row.Altitude)
-	}
-	return when, coord
-}
-
+// WriterOptions contains some preprocessed information
+// about the flight
 type WriterOptions struct {
 	RouteName        string
 	RouteDescription string
@@ -59,6 +51,8 @@ type WriterOptions struct {
 	DestinationName        string
 	DestinationDescription string
 }
+
+// Writer processes locations into a KML file
 type Writer struct {
 	opt   WriterOptions
 	first *db.SightingLocation
@@ -67,15 +61,21 @@ type Writer struct {
 	coord string
 }
 
+// NewWriter returns a new Writer initialized with opt
 func NewWriter(opt WriterOptions) *Writer {
 	return &Writer{
 		opt: opt,
 	}
 }
+
+// Write processes the new locationData and appends it to internal state
 func (w *Writer) Write(locationData []db.SightingLocation) {
-	when, coord := buildPlacemarkFragment(locationData)
-	w.when += when
-	w.coord += coord
+	for i := range locationData {
+		w.when += "            <when>" + locationData[i].TimeStamp.Format(time.RFC3339) + "</when>\n"
+		w.coord += fmt.Sprintf("            <gx:coord>%f %f %d</gx:coord>\n",
+			locationData[i].Longitude, locationData[i].Latitude, locationData[i].Altitude)
+	}
+
 	if len(locationData) > 0 {
 		if w.first == nil {
 			w.first = &locationData[0]
@@ -83,11 +83,13 @@ func (w *Writer) Write(locationData []db.SightingLocation) {
 		w.last = &locationData[len(locationData)-1]
 	}
 }
+
+// Final returns the final result of the writer, or an error if one occurred.
 func (w *Writer) Final() (string, error) {
 	if w.first == nil || w.last == nil {
 		return "", errors.New("missing location information")
 	}
-	return OpenDoc +
+	return openDoc +
 		locationPlacemark(w.opt.SourceName, w.opt.SourceDescription, w.first.Altitude, w.first.Latitude, w.first.Longitude) +
 		locationPlacemark(w.opt.DestinationName, w.opt.DestinationDescription, w.last.Altitude, w.last.Latitude, w.last.Longitude) +
 		`
@@ -101,5 +103,5 @@ func (w *Writer) Final() (string, error) {
 		w.when +
 		w.coord + `        </gx:Track>
     </Placemark>` +
-		CloseDoc, nil
+		closeDoc, nil
 }

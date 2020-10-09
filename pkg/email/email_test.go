@@ -36,7 +36,7 @@ func TestLoadMailTemplates(t *testing.T) {
 		tpls, err := LoadMailTemplates(GetTemplates()...)
 		assert.NoError(t, err)
 		_, err = tpls.Get("unknown")
-		assert.EqualError(t, err, EmailNotFoundErr.Error())
+		assert.EqualError(t, err, TemplateNotFoundErr.Error())
 	})
 }
 

@@ -16,7 +16,7 @@ import (
 type TestEmail struct {
 	To       string `help:"send test email to"`
 	Type     string `help:"notification type"`
-	Sighting int64  `help:"sighting ID"`
+	Sighting uint64 `help:"sighting ID"`
 }
 
 func (e *TestEmail) Run(ctx *Context) error {
@@ -57,11 +57,11 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return err
 	}
 
-	sighting, err := database.LoadSightingById(e.Sighting)
+	sighting, err := database.GetSightingById(e.Sighting)
 	if err != nil {
 		return err
 	}
-	ac, err := database.LoadAircraftById(int64(sighting.AircraftId))
+	ac, err := database.GetAircraftById(sighting.AircraftId)
 	if err != nil {
 		return err
 	}
@@ -71,7 +71,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return err
 	}
 
-	var job *db.EmailJob
+	var job *mailer.EmailJob
 	switch notifyType {
 	case tracker.MapProduced:
 		w := kml.NewWriter(kml.WriterOptions{
@@ -87,7 +87,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 
 		var numPoints int
 		var firstLocation, lastLocation *db.SightingLocation
-		err := database.GetLocationHistoryWalkBatch(sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
+		err := database.WalkLocationHistoryBatch(sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
 			w.Write(location)
 			if firstLocation == nil {
 				firstLocation = &location[0]

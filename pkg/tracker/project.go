@@ -23,9 +23,9 @@ type (
 		Name string
 		// ShouldMap indicates whether the map should be built for this project
 		ShouldMap bool
-		// Site - the db record for this collection site
-		Site *db.Project
-		// Session - the db record for the current collection session
+		// Project - the db record for this project
+		Project *db.Project
+		// Session - the db record for the project session
 		Session *db.Session
 		// Filter - a CEL expression for filtering aircraft (can be empty)
 		Filter string
@@ -195,7 +195,7 @@ func InitProject(cfg config.Project) (*Project, error) {
 					nil),
 				decls.NewVar("AdsbExchangeSource", decls.Int),
 				decls.NewVar("BeastSource", decls.Int),
-					))
+			))
 
 		if err != nil {
 			return nil, err

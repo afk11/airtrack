@@ -227,6 +227,8 @@ import (
 )
 
 type (
+	HeadingType int
+
 	// Aircraft simply wraps a readsb aircraft pointer so we can pass it around
 	Aircraft struct {
 		a *C.struct_aircraft
@@ -248,9 +250,12 @@ type (
 var (
 	// ErrNoData is returned when the fields data was not available
 	ErrNoData = errors.New("no data for field")
-)
 
-type HeadingType int
+	// private state, for *Once functions
+	doneIcaoFilterInit bool
+	doneModeAcInit     bool
+	doneChecksumInit   bool
+)
 
 const (
 	ModeACMsgBytes = int(C.MODEAC_MSG_BYTES)
@@ -283,6 +288,16 @@ func IcaoFilterInit() {
 	C.icaoFilterInit()
 }
 
+// IcaoFilterInitOnce uses internal state to ensure IcaoFilterInit
+// is only called once
+func IcaoFilterInitOnce() {
+	if doneIcaoFilterInit {
+		return
+	}
+	IcaoFilterInit()
+	doneIcaoFilterInit = true
+}
+
 // IcaoFilterExpire should be called periodically so aircraft which
 // are out of range (not seen for some TTL) are removed from our filter
 func IcaoFilterExpire() {
@@ -295,10 +310,30 @@ func ModeACInit() {
 	C.modeACInit()
 }
 
+// ModeACInitOnce uses internal state to ensure ModeACInit is only
+// called once
+func ModeACInitOnce() {
+	if doneModeAcInit {
+		return
+	}
+	ModeACInit()
+	doneModeAcInit = true
+}
+
 // ModesChecksumInit calls the readsb function modesChecksumInit which
 // precomputes data about CRC errors
 func ModesChecksumInit(numbits int) {
 	C.modesChecksumInit(C.int(numbits))
+}
+
+// ModesChecksumInitOnce uses internal state to ensure ModesChecksumInit is only
+// called once
+func ModesChecksumInitOnce(numbits int) {
+	if doneChecksumInit {
+		return
+	}
+	ModesChecksumInit(numbits)
+	doneChecksumInit = true
 }
 
 // DfToString returns the description of this df value.

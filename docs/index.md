@@ -18,6 +18,6 @@ can geolocate the takeoff and landing airport for a flight.
 See [Aircraft Tracking Lifecycle](tracking-lifecycle.html) for a description of the
 key stages in flight tracking.
 
-Airtrack provides a built in web server with a map UI for each project. It supports
-multiple map layouts (currently dump1090 and tar1090 interfaces). The default
-url is [http://localhost:8080/tar1090/PROJECT/index.html](http://localhost:8080/tar1090/PROJECT/index.html)
+## Run Airtrack
+
+[Click here](./running-airtrack.html) to see how to setup and run airtrack.
