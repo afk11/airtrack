@@ -246,8 +246,7 @@ func DropTables(db *sqlx.DB) error {
 func sqliteTempFile(testDB *TestDB) string {
 	return "/tmp/" + testDB.db + ".sqlite3"
 }
-func InitDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
-	testDB := ClaimNextDB()
+func initDb(testDB *TestDB, migrate bool) (*sqlx.DB, *config.Database, goqu.DialectWrapper, string, func()) {
 	_, ok := os.LookupEnv("AIRTRACK_TEST_DB_DRIVER")
 	var dbConf *config.Database
 	var err error
@@ -288,26 +287,28 @@ func InitDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 		panic(err)
 	}
 
-	switch dbConf.Driver {
-	case config.DatabaseDriverMySQL:
-		err = DropTables(dbConn)
-		if err != nil {
-			panic(err)
+	if migrate {
+		switch dbConf.Driver {
+		case config.DatabaseDriverMySQL:
+			err = DropTables(dbConn)
+			if err != nil {
+				panic(err)
+			}
+		case config.DatabaseDriverPostgresql:
+			err = DropTablesPostgres(dbConn)
+			if err != nil {
+				panic(err)
+			}
 		}
-	case config.DatabaseDriverPostgresql:
-		err = DropTablesPostgres(dbConn)
-		if err != nil {
-			panic(err)
-		}
-	}
 
-	m, err := migrations.InitMigrations(dbConf, testDB.tz)
-	if err != nil {
-		panic(err)
-	}
-	err = m.Up()
-	if err != nil {
-		panic(err)
+		m, err := migrations.InitMigrations(dbConf, testDB.tz)
+		if err != nil {
+			panic(err)
+		}
+		err = m.Up()
+		if err != nil {
+			panic(err)
+		}
 	}
 
 	// create close function
@@ -317,11 +318,16 @@ func InitDB() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 	}
 	dialect := goqu.Dialect(dbConf.Driver)
 
-	return dbConn, dialect, testDB.db, closeFn
+	return dbConn, dbConf, dialect, testDB.db, closeFn
+}
+func InitDB() (*sqlx.DB, *config.Database, goqu.DialectWrapper, string, func()) {
+	testDB := ClaimNextDB()
+	dbConn, dbConf, dialect, dbName, closeFn := initDb(testDB, false)
+	return dbConn, dbConf, dialect, dbName, closeFn
 }
 
 func InitDBUp() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
-	dbConn, dialect, dbName, closeFn := InitDB()
-
+	testDB := ClaimNextDB()
+	dbConn, _, dialect, dbName, closeFn := initDb(testDB, true)
 	return dbConn, dialect, dbName, closeFn
 }
