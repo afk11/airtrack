@@ -46,7 +46,7 @@ var (
 	})
 	//filterEvalDurations = promauto.NewSummary(prometheus.SummaryOpts{
 	//	Subsystem:  "airtrack",
-	//	Address:       "filter_evaluation_durations",
+	//	Interface:       "filter_evaluation_durations",
 	//	Help:       "Redis requests latencies in seconds",
 	//	Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
 	//})
