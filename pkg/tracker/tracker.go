@@ -226,7 +226,7 @@ func (o *ProjectObservation) HasCallSign() bool {
 func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
 	if track {
 		if o.HasCallSign() {
-			log.Infof("[session %d] %s: updated callsign %s -> %s", o.project.Session.ID, o.mem.State.Icao, *o.CallSign(), callsign)
+			log.Infof("[session %d] %s: updated callsign %s -> %s", o.project.Session.ID, o.mem.State.Icao, o.CallSign(), callsign)
 		} else {
 			log.Infof("[session %d] %s: found callsign %s", o.project.Session.ID, o.mem.State.Icao, callsign)
 		}
@@ -240,9 +240,9 @@ func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
 	return nil
 }
 
-// CallSign returns a pointer to the current callsign
-func (o *ProjectObservation) CallSign() *string {
-	return &o.callsign
+// CallSign returns the current callsign, or an empty string if unknown
+func (o *ProjectObservation) CallSign() string {
+	return o.callsign
 }
 
 // HasSquawk - returns true if the ProjectObservation has a current squawk set
@@ -957,7 +957,7 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 	endTimeFmt := observation.lastSeen.Format(time.RFC822)
 	sightingDuration := observation.lastSeen.Sub(observation.firstSeen)
 	if observation.HasCallSign() {
-		ac = *observation.CallSign()
+		ac = observation.CallSign()
 	} else {
 		ac = sighting.State.Icao
 	}
@@ -1044,7 +1044,7 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 			MapUpdated: mapUpdated,
 		}
 		if observation.HasCallSign() {
-			sp.CallSign = *observation.CallSign()
+			sp.CallSign = observation.CallSign()
 		}
 		log.Debugf("[session %d] %s: sending %s notification", project.Session.ID, sighting.State.Icao, MapProduced)
 		msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, plainTextKml, sp)
@@ -1362,7 +1362,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		}
 	}
 	if s.State.HaveCallsign {
-		updatedCallSign := !observation.HasCallSign() || s.State.CallSign != *observation.CallSign()
+		updatedCallSign := !observation.HasCallSign() || s.State.CallSign != observation.CallSign()
 		if updatedCallSign {
 			err := observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns))
 			if err != nil {
