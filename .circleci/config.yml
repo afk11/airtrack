@@ -110,7 +110,7 @@ jobs: # basic units of work in a run
       - run:
           name: Run unit tests
           # store the results of our tests in the $TEST_RESULTS directory
-          command: TESTOPTIONS="-v " make build-airtrack-linux-amd64
+          command: TESTOPTIONS="-v " RELEASE_LDFLAGS="-X github.com/afk11/airtrack/pkg/cmd/airtrack.version=${CIRCLE_TAG} -X github.com/afk11/airtrack/pkg/cmd/airtrack.usingOpenAipData=y" make build-airtrack-linux-amd64
       - run:
           name: Copy build artifacts
           command: |
