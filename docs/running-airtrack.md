@@ -9,19 +9,21 @@ This guide explains how setup and run airtrack and view a project's map in the b
 ## Configuration
 
 If you haven't already, [create a configuration file](./configuration.html). Throughout
-this guide, we'll assume the main configuration file is called `airtrack.yml` located
-in our current working directory.
+this guide, we'll assume the main configuration file is called `airtrack.yml` located in
+our current working directory.
 
-A database section is mandatory, and you'll need at least one data source. Add the following
-project named `global` to follow along with the rest of the guide:
+A database section is mandatory, and you'll need either a local dump1090 instance, or an
+ADSB Exchange API key. Use the following configuration to use a local sqlite3 database.
+This project has no filter defined, so it will track every aircraft it hears about. It
+doesn't enable extra tracking features so shouldn't consume storage too quickly.
 
 ```yaml
+database:
+  driver: sqlite3
+  database: airtrack.sqlite3
 projects:
   - name: global
 ```
-
-This project has no filter defined, so it will track every aircraft it hears about. It doesn't enable
-extra tracking features so shouldn't consume storage too quickly.
 
 ## Migrations
 
