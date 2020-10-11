@@ -106,7 +106,7 @@ jobs: # basic units of work in a run
           command: make install-protobuf-c install-protoc-gen-go install-go-bindata install-easyjson
       - run:
           name: Download openAIP airport data
-          command: go run contrib/refresh_airports_openaip/main.go
+          command: make build-deps && go run contrib/refresh_airports_openaip/main.go
       - run:
           name: Run unit tests
           # store the results of our tests in the $TEST_RESULTS directory
