@@ -61,7 +61,7 @@ Certain features can trigger email notifications. Each project defines its own l
 
  - "map_produced": Triggered when a sighting closes. The message contains the initial and final time and location, and has the Google Earth KML file attached.
  - "spotted_in_flight": Triggered when a sighting is opened. The message includes the time/location/ICAO/callsign.
- - "takeoff_start": Triggered when a takeoff first begins.
+ - "takeoff_from_airport": Triggered when a takeoff first begins.
  - "takeoff_complete": Triggered when a takeoff is complete.
 
 ## Building the software

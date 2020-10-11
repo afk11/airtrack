@@ -1376,9 +1376,9 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 			if observation.tags.IsInTakeoff {
 				log.Infof("[session %d] %s: has begun takeoff",
 					project.Session.Id, s.State.Icao)
-				if geocodeOK && project.IsEmailNotificationEnabled(TakeoffStart) {
+				if geocodeOK && project.IsEmailNotificationEnabled(TakeoffFromAirport) {
 					// takeoff start
-					log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, TakeoffStart)
+					log.Debugf("[session %d] %s: sending %s notification", project.Session.Id, s.State.Icao, TakeoffFromAirport)
 					msg, err := email.PrepareTakeoffFromAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffParams{
 						Project:      project.Name,
 						Icao:         s.State.Icao,

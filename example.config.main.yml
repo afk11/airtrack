@@ -102,7 +102,7 @@ projects:
       events:
         - map_produced
         - spotted_in_flight
-        - takeoff_start
+        - takeoff_from_airport
         - takeoff_complete
     # List of features enabled for the project
     features:

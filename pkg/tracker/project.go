@@ -72,8 +72,8 @@ const (
 	MapProduced EmailNotification = "map_produced"
 	// SpottedInFlight - the notification about an aircraft spotted in air
 	SpottedInFlight EmailNotification = "spotted_in_flight"
-	// TakeoffStart - the notification about an aircraft that just lifted off
-	TakeoffStart EmailNotification = "takeoff_start"
+	// TakeoffFromAirport - the notification about an aircraft that just lifted off
+	TakeoffFromAirport EmailNotification = "takeoff_from_airport"
 	// TakeoffUnknownAirport - the notification about an aircraft that just lifted off from an unknown airport
 	TakeoffUnknownAirport EmailNotification = "takeoff_unknown_airport"
 	// TakeoffComplete - the notification about an aircraft that levels off after takeoff
@@ -109,8 +109,8 @@ func EmailNotificationFromString(n string) (EmailNotification, error) {
 		return MapProduced, nil
 	case string(SpottedInFlight):
 		return SpottedInFlight, nil
-	case string(TakeoffStart):
-		return TakeoffStart, nil
+	case string(TakeoffFromAirport):
+		return TakeoffFromAirport, nil
 	case string(TakeoffComplete):
 		return TakeoffComplete, nil
 	case string(TakeoffUnknownAirport):

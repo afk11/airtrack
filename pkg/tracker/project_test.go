@@ -26,7 +26,7 @@ var allFeatures = []Feature{
 	TrackKmlLocation, TrackTxTypes, GeocodeEndpoints,
 }
 var allNotifications = []EmailNotification{
-	MapProduced, SpottedInFlight, TakeoffStart,
+	MapProduced, SpottedInFlight, TakeoffFromAirport,
 	TakeoffUnknownAirport, TakeoffComplete,
 }
 
