@@ -79,13 +79,10 @@ A valid configuration file is required to run airtrack.
 After copying and modifying [the example configuration file](./example.config.main.yml) to meet your needs,
 the database migrations need to be run.
 
-    Usage: airtrack.linux-amd64 <command>
+    Usage: airtrack <command>
 
     Flags:
-      --help                     Show context-sensitive help.
-      --config=STRING            Configuration file path
-      --projects=PROJECTS,...    Projects configuration file (may be repeated, and in addition to main
-                                 configuration file)
+      --help    Show context-sensitive help.
 
     Commands:
       track
@@ -100,7 +97,7 @@ the database migrations need to be run.
       migrate steps
         Migrate n steps forward if positive, or rollback n if negative
 
-    Run "airtrack.linux-amd64 <command> --help" for more information on a command.
+    Run "airtrack <command> --help" for more information on a command.
 
 
 ## Contribute
