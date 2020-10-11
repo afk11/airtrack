@@ -113,7 +113,7 @@ jobs: # basic units of work in a run
           command: |
             mkdir ./artifacts/
             mv airtrack.linux-amd64 airtrack
-            tar -czvf ./artifacts/airtrack.linux-amd64.tar.gz ./airtrack
+            tar -czvf ./artifacts/airtrack-${CIRCLE_TAG}.linux-amd64.tar.gz ./airtrack
       - run:
           name: "Publish Release on GitHub"
           command: |
