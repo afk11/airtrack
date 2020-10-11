@@ -121,12 +121,7 @@ jobs: # basic units of work in a run
             ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ./artifacts/
 workflows:
   version: 2
-  pr-workflow:
-    jobs:
-      - build-sqlite3
-      - build-postgres
-      - build-mysql
-  tag-workflow:
+  test-and-build-workflow:
     jobs:
       - build-sqlite3:
           filters:
