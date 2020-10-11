@@ -39,8 +39,11 @@ The `--config` command line option specifies the main configuration file.
  
 The main configuration file has the following structure:
 ```yaml
+# Database configuration
+database: <database_config>
+
 # Local time zone
-timezone: <string>
+[ timezone: <string> | default = system timezone ]
 
 # Configuration for ADSBExchange API
 [ adsbx: <adsbexchange_config> | default = none ]
@@ -48,9 +51,6 @@ timezone: <string>
 # Configuration for beast servers
 beast:
   [ - <beast_config> | default = none ]
-
-# Database configuration
-database: <database_config>
 
 # Import airport locations for flight source + destination geolocation
 [ airports: <airports_config> | default = none ]
