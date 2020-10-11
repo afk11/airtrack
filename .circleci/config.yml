@@ -112,7 +112,8 @@ jobs: # basic units of work in a run
           name: Copy build artifacts
           command: |
             mkdir ./artifacts/
-            cp airtrack.* ./artifacts/
+            mv airtrack.linux-amd64 airtrack
+            tar -czvf ./artifacts/airtrack.linux-amd64.tar.gz ./airtrack
       - run:
           name: "Publish Release on GitHub"
           command: |
