@@ -95,7 +95,7 @@ jobs: # basic units of work in a run
             - "/go/pkg/mod"
   publish-github-release:
     docker:
-      - image: circleci/golang:1.8
+      - image: circleci/golang:1.15
     steps:
       - run:
           name: Install build tools
