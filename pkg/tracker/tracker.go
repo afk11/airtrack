@@ -217,8 +217,7 @@ func (o *ProjectObservation) HaveCallSign() bool {
 
 // SetCallSign updates the current callsign for the sighting, and if track
 // is true, creates a callsign log to be written to the database.
-// todo: pass time instead of doing call to time.Now
-func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
+func (o *ProjectObservation) SetCallSign(callsign string, track bool, msgTime time.Time) error {
 	if track {
 		if o.HaveCallSign() {
 			log.Infof("[session %d] %s: updated callsign %s -> %s", o.project.Session.ID, o.mem.State.Icao, o.CallSign(), callsign)
@@ -226,7 +225,7 @@ func (o *ProjectObservation) SetCallSign(callsign string, track bool) error {
 			log.Infof("[session %d] %s: found callsign %s", o.project.Session.ID, o.mem.State.Icao, callsign)
 		}
 		o.dirty = true
-		o.csLogs = append(o.csLogs, callsignLog{callsign, time.Now(), nil})
+		o.csLogs = append(o.csLogs, callsignLog{callsign, msgTime, nil})
 	}
 	o.callsign = callsign
 	if !o.haveCallsign {
@@ -247,8 +246,7 @@ func (o *ProjectObservation) HaveSquawk() bool {
 
 // SetSquawk updates the current squawk for the sighting, and if track
 // is true, creates a squawk log to be written to the database.
-// todo: pass time instead of doing time.Now
-func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
+func (o *ProjectObservation) SetSquawk(squawk string, track bool, msgTime time.Time) error {
 	if track {
 		if o.HaveSquawk() {
 			log.Infof("[session %d] %s: updated squawk %s -> %s", o.project.Session.ID, o.mem.State.Icao, o.Squawk(), squawk)
@@ -256,7 +254,7 @@ func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
 			log.Infof("[session %d] %s: found squawk %s", o.project.Session.ID, o.mem.State.Icao, squawk)
 		}
 		o.dirty = true
-		o.squawkLogs = append(o.squawkLogs, squawkLog{squawk, time.Now(), nil})
+		o.squawkLogs = append(o.squawkLogs, squawkLog{squawk, msgTime, nil})
 	}
 	o.squawk = squawk
 	if !o.haveSquawk {
@@ -320,12 +318,11 @@ func (o *ProjectObservation) Location() (float64, float64) {
 
 // SetLocation updates the current location for the sighting, and if track
 // is true, creates a location log to be written to the database.
-// todo: pass location instead of doing time.jnow
-func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
+func (o *ProjectObservation) SetLocation(lat, lon float64, track bool, msgTime time.Time) error {
 	if track && o.haveAltBaro {
 		o.dirty = true
 		o.locationLogs = append(o.locationLogs, locationLog{
-			o.AltitudeBarometric(), lat, lon, time.Now(), nil,
+			o.AltitudeBarometric(), lat, lon, msgTime, nil,
 		})
 		log.Infof("[session %d] %s: new position: altitude %dft, position (%f, %f) #pos=%d",
 			o.project.Session.ID, o.mem.State.Icao, o.AltitudeBarometric(), lat, lon, o.locationCount)
@@ -340,12 +337,12 @@ func (o *ProjectObservation) SetLocation(lat, lon float64, track bool) error {
 }
 
 // NewSighting initializes a new sighting for aircraft with this ICAO
-func NewSighting(icao string) *Sighting {
+func NewSighting(icao string, now time.Time) *Sighting {
 	return &Sighting{
 		State: pb.State{
 			Icao: icao,
 		},
-		firstSeen:  time.Now(),
+		firstSeen:  now,
 		observedBy: make(map[uint64]*ProjectObservation, 0),
 	}
 }
@@ -1066,7 +1063,7 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 		inflightMsgVec.WithLabelValues().Inc()
 		t.projectMu.RLock()
 		now := time.Now()
-		s := t.getSighting(msg.Icao)
+		s := t.getSighting(msg.Icao, now)
 		err := t.UpdateStateFromMessage(s, msg, now)
 		if err != nil {
 			s.mu.Unlock()
@@ -1095,13 +1092,13 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 // and creates a new one if missing. It locks sightingMu
 // for this operation. The sighting will be returned
 // Locked, so must be unlocked by the caller when finished.
-func (t *Tracker) getSighting(icao string) *Sighting {
+func (t *Tracker) getSighting(icao string, msgTime time.Time) *Sighting {
 	// init sighting in map
 	t.sightingMu.Lock()
 	defer t.sightingMu.Unlock()
 	s, ok := t.sighting[icao]
 	if !ok {
-		s = NewSighting(icao)
+		s = NewSighting(icao, msgTime)
 		s.mu.Lock()
 		t.sighting[icao] = s
 	} else {
@@ -1351,7 +1348,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		oldlat, oldlon := observation.Location()
 		updatedLocation = !observation.HaveLocation() || s.State.Latitude != oldlat || s.State.Longitude != oldlon
 		if updatedLocation {
-			err := observation.SetLocation(s.State.Latitude, s.State.Longitude, project.IsFeatureEnabled(TrackKmlLocation))
+			err := observation.SetLocation(s.State.Latitude, s.State.Longitude, project.IsFeatureEnabled(TrackKmlLocation), now)
 			if err != nil {
 				return errors.Wrapf(err, "setting location")
 			}
@@ -1360,7 +1357,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	if s.State.HaveCallsign {
 		updatedCallSign := !observation.HaveCallSign() || s.State.CallSign != observation.CallSign()
 		if updatedCallSign {
-			err := observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns))
+			err := observation.SetCallSign(s.State.CallSign, project.IsFeatureEnabled(TrackCallSigns), now)
 			if err != nil {
 				return errors.Wrapf(err, "setting callsign")
 			}
@@ -1369,7 +1366,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	if s.State.HaveSquawk {
 		updatedSquawk := !observation.HaveSquawk() || (s.State.Squawk != observation.Squawk())
 		if updatedSquawk {
-			err := observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks))
+			err := observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks), now)
 			if err != nil {
 				return errors.Wrapf(err, "setting squawk")
 			}
