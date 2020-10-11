@@ -195,7 +195,7 @@ the following defaults:
 
 ```yaml
 # Interface the HTTP server will listen on
-[ host: <ip_address> | default = "0.0.0.0" ]
+[ interface: <ip_address> | default = "0.0.0.0" ]
 # Port for the HTTP server. Default is 8080
 [ port: <int> | default = 8080 ]
 # Disable map server. Default is false.

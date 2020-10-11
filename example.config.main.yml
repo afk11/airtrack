@@ -71,7 +71,7 @@ metrics:
 # matches the defaults
 map:
   # Interface the HTTP server will listen on
-  host: 0.0.0.0
+  interface: 0.0.0.0
   # Port for the HTTP server. Default is 8080
   port: 8080
   # Disable map server. Default is false.

@@ -840,7 +840,7 @@ func DebugModesMessage(w io.Writer, mm *C.struct_modesMessage) error {
 			return err
 		}
 	} else {
-		_, err = fmt.Fprintf(w, "  ICAO Address:  %06X (%s)\n", mm.addr, C.GoString(C.addrtype_to_string(mm.addrtype)))
+		_, err = fmt.Fprintf(w, "  ICAO Interface:  %06X (%s)\n", mm.addr, C.GoString(C.addrtype_to_string(mm.addrtype)))
 		if err != nil {
 			return err
 		}

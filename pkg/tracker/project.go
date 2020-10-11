@@ -99,7 +99,7 @@ func FeatureFromString(f string) (Feature, error) {
 	case string(GeocodeEndpoints):
 		return GeocodeEndpoints, nil
 	}
-	return "", errors.New("unknown feature")
+	return "", errors.Errorf("unknown feature: %s", f)
 }
 
 // EmailNotificationFromString parses the EmailNotification type from the provided string
@@ -113,8 +113,10 @@ func EmailNotificationFromString(n string) (EmailNotification, error) {
 		return TakeoffStart, nil
 	case string(TakeoffComplete):
 		return TakeoffComplete, nil
+	case string(TakeoffUnknownAirport):
+		return TakeoffUnknownAirport, nil
 	}
-	return "", errors.New("unknown notification")
+	return "", errors.Errorf("unknown email notification: %s", n)
 }
 
 // IsFeatureEnabled returns whether the project has Feature f enabled
@@ -153,7 +155,7 @@ func InitProject(cfg config.Project) (*Project, error) {
 		Observations:            make(map[string]*ProjectObservation),
 	}
 	if cfg.Map != nil {
-		p.ShouldMap = cfg.Map.Disabled == false
+		p.ShouldMap = !cfg.Map.Disabled
 	}
 	if p.ReopenSightings {
 		p.ReopenSightingsInterval = time.Duration(cfg.ReopenSightingsInterval) * time.Second
@@ -164,7 +166,7 @@ func InitProject(cfg config.Project) (*Project, error) {
 	for _, f := range cfg.Features {
 		feature, err := FeatureFromString(f)
 		if err != nil {
-			return nil, errors.Wrapf(err, "unknown feature: %s", f)
+			return nil, err
 		}
 		p.Features = append(p.Features, feature)
 	}
@@ -177,7 +179,7 @@ func InitProject(cfg config.Project) (*Project, error) {
 		for _, n := range cfg.Notifications.Enabled {
 			notification, err := EmailNotificationFromString(n)
 			if err != nil {
-				return nil, errors.Wrapf(err, "unknown email notification: %s", n)
+				return nil, err
 			}
 			p.EmailNotifications = append(p.EmailNotifications, notification)
 		}

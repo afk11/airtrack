@@ -27,41 +27,43 @@ const (
 // UnknownProject is returned by MapAccess.GetProjectAircraft
 var UnknownProject = errors.New("unknown project")
 
-// MapAccess provides access to the current map view
-type MapAccess interface {
-	// GetProjectAircraft loads the subset of aircraft in
-	// view for this project, and the current message count
-	// and []*JsonAircraft is passed to the provided closure.
-	// The aircraft are locked for the lifetime of the closure
-	// and must be copied to be safely used elsewhere.
-	GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error
-}
+type (
+	// MapAccess provides access to the current map view
+	MapAccess interface {
+		// GetProjectAircraft loads the subset of aircraft in
+		// view for this project, and the current message count
+		// and []*JsonAircraft is passed to the provided closure.
+		// The aircraft are locked for the lifetime of the closure
+		// and must be copied to be safely used elsewhere.
+		GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error
+	}
 
-// MapHistoryUpdateScheduler defines an interface allowing
-// AircraftMap trigger MapServices to save a new history file
-// Used by AircraftMap
-type MapHistoryUpdateScheduler interface {
-	// UpdateHistory triggers the MapService to save
-	// a new history file
-	UpdateHistory(projects []string) error
-}
+	// MapHistoryUpdateScheduler defines an interface allowing
+	// AircraftMap trigger MapServices to save a new history file
+	// Used by AircraftMap
+	MapHistoryUpdateScheduler interface {
+		// UpdateHistory triggers the MapService to save
+		// a new history file
+		UpdateHistory(projects []string) error
+	}
 
-// MapService is a contract for map backends.
-type MapService interface {
-	// MapService returns the name of the backend
-	MapService() string
-	// RegisterRoutes allows the MapService to add
-	// it's map related routes to the router
-	RegisterRoutes(r *mux.Router) error
-	// UpdateHistory is used to
-	UpdateHistory(projNames []string) error
-}
+	// MapService is a contract for map backends.
+	MapService interface {
+		// MapService returns the name of the backend
+		MapService() string
+		// RegisterRoutes allows the MapService to add
+		// it's map related routes to the router
+		RegisterRoutes(r *mux.Router) error
+		// UpdateHistory is used to
+		UpdateHistory(projNames []string) error
+	}
 
-// MapProjectStatusListener implements the ProjectStatusListener
-// allowing tracker to notify us about new or closed projects
-type MapProjectStatusListener struct {
-	m *AircraftMap
-}
+	// MapProjectStatusListener implements the ProjectStatusListener
+	// allowing tracker to notify us about new or closed projects
+	MapProjectStatusListener struct {
+		m *AircraftMap
+	}
+)
 
 // NewMapProjectStatusListener creates a new *MapProjectStatusListener
 func NewMapProjectStatusListener(m *AircraftMap) *MapProjectStatusListener {
@@ -284,7 +286,7 @@ func NewAircraftMap(cfg *config.MapSettings) (*AircraftMap, error) {
 		port = cfg.Port
 	}
 	m.s = &http.Server{
-		Addr:    fmt.Sprintf("%s:%d", cfg.Address, port),
+		Addr:    fmt.Sprintf("%s:%d", cfg.Interface, port),
 		Handler: handlers.CORS()(m.r),
 		// Good practice: enforce timeouts for servers you create!
 		WriteTimeout: 15 * time.Second,
@@ -342,8 +344,7 @@ func (m *AircraftMap) deregisterProject(p *Project) error {
 	}
 	numAC := len(proj.aircraft)
 	for i := 0; i < numAC; i++ {
-		icao := proj.aircraft[i]
-		m.dereferenceAircraft(icao)
+		m.dereferenceAircraft(proj.aircraft[i])
 	}
 	proj.aircraft = nil
 	delete(m.projects, p.Name)

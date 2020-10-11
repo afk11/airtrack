@@ -64,8 +64,8 @@ type (
 		HistoryCount int `yaml:"history_count"`
 		// Map interfaces to expose (default: dump1090 + tar1090)
 		Services []string `yaml:"services"`
-		// Address webserver should listen on.
-		Address string `yaml:"address"`
+		// Interface webserver should listen on.
+		Interface string `yaml:"interface"`
 		// Port webserver should listen on (default: 8080)
 		Port uint16 `yaml:"port"`
 	}
