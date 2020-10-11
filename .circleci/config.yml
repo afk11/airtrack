@@ -97,6 +97,7 @@ jobs: # basic units of work in a run
     docker:
       - image: circleci/golang:1.15
     steps:
+      - checkout # check out source code to working directory
       - run:
           name: Install build tools
           command: sudo apt install autoconf libtool libprotobuf-dev libprotoc-dev libncurses-dev protobuf-compiler librrd-dev build-essential
