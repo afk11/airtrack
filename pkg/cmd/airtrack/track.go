@@ -40,6 +40,8 @@ import (
 	"time"
 )
 
+var usingOpenAipData string
+
 // TrackCmd - aircraft tracking task
 type TrackCmd struct {
 	// Config - aircraft configuration file path
@@ -245,6 +247,9 @@ func (l *Loader) Load(c *TrackCmd) error {
 	var airportsFound int
 	useBuiltinAirports := l.cfg.Airports == nil || l.cfg.Airports.DisableBuiltInAirports == false
 	if useBuiltinAirports {
+		if usingOpenAipData != "" {
+			log.Infof("using airport location data from openaip.net")
+		}
 		airportAssetFiles := airports.AssetNames()
 		airportFiles += len(airportAssetFiles)
 		for i := range airportAssetFiles {

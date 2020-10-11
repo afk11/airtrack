@@ -9,6 +9,8 @@ TAR1090_VERSION=a0491945db41aaa7d49df2951ce1019968048046
 READSB_VERSION=4815cbe7441ae045890b9adfac3426b93b7b8d75
 READSB_REPO=https://github.com/afk11/readsb-protobuf
 PROTOBUF_C_VERSION=v1.3.3
+AIRTRACK_COMMIT = $(shell git rev-parse HEAD)
+AIRTRACK_LDFLAGS = "-X github.com/afk11/airtrack/pkg/cmd/airtrack.commit=$(AIRTRACK_COMMIT) $(RELEASE_LDFLAGS)"
 
 install-go-bindata:
 		go get -u github.com/jteeuwen/go-bindata/...
@@ -56,7 +58,7 @@ build-dir-airports: build-dir
 		go run ./contrib/copy_airport_resources/main.go resources/airports
 build-deps: build-protobuf build-bindata build-easyjson
 build-airtrack-linux-amd64: delete-build-dir resources/readsb-src build-deps
-		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -o airtrack.linux-amd64 cmd/airtrack/main.go
+		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -ldflags $(AIRTRACK_LDFLAGS) -o airtrack.linux-amd64 cmd/airtrack/main.go
 build-airtrack-qa-linux-amd64: delete-build-dir resources/readsb-src build-deps
 		CGO_ENABLED=1 GO111MODULE=on GOOS=linux GOARCH=amd64 go $(BUILDARGS) build -o airtrackqa.linux-amd64 cmd/airtrack-qa/main.go
 

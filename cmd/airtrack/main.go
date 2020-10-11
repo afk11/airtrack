@@ -6,6 +6,8 @@ import (
 )
 
 var cli struct {
+	Version airtrack.VersionCmd `cmd help:"Prints version information"`
+
 	Track airtrack.TrackCmd `cmd help:"Track aircraft"`
 
 	Migrate struct {
