@@ -116,20 +116,20 @@ func TestSession(t *testing.T) {
 	assert.False(t, sess3.WithTransmissionTypes)
 	assert.True(t, sess3.WithCallSigns)
 
-	_, err = database.CloseSession(sess)
+	closeTime := createdAt.Add(time.Second * 6)
+	_, err = database.CloseSession(sess, closeTime)
 	assert.NoError(t, err)
-	_, err = database.CloseSession(sess1)
+	_, err = database.CloseSession(sess1, closeTime)
 	assert.NoError(t, err)
-	_, err = database.CloseSession(sess2)
+	_, err = database.CloseSession(sess2, closeTime)
 	assert.NoError(t, err)
-	_, err = database.CloseSession(sess3)
+	_, err = database.CloseSession(sess3, closeTime)
 	assert.NoError(t, err)
 
-	// todo: test value of ClosedAt
-	assert.NotNil(t, sess.ClosedAt)
-	assert.NotNil(t, sess1.ClosedAt)
-	assert.NotNil(t, sess2.ClosedAt)
-	assert.NotNil(t, sess3.ClosedAt)
+	assert.Equal(t, closeTime.Unix(), sess.ClosedAt.Unix())
+	assert.Equal(t, closeTime.Unix(), sess1.ClosedAt.Unix())
+	assert.Equal(t, closeTime.Unix(), sess2.ClosedAt.Unix())
+	assert.Equal(t, closeTime.Unix(), sess3.ClosedAt.Unix())
 }
 func TestSessionDuplicateIdentifier(t *testing.T) {
 	loc := test.MustLoadTestTimeZone()
@@ -169,14 +169,16 @@ func TestAircraft(t *testing.T) {
 	assert.Error(t, err)
 	assert.Equal(t, sql.ErrNoRows, err)
 
-	_, err = database.CreateAircraft(icao)
+	n := time.Now()
+	_, err = database.CreateAircraft(icao, n)
 	assert.NoError(t, err)
 
 	a, err := database.GetAircraftByIcao(icao)
 	assert.NoError(t, err)
 	assert.NotNil(t, a)
 	assert.Equal(t, icao, a.Icao)
-	// todo: test value of aircraft created_at
+	assert.Equal(t, n.Unix(), a.CreatedAt.Unix())
+	assert.Equal(t, n.Unix(), a.UpdatedAt.Unix())
 
 	a, err = database.GetAircraftByID(a.ID)
 	assert.NoError(t, err)
@@ -193,13 +195,15 @@ func TestSighting(t *testing.T) {
 	projName := "testProj"
 	icao := "123456"
 	createdAt := time.Now()
-	_, err := database.CreateAircraft(icao)
+	_, err := database.CreateAircraft(icao, createdAt)
 	assert.NoError(t, err)
 
 	a, err := database.GetAircraftByIcao(icao)
 	assert.NoError(t, err)
 	assert.NotNil(t, a)
 	assert.Equal(t, icao, a.Icao)
+	assert.Equal(t, createdAt.Unix(), a.CreatedAt.Unix())
+	assert.Equal(t, createdAt.Unix(), a.UpdatedAt.Unix())
 
 	_, err = database.CreateProject(projName, createdAt)
 	assert.NoError(t, err)
@@ -221,7 +225,7 @@ func TestSighting(t *testing.T) {
 	assert.Error(t, sql.ErrNoRows, err)
 	assert.Nil(t, sighting)
 
-	_, err = database.CreateSighting(sess, a)
+	_, err = database.CreateSighting(sess, a, createdAt)
 	assert.NoError(t, err)
 	sighting, err = database.GetLastSighting(sess, a)
 	assert.NoError(t, err)
@@ -229,6 +233,8 @@ func TestSighting(t *testing.T) {
 	assert.Nil(t, sighting.ClosedAt)
 	assert.Equal(t, sess.ID, sighting.SessionID)
 	assert.Equal(t, a.ID, sighting.AircraftID)
+	assert.Equal(t, createdAt.Unix(), sighting.CreatedAt.Unix())
+	assert.Equal(t, createdAt.Unix(), sighting.UpdatedAt.Unix())
 	assert.Nil(t, sighting.CallSign)
 	assert.Nil(t, sighting.Squawk)
 	assert.Equal(t, uint8(0), sighting.TransmissionTypes)
@@ -327,7 +333,7 @@ func TestSightingLocation(t *testing.T) {
 	projName := "testProj"
 	icao := "123456"
 	createdAt := time.Now()
-	_, err := database.CreateAircraft(icao)
+	_, err := database.CreateAircraft(icao, createdAt)
 	assert.NoError(t, err)
 
 	a, err := database.GetAircraftByIcao(icao)
@@ -351,7 +357,7 @@ func TestSightingLocation(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, sess)
 
-	_, err = database.CreateSighting(sess, a)
+	_, err = database.CreateSighting(sess, a, createdAt)
 	assert.NoError(t, err)
 	sighting, err := database.GetLastSighting(sess, a)
 	assert.NoError(t, err)

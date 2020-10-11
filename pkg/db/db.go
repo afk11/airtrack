@@ -220,7 +220,7 @@ type Database interface {
 	GetSessionByIdentifier(project *Project, identifier string) (*Session, error)
 	// CloseSession marks the Session as closed. The sql.Result is returned
 	// if the query was successful, otherwise an error is returned.
-	CloseSession(session *Session) (sql.Result, error)
+	CloseSession(session *Session, closedAt time.Time) (sql.Result, error)
 
 	// GetAircraftByIcao searches for an Aircraft using it's hex ICAO. If the
 	// Aircraft exists it will be returned. Otherwise an error is returned.
@@ -229,15 +229,15 @@ type Database interface {
 	// Aircraft exists it will be returned. Otherwise an error is returned.
 	GetAircraftByID(id uint64) (*Aircraft, error)
 	// CreateAircraft creates an Aircraft for the specified icao.
-	CreateAircraft(icao string) (sql.Result, error)
+	CreateAircraft(icao string, firstSeenTime time.Time) (sql.Result, error)
 
 	// CreateSighting creates a sighting for ac on the provided Session. A sql.Result
 	// is returned if the query was successful. Otherwise an error is returned.
-	CreateSighting(session *Session, ac *Aircraft) (sql.Result, error)
+	CreateSighting(session *Session, ac *Aircraft, firstSeenTime time.Time) (sql.Result, error)
 	// CreateSightingTx creates a sighting for ac on the provided Session, executing
 	// the query with the provided transaction. A sql.Result is returned if the query
 	// was successful. Otherwise an error is returned.
-	CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (sql.Result, error)
+	CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft, firstSeenTime time.Time) (sql.Result, error)
 	// GetSightingById searches for a Sighting with the provided ID. The Sighting is returned
 	// if one was found. Otherwise an error is returned.
 	GetSightingByID(sightingID uint64) (*Sighting, error)
@@ -378,7 +378,6 @@ func (d *DatabaseImpl) GetProject(name string) (*Project, error) {
 }
 
 // CreateSession - see Database.CreateSession
-// todo: pass in current time
 func (d *DatabaseImpl) CreateSession(project *Project, identifier string, withSquawks bool, withTxTypes bool, withCallSigns bool) (sql.Result, error) {
 	now := time.Now()
 	s, p, err := d.dialect.
@@ -421,14 +420,12 @@ func (d *DatabaseImpl) GetSessionByIdentifier(project *Project, identifier strin
 }
 
 // CloseSession - see Database.CloseSession
-// todo: pass in time.Now()
-func (d *DatabaseImpl) CloseSession(session *Session) (sql.Result, error) {
-	now := time.Now()
+func (d *DatabaseImpl) CloseSession(session *Session, closedAt time.Time) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Update(sessionTable).
 		Prepared(true).
 		Set(goqu.Ex{
-			"closed_at": now,
+			"closed_at": closedAt,
 		}).
 		Where(goqu.C("id").Eq(session.ID)).
 		ToSQL()
@@ -439,7 +436,7 @@ func (d *DatabaseImpl) CloseSession(session *Session) (sql.Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	session.ClosedAt = &now
+	session.ClosedAt = &closedAt
 	return res, nil
 }
 
@@ -482,14 +479,12 @@ func (d *DatabaseImpl) GetAircraftByID(id uint64) (*Aircraft, error) {
 }
 
 // CreateAircraft - see Database.CreateAircraft
-// todo: pass in current time
-func (d *DatabaseImpl) CreateAircraft(icao string) (sql.Result, error) {
-	now := time.Now()
+func (d *DatabaseImpl) CreateAircraft(icao string, firstSeenTime time.Time) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert(aircraftTable).
 		Prepared(true).
 		Cols("icao", "created_at", "updated_at").
-		Vals(goqu.Vals{icao, now, now}).
+		Vals(goqu.Vals{icao, firstSeenTime, firstSeenTime}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -498,14 +493,12 @@ func (d *DatabaseImpl) CreateAircraft(icao string) (sql.Result, error) {
 }
 
 // CreateSighting - see Database.CreateSighting
-// todo: pass in current time
-func (d *DatabaseImpl) CreateSighting(session *Session, ac *Aircraft) (sql.Result, error) {
-	now := time.Now()
+func (d *DatabaseImpl) CreateSighting(session *Session, ac *Aircraft, firstSeenTime time.Time) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert(sightingTable).
 		Prepared(true).
 		Cols("project_id", "session_id", "aircraft_id", "created_at", "updated_at").
-		Vals(goqu.Vals{session.ProjectID, session.ID, ac.ID, &now, &now}).
+		Vals(goqu.Vals{session.ProjectID, session.ID, ac.ID, &firstSeenTime, &firstSeenTime}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -514,14 +507,12 @@ func (d *DatabaseImpl) CreateSighting(session *Session, ac *Aircraft) (sql.Resul
 }
 
 // CreateSightingTx - see Database.CreateSightingTx
-// todo: pass in current time
-func (d *DatabaseImpl) CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (sql.Result, error) {
-	now := time.Now()
+func (d *DatabaseImpl) CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft, firstSeenTime time.Time) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert(sightingTable).
 		Prepared(true).
 		Cols("project_id", "session_id", "aircraft_id", "created_at", "updated_at").
-		Vals(goqu.Vals{session.ProjectID, session.ID, ac.ID, &now, &now}).
+		Vals(goqu.Vals{session.ProjectID, session.ID, ac.ID, &firstSeenTime, &firstSeenTime}).
 		ToSQL()
 	if err != nil {
 		return nil, err

@@ -483,7 +483,7 @@ func (t *Tracker) Stop() error {
 	t.projectMu.RLock()
 	defer t.projectMu.RUnlock()
 	for _, p := range t.projects {
-		res, err := t.database.CloseSession(p.Session)
+		res, err := t.database.CloseSession(p.Session, now)
 		if err != nil {
 			return errors.Wrapf(err, "closing session")
 		} else if err = db.CheckRowsUpdated(res, 1); err != nil {
@@ -626,7 +626,7 @@ func (t *Tracker) updateSightingAndReturnLogs(o *ProjectObservation) (bool, []ca
 		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
 			if hasNoSighting {
-				o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a)
+				o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a, o.firstSeen)
 				if err != nil {
 					// Cleanup reserved sighting
 					return errors.Wrapf(err, "failed to init project sighting")
@@ -1287,7 +1287,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	// Create if missing, and assign to sighting
 	if s.a == nil {
 		var err error
-		s.a, err = t.loadAircraft(s.State.Icao)
+		s.a, err = t.loadAircraft(s.State.Icao, now)
 		if err != nil {
 			return errors.Wrapf(err, "loading aircraft by icao")
 		}
@@ -1509,11 +1509,11 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 }
 
 // loadAircraft finds or creates an aircraft record for the provided icao.
-func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
+func (t *Tracker) loadAircraft(icao string, seenTime time.Time) (*db.Aircraft, error) {
 	// create sighting
 	a, err := t.database.GetAircraftByIcao(icao)
 	if err == sql.ErrNoRows {
-		_, err := t.database.CreateAircraft(icao)
+		_, err := t.database.CreateAircraft(icao, seenTime)
 		if err != nil {
 			return nil, err
 		}
@@ -1529,7 +1529,7 @@ func (t *Tracker) loadAircraft(icao string) (*db.Aircraft, error) {
 }
 
 // initProjectSighting creates or reopens a sighting for the aircraft in the provided project
-func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) (*db.Sighting, bool, error) {
+func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft, firstSeenTime time.Time) (*db.Sighting, bool, error) {
 	s, err := t.database.GetLastSightingTx(tx, p.Session, ac)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, false, err
@@ -1557,7 +1557,7 @@ func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft) 
 	}
 
 	// A new sighting is needed
-	_, err = t.database.CreateSightingTx(tx, p.Session, ac)
+	_, err = t.database.CreateSightingTx(tx, p.Session, ac, firstSeenTime)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "creating sighting record failed")
 	}
