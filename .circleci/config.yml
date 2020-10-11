@@ -93,6 +93,31 @@ jobs: # basic units of work in a run
           key: go-mod-v4-{{ checksum "go.sum" }}
           paths:
             - "/go/pkg/mod"
+  publish-github-release:
+    docker:
+      - image: circleci/golang:1.8
+    steps:
+      - run:
+          name: Install build tools
+          command: sudo apt install autoconf libtool libprotobuf-dev libprotoc-dev libncurses-dev protobuf-compiler librrd-dev build-essential
+      - run:
+          name: Install go-bindata and easyjson and protobuf tools
+          command: make install-protobuf-c install-protoc-gen-go install-go-bindata install-easyjson
+      - run:
+          name: Run unit tests
+          # store the results of our tests in the $TEST_RESULTS directory
+          command: TESTOPTIONS="-v " make build-airtrack-linux-amd64
+      - run:
+          name: Copy build artifacts
+          command: |
+            mkdir ./artifacts/
+            cp airtrack.* ./artifacts/
+      - run:
+          name: "Publish Release on GitHub"
+          command: |
+            go get github.com/tcnksm/ghr
+            VERSION=$(my-binary --version)
+            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} -delete ${VERSION} ./artifacts/
 workflows:
   version: 2
   pr-workflow:
