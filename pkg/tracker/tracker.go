@@ -108,7 +108,6 @@ type (
 	// ProjectObservation contains information about a sighting from the point of
 	// view of a particular project.
 	ProjectObservation struct {
-		db      db.Database
 		project *Project
 
 		mem          *Sighting
@@ -203,9 +202,8 @@ type (
 )
 
 // NewProjectObservation initializes a ProjectObservation structure for this sighting & project pair
-func NewProjectObservation(db db.Database, p *Project, s *Sighting, msgTime time.Time) *ProjectObservation {
+func NewProjectObservation(p *Project, s *Sighting, msgTime time.Time) *ProjectObservation {
 	return &ProjectObservation{
-		db:         db,
 		mem:        s,
 		project:    p,
 		firstSeen:  msgTime,
@@ -629,7 +627,7 @@ func (t *Tracker) updateSightingAndReturnLogs(o *ProjectObservation) (bool, []ca
 	var locationUpdates []locationLog
 	if hasNoSighting || hasCsLogs || hasSquawkLogs {
 		// Updates regarding the sighting record (also to gather build up inserts for batching)
-		err := o.db.Transaction(func(tx *sqlx.Tx) error {
+		err := t.database.Transaction(func(tx *sqlx.Tx) error {
 			var err error
 			if hasNoSighting {
 				o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a)
@@ -639,7 +637,7 @@ func (t *Tracker) updateSightingAndReturnLogs(o *ProjectObservation) (bool, []ca
 				}
 			}
 			if hasCsLogs {
-				res, err := o.db.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
+				res, err := t.database.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
 				if err != nil {
 					return errors.Wrap(err, "updating sighting callsign")
 				} else if err = db.CheckRowsUpdated(res, 1); err != nil {
@@ -653,7 +651,7 @@ func (t *Tracker) updateSightingAndReturnLogs(o *ProjectObservation) (bool, []ca
 				o.csLogs = nil
 			}
 			if hasSquawkLogs {
-				_, err := o.db.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
+				_, err := t.database.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
 				// todo: add this back in once we have 'sighting restore' added.
 				// reopened sightings trigger update though row count will be zero
 				if err != nil {
@@ -1081,7 +1079,6 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 				s.mu.Unlock()
 				panic(err)
 			}
-
 		}
 		s.mu.Unlock()
 		t.projectMu.RUnlock()
@@ -1304,7 +1301,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	observation, ok := s.observedBy[project.Session.ID]
 	var sightingOpened bool
 	if !ok {
-		observation = NewProjectObservation(t.database, project, s, now)
+		observation = NewProjectObservation(project, s, now)
 		project.obsMu.Lock()
 		s.observedBy[project.Session.ID] = observation
 		project.Observations[s.State.Icao] = observation
