@@ -255,7 +255,7 @@ func (o *ProjectObservation) HasSquawk() bool {
 func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
 	if track {
 		if o.HasSquawk() {
-			log.Infof("[session %d] %s: updated squawk %s -> %s", o.project.Session.ID, o.mem.State.Icao, *o.Squawk(), squawk)
+			log.Infof("[session %d] %s: updated squawk %s -> %s", o.project.Session.ID, o.mem.State.Icao, o.Squawk(), squawk)
 		} else {
 			log.Infof("[session %d] %s: found squawk %s", o.project.Session.ID, o.mem.State.Icao, squawk)
 		}
@@ -269,9 +269,9 @@ func (o *ProjectObservation) SetSquawk(squawk string, track bool) error {
 	return nil
 }
 
-// Squawk returns a pointer to the current squawk
-func (o *ProjectObservation) Squawk() *string {
-	return &o.squawk
+// Squawk returns the current squawk, or an empty string if unknown
+func (o *ProjectObservation) Squawk() string {
+	return o.squawk
 }
 
 // HaveAltitudeBarometric returns true if the current barometric altitude is known
@@ -1371,7 +1371,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		}
 	}
 	if s.State.HaveSquawk {
-		updatedSquawk := !observation.HasSquawk() || (s.State.Squawk != *observation.Squawk())
+		updatedSquawk := !observation.HasSquawk() || (s.State.Squawk != observation.Squawk())
 		if updatedSquawk {
 			err := observation.SetSquawk(s.State.Squawk, project.IsFeatureEnabled(TrackSquawks))
 			if err != nil {
