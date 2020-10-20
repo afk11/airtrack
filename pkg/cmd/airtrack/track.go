@@ -18,11 +18,12 @@ import (
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/afk11/airtrack/pkg/readsb"
-	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
+	"github.com/afk11/airtrack/pkg/readsb/aircraftdb"
 	"github.com/afk11/airtrack/pkg/tar1090"
 	"github.com/afk11/airtrack/pkg/tracker"
 	smtp "github.com/afk11/mail"
 	"github.com/doug-martin/goqu/v9"
+	// include necessary drivers for db
 	_ "github.com/doug-martin/goqu/v9/dialect/mysql"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -183,11 +184,11 @@ func (l *Loader) Load(c *TrackCmd) error {
 		return errors.Wrapf(err, "loading timezone")
 	}
 
-	dbUrl, err := l.cfg.Database.DataSource(l.location)
+	dbURL, err := l.cfg.Database.DataSource(l.location)
 	if err != nil {
 		return errors.Wrapf(err, "creating database connection parameters")
 	}
-	l.dbConn, err = sqlx.Connect(l.cfg.Database.Driver, dbUrl)
+	l.dbConn, err = sqlx.Connect(l.cfg.Database.Driver, dbURL)
 	if err != nil {
 		return errors.Wrapf(err, "creating database connection")
 	}
@@ -210,8 +211,8 @@ func (l *Loader) Load(c *TrackCmd) error {
 
 	if l.cfg.EmailSettings != nil {
 		switch l.cfg.EmailSettings.Driver {
-		case config.MailDriverSmtp:
-			settings := l.cfg.EmailSettings.Smtp
+		case config.MailDriverSMTP:
+			settings := l.cfg.EmailSettings.SMTP
 			if settings == nil {
 				return errors.New("email.driver is smtp but missing email.smtp configuration")
 			} else if settings.Sender == "" {
@@ -372,14 +373,14 @@ func (l *Loader) Load(c *TrackCmd) error {
 	l.msgs = make(chan *pb.Message)
 	if l.cfg.AdsbxConfig != nil {
 		var adsbxEndpoint = tracker.DefaultAdsbxEndpoint
-		var adsbxApiKey string
-		if l.cfg.AdsbxConfig.ApiUrl != "" {
-			adsbxEndpoint = l.cfg.AdsbxConfig.ApiUrl
+		var adsbxAPIKey string
+		if l.cfg.AdsbxConfig.APIURL != "" {
+			adsbxEndpoint = l.cfg.AdsbxConfig.APIURL
 		}
-		if l.cfg.AdsbxConfig.ApiKey != "" {
-			adsbxApiKey = l.cfg.AdsbxConfig.ApiKey
+		if l.cfg.AdsbxConfig.APIKey != "" {
+			adsbxAPIKey = l.cfg.AdsbxConfig.APIKey
 		}
-		p := tracker.NewAdsbxProducer(l.msgs, adsbxEndpoint, adsbxApiKey)
+		p := tracker.NewAdsbxProducer(l.msgs, adsbxEndpoint, adsbxAPIKey)
 		v, ok := os.LookupEnv("AIRTRACK_ADSBX_PANIC_IF_STUCK")
 		p.PanicIfStuck(!ok || (v == "true" || v == "1" || v == "y" || v == "Y"))
 		l.producers = append(l.producers, p)
@@ -396,8 +397,8 @@ func (l *Loader) Load(c *TrackCmd) error {
 		}
 	}
 
-	opt.AircraftDb = aircraft_db.New()
-	err = aircraft_db.LoadAssets(opt.AircraftDb, aircraft_db.Asset)
+	opt.AircraftDb = aircraftdb.New()
+	err = aircraftdb.LoadAssets(opt.AircraftDb, aircraftdb.Asset)
 	if err != nil {
 		return errors.Wrapf(err, "load aircraft db assets")
 	}

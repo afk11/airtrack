@@ -71,7 +71,7 @@ func Parse(contents io.Reader) ([][]string, error) {
 		return nil, err
 	}
 	if strings.Join(records[0], ",") != "name,code,country,lat,lon,elev,style,rwdir,rwlen,freq,desc" {
-		return nil, errors.New("missing first row with column titles, or invalid titles found.")
+		return nil, errors.New("missing first row with column titles, or invalid titles found")
 	}
 
 	return records[1:], nil

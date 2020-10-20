@@ -40,7 +40,7 @@ func (e *jsonDecodeError) Error() string {
 	return e.err.Error()
 }
 
-// AdsbxProducer. See Producer.
+// AdsbxProducer - See Producer.
 // This type is responsible for polling the ADSB Exchange API using
 // the provided url and apikey. The JSON result is parsed and into messages
 // which are written to the messages channel.
@@ -64,13 +64,16 @@ func NewAdsbxProducer(msgs chan *pb.Message, url string, apikey string) *AdsbxPr
 		apikey:              apikey,
 	}
 }
+
+// PanicIfStuck sets whether the producer should panic
+// if a request takes more than 1 minute to be processed
 func (p *AdsbxProducer) PanicIfStuck(stop bool) {
 	p.panicIfStuck = stop
 }
 
 // GetAdsbx performs a HTTP request to ADSB Exchange and sends
 // messages over the msgs channel.
-func (p *AdsbxProducer) GetAdsbx(client *http.Client, ctx context.Context, msgs chan *pb.Message, source *pb.Source) error {
+func (p *AdsbxProducer) GetAdsbx(ctx context.Context, client *http.Client, msgs chan *pb.Message, source *pb.Source) error {
 	start := time.Now()
 	cancelled := make(chan bool)
 	p.numReqs++
@@ -194,7 +197,7 @@ func (p *AdsbxProducer) producer(ctx context.Context) {
 	for {
 		select {
 		case <-time.After(wait):
-			err := p.GetAdsbx(client, ctx, p.messages, src)
+			err := p.GetAdsbx(ctx, client, p.messages, src)
 			if err != nil {
 				jsonErr, ok := (err).(*jsonDecodeError)
 				if ok {

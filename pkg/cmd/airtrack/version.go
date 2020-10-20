@@ -2,16 +2,17 @@ package airtrack
 
 import (
 	"fmt"
-	_ "github.com/go-sql-driver/mysql"
 )
 
 var version string
 var commit string
 
 type (
+	// VersionCmd - prints version & build info
 	VersionCmd struct{}
 )
 
+// Run - prints version & build info
 func (c *VersionCmd) Run() error {
 	if version == "" {
 		_, err := fmt.Printf("airtrack development version\n")

@@ -15,11 +15,11 @@ func TestMap_GetProjectAircraft_UnknownProject(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, m)
 
-	err = m.GetProjectAircraft("unknown", func(i int64, aircrafts []*JsonAircraft) error {
+	err = m.GetProjectAircraft("unknown", func(i int64, aircraft []*JSONAircraft) error {
 		return nil
 	})
 	assert.Error(t, err)
-	assert.Equal(t, UnknownProject, err)
+	assert.Equal(t, ErrUnknownProject, err)
 }
 func TestMap_GetProjectAircraft_ReceivesError(t *testing.T) {
 	settings := &config.MapSettings{}
@@ -38,7 +38,7 @@ func TestMap_GetProjectAircraft_ReceivesError(t *testing.T) {
 	pl.Activated(p1)
 
 	expected := errors.New("it happened")
-	err = m.GetProjectAircraft(p1.Name, func(i int64, aircrafts []*JsonAircraft) error {
+	err = m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JSONAircraft) error {
 		return expected
 	})
 	assert.Error(t, err)
@@ -184,7 +184,7 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, s1.State.CallSign, ac1.Flight)
 	assert.Equal(t, s1.State.Squawk, ac1.Squawk)
 	assert.Equal(t, int64(1), ac1.referenceCount)
-	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JsonAircraft) error {
+	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JSONAircraft) error {
 		assert.Equal(t, 1, len(aircraft))
 		assert.Equal(t, ac1.Hex, aircraft[0].Hex)
 		return nil
@@ -202,7 +202,7 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, s2.State.CallSign, ac2.Flight)
 	assert.Equal(t, s2.State.Squawk, ac2.Squawk)
 	assert.Equal(t, int64(1), ac2.referenceCount)
-	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JsonAircraft) error {
+	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JSONAircraft) error {
 		assert.Equal(t, 2, len(aircraft))
 		assert.Equal(t, ac1.Hex, aircraft[0].Hex)
 		assert.Equal(t, ac2.Hex, aircraft[1].Hex)
@@ -211,7 +211,7 @@ func TestMap(t *testing.T) {
 
 	paul.NewAircraft(p2, s2)
 	assert.Equal(t, int64(2), ac2.referenceCount)
-	assert.NoError(t, m.GetProjectAircraft(p2.Name, func(i int64, aircraft []*JsonAircraft) error {
+	assert.NoError(t, m.GetProjectAircraft(p2.Name, func(i int64, aircraft []*JSONAircraft) error {
 		assert.Equal(t, 1, len(aircraft))
 		assert.Equal(t, ac2.Hex, aircraft[0].Hex)
 		return nil
@@ -236,7 +236,7 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, int64(1), ac2.referenceCount)
 	_, check := m.ac[s2.State.Icao]
 	assert.True(t, check)
-	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JsonAircraft) error {
+	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JSONAircraft) error {
 		assert.Equal(t, 1, len(aircraft))
 		assert.Equal(t, ac1.Hex, aircraft[0].Hex)
 		return nil
@@ -248,7 +248,7 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, int64(0), ac1.referenceCount)
 	_, check = m.ac[s1.State.Icao]
 	assert.False(t, check)
-	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JsonAircraft) error {
+	assert.NoError(t, m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JSONAircraft) error {
 		assert.Equal(t, 0, len(aircraft))
 		return nil
 	}))
@@ -259,7 +259,7 @@ func TestMap(t *testing.T) {
 	assert.Equal(t, int64(0), ac2.referenceCount)
 	_, check = m.ac[s2.State.Icao]
 	assert.False(t, check)
-	assert.NoError(t, m.GetProjectAircraft(p2.Name, func(i int64, aircraft []*JsonAircraft) error {
+	assert.NoError(t, m.GetProjectAircraft(p2.Name, func(i int64, aircraft []*JSONAircraft) error {
 		assert.Equal(t, 0, len(aircraft))
 		return nil
 	}))

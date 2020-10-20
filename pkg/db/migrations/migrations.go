@@ -18,6 +18,8 @@ import (
 	"time"
 )
 
+// InitMigrations returns a migrate.Migrate pointer initialized
+// for the provided dbConf, or an error if one occurred.
 func InitMigrations(dbConf *config.Database, loc *time.Location) (*migrate.Migrate, error) {
 	var db *sql.DB
 	var driver database.Driver

@@ -6,9 +6,11 @@ import (
 	"github.com/afk11/airtrack/pkg/kml"
 )
 
+// EmptyKml - generates an empty kml file
 type EmptyKml struct {
 }
 
+// Run - generates an empty kml file
 func (e *EmptyKml) Run(ctx *Context) error {
 	history := []db.SightingLocation{
 		{

@@ -1,4 +1,4 @@
-package aircraft_db
+package aircraftdb
 
 import (
 	"github.com/afk11/airtrack/pkg/pb"
@@ -6,6 +6,8 @@ import (
 	"github.com/pkg/errors"
 )
 
+// OperatorCountryFixupMap - map of mictronics country names to
+// names in our list
 var OperatorCountryFixupMap = map[string]string{
 	"Netherlands":             "Netherlands, Kingdom of",
 	"Tanzania":                "United Republic of Tanzania",
@@ -82,12 +84,12 @@ func LoadAssets(db *Db, Asset func(string) ([]byte, error)) error {
 	if db.initialized {
 		return nil
 	}
-	filesJson, err := Asset("files.json")
+	filesJSON, err := Asset("files.json")
 	if err != nil {
 		return errors.Wrapf(err, "reading files.json asset")
 	}
 	var files shardFile
-	err = easyjson.Unmarshal(filesJson, &files)
+	err = easyjson.Unmarshal(filesJSON, &files)
 	if err != nil {
 		return errors.Wrapf(err, "unmarshal files.json")
 	}
@@ -115,12 +117,12 @@ func LoadAssets(db *Db, Asset func(string) ([]byte, error)) error {
 		}
 	}
 
-	operatorsJson, err := Asset("operators.json")
+	operatorsJSON, err := Asset("operators.json")
 	if err != nil {
 		return errors.Wrapf(err, "reading operators.json asset")
 	}
 	var operators operatorFile
-	err = easyjson.Unmarshal(operatorsJson, &operators)
+	err = easyjson.Unmarshal(operatorsJSON, &operators)
 	if err != nil {
 		return errors.Wrapf(err, "unmarshal operators.json")
 	}

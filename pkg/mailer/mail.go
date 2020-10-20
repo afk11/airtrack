@@ -18,14 +18,14 @@ import (
 )
 
 type (
-	// EmailAttachment. JSON structure for an email attachment in
+	// EmailAttachment is a JSON structure for an email attachment in
 	// encoded job.
 	EmailAttachment struct {
 		ContentType string `json:"content_type"`
 		FileName    string `json:"filename"`
 		Contents    []byte `json:"contents"`
 	}
-	// EmailJob. JSON structure for db.Email Job field.
+	// EmailJob - the JSON structure for db.Email Job field.
 	EmailJob struct {
 		To          string            `json:"to"`
 		Subject     string            `json:"subject"`
@@ -189,7 +189,7 @@ func (m *Mailer) processMails() error {
 				for i := range finishedEmails {
 					_, err = m.database.DeleteCompletedEmailTx(tx, finishedEmails[i])
 					if err != nil {
-						return errors.Wrapf(err, "deleting completed email %d", finishedEmails[i].Id)
+						return errors.Wrapf(err, "deleting completed email %d", finishedEmails[i].ID)
 					}
 				}
 				return nil
@@ -205,12 +205,12 @@ func (m *Mailer) processMails() error {
 					if failedEmails[i].Retries == 4 {
 						_, err = m.database.MarkEmailFailedTx(tx, &failedEmails[i])
 						if err != nil {
-							return errors.Wrapf(err, "marking email failed %d", failedEmails[i].Id)
+							return errors.Wrapf(err, "marking email failed %d", failedEmails[i].ID)
 						}
 					} else {
 						_, err = m.database.RetryEmailAfterTx(tx, &failedEmails[i], time.Now().Add(time.Minute*2))
 						if err != nil {
-							return errors.Wrapf(err, "updating email retry information %d", failedEmails[i].Id)
+							return errors.Wrapf(err, "updating email retry information %d", failedEmails[i].ID)
 						}
 					}
 				}

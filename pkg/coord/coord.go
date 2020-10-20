@@ -7,6 +7,8 @@ import (
 	"strconv"
 )
 
+// DMSToDecimalLocation converts a position in degrees/minutes/seconds
+// into decimal form
 func DMSToDecimalLocation(lat, lon string) (float64, float64, error) {
 	_, la, err := parseDMSLat(lat)
 	if err != nil {
@@ -18,6 +20,9 @@ func DMSToDecimalLocation(lat, lon string) (float64, float64, error) {
 	}
 	return la, lo, nil
 }
+
+// DecimalToDMSLocation converts a decimal position into degrees/minutes/seconds
+// form
 func DecimalToDMSLocation(lat, lon float64) (string, string, error) {
 	// lat
 	latDeg := int(math.Abs(lat))

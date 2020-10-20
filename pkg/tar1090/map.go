@@ -2,7 +2,7 @@ package tar1090
 
 import (
 	"encoding/json"
-	"github.com/afk11/airtrack/pkg/readsb/aircraft_db"
+	"github.com/afk11/airtrack/pkg/readsb/aircraftdb"
 	"github.com/afk11/airtrack/pkg/tracker"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -112,7 +112,7 @@ func (h *History) GetHistoryFile(project string, n int64) ([]byte, error) {
 type jsonAircraft struct {
 	Now      float64                 `json:"now"`
 	Messages int64                   `json:"messages"`
-	Aircraft []*tracker.JsonAircraft `json:"aircraft"`
+	Aircraft []*tracker.JSONAircraft `json:"aircraft"`
 }
 
 // assetResponseHandler provides a HTTP handler to serve a static asset
@@ -167,7 +167,7 @@ func (t *Map) MapService() string {
 func (t *Map) UpdateHistory(projNames []string) error {
 	var data []byte
 	for i := range projNames {
-		err := t.m.GetProjectAircraft(projNames[i], func(messageCount int64, fields []*tracker.JsonAircraft) error {
+		err := t.m.GetProjectAircraft(projNames[i], func(messageCount int64, fields []*tracker.JSONAircraft) error {
 			ac := jsonAircraft{
 				Now:      float64(time.Now().Unix()),
 				Messages: messageCount,
@@ -180,7 +180,7 @@ func (t *Map) UpdateHistory(projNames []string) error {
 			}
 			return nil
 		})
-		if err == tracker.UnknownProject {
+		if err == tracker.ErrUnknownProject {
 			panic(err)
 		} else if err != nil {
 			panic(err)
@@ -195,13 +195,13 @@ func (t *Map) UpdateHistory(projNames []string) error {
 
 // RegisterRoutes registers handler functions for tar1090 routes on r.
 func (t *Map) RegisterRoutes(r *mux.Router) error {
-	r.HandleFunc("/{project}/data/aircraft.json", t.AircraftJsonHandler)
-	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJsonHandler)
-	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverJsonHandler)
-	r.HandleFunc("/{project}/db2/icao_aircraft_types.js", assetResponseHandler{"types.json", aircraft_db.Asset}.responseHandler)
-	r.HandleFunc("/{project}/db2/files.js", assetResponseHandler{"files.json", aircraft_db.Asset}.responseHandler)
+	r.HandleFunc("/{project}/data/aircraft.json", t.AircraftJSONHandler)
+	r.HandleFunc("/{project}/data/history_{file}.json", t.HistoryJSONHandler)
+	r.HandleFunc("/{project}/data/receiver.json", t.ReceiverJSONHandler)
+	r.HandleFunc("/{project}/db2/icao_aircraft_types.js", assetResponseHandler{"types.json", aircraftdb.Asset}.responseHandler)
+	r.HandleFunc("/{project}/db2/files.js", assetResponseHandler{"files.json", aircraftdb.Asset}.responseHandler)
 
-	dat, err := aircraft_db.Asset("files.json")
+	dat, err := aircraftdb.Asset("files.json")
 	if err != nil {
 		return errors.Wrapf(err, "reading aircraft_db asset files.json")
 	}
@@ -212,7 +212,7 @@ func (t *Map) RegisterRoutes(r *mux.Router) error {
 	}
 
 	for _, shard := range shards {
-		r.HandleFunc("/{project}/db2/"+shard+".js", assetResponseHandler{shard + ".json", aircraft_db.Asset}.responseHandler)
+		r.HandleFunc("/{project}/db2/"+shard+".js", assetResponseHandler{shard + ".json", aircraftdb.Asset}.responseHandler)
 	}
 
 	assetNames := AssetNames()
@@ -226,8 +226,8 @@ func (t *Map) RegisterRoutes(r *mux.Router) error {
 	return nil
 }
 
-// ReceiverJsonHandler implements the HTTP handler for receiver.json
-func (t *Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request) {
+// ReceiverJSONHandler implements the HTTP handler for receiver.json
+func (t *Map) ReceiverJSONHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectName := vars["project"]
 	count, err := t.h.GetHistoryCount(projectName)
@@ -243,10 +243,10 @@ func (t *Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// AircraftJsonHandler implements the HTTP handler for aircraft.json
-func (t *Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
+// AircraftJSONHandler implements the HTTP handler for aircraft.json
+func (t *Map) AircraftJSONHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	err := t.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JsonAircraft) error {
+	err := t.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JSONAircraft) error {
 		ac := jsonAircraft{
 			Now:      float64(time.Now().Unix()),
 			Messages: messageCount,
@@ -259,7 +259,7 @@ func (t *Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
 		_, err = w.Write(data)
 		return err
 	})
-	if err == tracker.UnknownProject {
+	if err == tracker.ErrUnknownProject {
 		w.WriteHeader(404)
 	} else if err != nil {
 		w.WriteHeader(500)
@@ -267,8 +267,8 @@ func (t *Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HistoryJsonHandler implements the HTTP handler for history_%n.json
-func (t *Map) HistoryJsonHandler(w http.ResponseWriter, r *http.Request) {
+// HistoryJSONHandler implements the HTTP handler for history_%n.json
+func (t *Map) HistoryJSONHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	projectName := vars["project"]
 	i, err := strconv.ParseInt(vars["file"], 10, 32)
@@ -278,7 +278,7 @@ func (t *Map) HistoryJsonHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	history, err := t.h.GetHistoryFile(projectName, i)
-	if err == tracker.UnknownProject {
+	if err == tracker.ErrUnknownProject {
 		w.WriteHeader(404)
 		return
 	} else if err != nil {

@@ -6,15 +6,15 @@ import (
 )
 
 var cli struct {
-	Version airtrack.VersionCmd `cmd help:"Prints version information"`
+	Version airtrack.VersionCmd `cmd:"" help:"Prints version information"`
 
-	Track airtrack.TrackCmd `cmd help:"Track aircraft"`
+	Track airtrack.TrackCmd `cmd:"" help:"Track aircraft"`
 
 	Migrate struct {
-		Up    airtrack.MigrateUpCmd    `cmd help:"Migrate to latest database migration"`
-		Down  airtrack.MigrateDownCmd  `cmd help:"Rollback all migrations"`
-		Steps airtrack.MigrateStepsCmd `cmd help:"Migrate n steps forward if positive, or rollback n if negative"`
-	} `cmd help:"Database management functions"`
+		Up    airtrack.MigrateUpCmd    `cmd:"" help:"Migrate to latest database migration"`
+		Down  airtrack.MigrateDownCmd  `cmd:"" help:"Rollback all migrations"`
+		Steps airtrack.MigrateStepsCmd `cmd:"" help:"Migrate n steps forward if positive, or rollback n if negative"`
+	} `cmd:"" help:"Database management functions"`
 }
 
 func main() {

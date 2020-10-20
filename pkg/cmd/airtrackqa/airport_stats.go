@@ -7,10 +7,12 @@ import (
 	"io/ioutil"
 )
 
+// OpenAipAirportStats - prints a report about an openaip file
 type OpenAipAirportStats struct {
 	File string `help:"File path to openaip file"`
 }
 
+// Run - prints a report about an openaip file
 func (o *OpenAipAirportStats) Run(ctx *Context) error {
 	fmt.Printf("%s\n", o.File)
 
