@@ -15,9 +15,11 @@ type Aircraft struct {
 }
 
 type AcJsonAsSlice Aircraft
+
 func (t AcJsonAsSlice) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]string{t.Registration, t.TypeCode, t.F, t.Description})
 }
+
 type dbJson map[string]*AcJsonAsSlice
 
 func main() {
@@ -47,11 +49,11 @@ func main() {
 
 	// List of shards
 	shards := []string{
-		"0","1","2","3","4","5","6","7","8","9",
-		"A","B","C","D","E","F","3D","40","48",
-		"A0","A1","A2","A3","A4","A5","A6","A7",
-		"A8","A9","AA","AB","AC","C0","A00",
-		"A19","C00","C04","C05",
+		"0", "1", "2", "3", "4", "5", "6", "7", "8", "9",
+		"A", "B", "C", "D", "E", "F", "3D", "40", "48",
+		"A0", "A1", "A2", "A3", "A4", "A5", "A6", "A7",
+		"A8", "A9", "AA", "AB", "AC", "C0", "A00",
+		"A19", "C00", "C04", "C05",
 	}
 
 	// Init each shard

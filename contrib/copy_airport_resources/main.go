@@ -32,7 +32,7 @@ func main() {
 		} else if info.IsDir() {
 			return nil
 		}
-		if len(fp) > 4 && fp[len(fp)-4:len(fp)] == ".aip" {
+		if len(fp) > 4 && fp[len(fp)-4:] == ".aip" {
 			dat, err := ioutil.ReadFile(fp)
 			if err != nil {
 				return err
