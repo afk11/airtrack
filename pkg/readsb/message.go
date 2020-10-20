@@ -656,6 +656,9 @@ func DebugModesMessage(w io.Writer, mm *C.struct_modesMessage) error {
 		return err
 	}
 	_, err = fmt.Fprintf(w, "CRC: %d\n", int(mm.crc))
+	if err != nil {
+		return err
+	}
 	if mm.correctedbits > 0 {
 		_, err = fmt.Fprintf(w, "No. of bit errors fixed: %d\n", mm.correctedbits)
 		if err != nil {

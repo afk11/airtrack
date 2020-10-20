@@ -15,7 +15,7 @@ func TestMap_GetProjectAircraft_UnknownProject(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, m)
 
-	err = m.GetProjectAircraft("unknown", func(i int64, aircrafts []*JSONAircraft) error {
+	err = m.GetProjectAircraft("unknown", func(i int64, aircraft []*JSONAircraft) error {
 		return nil
 	})
 	assert.Error(t, err)
@@ -38,7 +38,7 @@ func TestMap_GetProjectAircraft_ReceivesError(t *testing.T) {
 	pl.Activated(p1)
 
 	expected := errors.New("it happened")
-	err = m.GetProjectAircraft(p1.Name, func(i int64, aircrafts []*JSONAircraft) error {
+	err = m.GetProjectAircraft(p1.Name, func(i int64, aircraft []*JSONAircraft) error {
 		return expected
 	})
 	assert.Error(t, err)

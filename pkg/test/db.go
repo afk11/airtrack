@@ -207,6 +207,9 @@ func initDb(testDB *DB, migrate bool) (*sqlx.DB, *config.Database, goqu.DialectW
 	}
 
 	dbURL, err := dbConf.DataSource(testDB.tz)
+	if err != nil {
+		panic(err)
+	}
 	if dbConf.Driver == config.DatabaseDriverSqlite3 {
 		if _, err := os.Stat(dbConf.Database); err == nil {
 			err = os.Remove(dbConf.Database)

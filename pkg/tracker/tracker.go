@@ -1009,7 +1009,7 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 		// Can be created
 		_, err = t.database.CreateSightingKmlContent(observation.sighting, plainTextKml)
 		if err != nil {
-			err = errors.Wrap(err, "create sighting kml")
+			return errors.Wrap(err, "create sighting kml")
 		}
 	} else if err == nil {
 		mapUpdated = true
@@ -1020,12 +1020,8 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 		}
 		_, err = t.database.UpdateSightingKml(sightingKml)
 		if err != nil {
-			err = errors.Wrap(err, "update sighting kml")
+			return errors.Wrap(err, "update sighting kml")
 		}
-	}
-
-	if err != nil {
-		return errors.Wrapf(err, "creating/updating sighting KML")
 	}
 
 	if project.IsEmailNotificationEnabled(MapProduced) {

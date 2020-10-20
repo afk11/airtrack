@@ -317,7 +317,7 @@ type Database interface {
 	// currentTime. A list of Email records is returned if successful, otherwise an error is
 	// returned.
 	GetPendingEmailJobs(currentTime time.Time) ([]Email, error)
-	// DeleteCompletedEmailTx deletes the specified job, excecuting the query on the provided tx.
+	// DeleteCompletedEmailTx deletes the specified job, executing the query on the provided tx.
 	// A sql.Result is returned if the query was successful, otherwise an error is returned.
 	DeleteCompletedEmailTx(tx *sqlx.Tx, job Email) (sql.Result, error)
 	// MarkEmailFailedTx sets job's status to failed, executing the query on the provided tx.

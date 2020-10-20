@@ -20,6 +20,9 @@ func main() {
 	ctx := kong.Parse(&cli)
 	// Call the Run() method of the selected parsed command.
 	cfg, err := config.ReadConfigFromFile(cli.Config)
+	if err != nil {
+		panic(err)
+	}
 	err = ctx.Run(&airtrackqa.Context{Config: cfg})
 	ctx.FatalIfErrorf(err)
 }
