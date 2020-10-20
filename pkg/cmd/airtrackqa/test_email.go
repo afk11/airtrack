@@ -20,7 +20,7 @@ type TestEmail struct {
 	Sighting uint64 `help:"sighting ID"`
 }
 
-// Run - attempts to send email for a certian sighting
+// Run - attempts to send email for a certain sighting
 func (e *TestEmail) Run(ctx *Context) error {
 	if e.To == "" {
 		return errors.New("missing to email address")
