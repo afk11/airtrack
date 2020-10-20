@@ -6,7 +6,6 @@ import (
 	"database/sql"
 	"github.com/doug-martin/goqu/v9"
 	"github.com/go-sql-driver/mysql"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 	"github.com/mattn/go-sqlite3"
@@ -16,10 +15,17 @@ import (
 )
 
 const (
-	EmailPending            = 1
-	EmailFailed             = 0
+	// EmailPending - status of a pending email
+	EmailPending = 1
+	// EmailFailed - status of a failed email
+	EmailFailed = 0
+
+	// KmlPlainTextContentType - content type used when
+	// sighting_kml kml record is encoded in plain text KML
 	KmlPlainTextContentType = 0
-	KmlGzipContentType      = 1
+	// KmlGzipContentType - content type used when
+	// sighting_kml kml record is gzipped KML
+	KmlGzipContentType = 1
 
 	projectTable          = "project"
 	sessionTable          = "session"
@@ -37,7 +43,7 @@ type (
 	// Project database record. Created the first time
 	// a project is used.
 	Project struct {
-		Id         uint64    `db:"id"`
+		ID         uint64    `db:"id"`
 		Identifier string    `db:"identifier"`
 		Label      *string   `db:"label"`
 		CreatedAt  time.Time `db:"created_at"`
@@ -48,9 +54,9 @@ type (
 	// Session database record. Created each time a project
 	// is used.
 	Session struct {
-		Id                    uint64     `db:"id"`
+		ID                    uint64     `db:"id"`
 		Identifier            string     `db:"identifier"`
-		ProjectId             uint64     `db:"project_id"`
+		ProjectID             uint64     `db:"project_id"`
 		ClosedAt              *time.Time `db:"closed_at"`
 		CreatedAt             time.Time  `db:"created_at"`
 		UpdatedAt             time.Time  `db:"updated_at"`
@@ -61,7 +67,7 @@ type (
 	}
 	// Aircraft database record. There will be one of these per icao.
 	Aircraft struct {
-		Id        uint64    `db:"id"`
+		ID        uint64    `db:"id"`
 		Icao      string    `db:"icao"`
 		CreatedAt time.Time `db:"created_at"`
 		UpdatedAt time.Time `db:"updated_at"`
@@ -69,10 +75,10 @@ type (
 	// Sighting database record. Created every time an aircraft is
 	// watched by a project in a session.
 	Sighting struct {
-		Id         uint64  `db:"id"`
-		ProjectId  uint64  `db:"project_id"`
-		SessionId  uint64  `db:"session_id"`
-		AircraftId uint64  `db:"aircraft_id"`
+		ID         uint64  `db:"id"`
+		ProjectID  uint64  `db:"project_id"`
+		SessionID  uint64  `db:"session_id"`
+		AircraftID uint64  `db:"aircraft_id"`
 		CallSign   *string `db:"callsign"`
 
 		CreatedAt time.Time  `db:"created_at"`
@@ -82,27 +88,27 @@ type (
 		TransmissionTypes uint8   `db:"transmission_types"`
 		Squawk            *string `db:"squawk"`
 	}
-	// SightingCallsign database record. Created for the first callsign
+	// SightingCallSign database record. Created for the first callsign
 	// and for newly adopted callsign.
 	SightingCallSign struct {
-		Id         uint64    `db:"id"`
-		SightingId uint64    `db:"sighting_id"`
+		ID         uint64    `db:"id"`
+		SightingID uint64    `db:"sighting_id"`
 		CallSign   string    `db:"callsign"`
 		ObservedAt time.Time `db:"observed_at"`
 	}
 	// SightingKml database record. Created once per sighting (as it closes). May be
 	// updated in future if the sighting is reopened.
 	SightingKml struct {
-		Id          uint64 `db:"id"`
-		SightingId  uint64 `db:"sighting_id"`
+		ID          uint64 `db:"id"`
+		SightingID  uint64 `db:"sighting_id"`
 		ContentType int32  `db:"content_type"`
 		Kml         []byte `db:"kml"`
 	}
 	// SightingLocation database record. Created each time a sightings location is
 	// updated.
 	SightingLocation struct {
-		Id         uint64    `db:"id"`
-		SightingId uint64    `db:"sighting_id"`
+		ID         uint64    `db:"id"`
+		SightingID uint64    `db:"sighting_id"`
 		TimeStamp  time.Time `db:"timestamp"`
 		Altitude   int64     `db:"altitude"`
 		Latitude   float64   `db:"latitude"`
@@ -111,8 +117,8 @@ type (
 	// SightingSquawk database record. Created for the first squawk, and for
 	// newly adopted squawks.
 	SightingSquawk struct {
-		Id         uint64    `db:"id"`
-		SightingId uint64    `db:"sighting_id"`
+		ID         uint64    `db:"id"`
+		SightingID uint64    `db:"sighting_id"`
 		Squawk     string    `db:"squawk"`
 		ObservedAt time.Time `db:"observed_at"`
 	}
@@ -120,7 +126,7 @@ type (
 	// relating to it's pending status. Will be deleted if successfully processed,
 	// otherwise will be left in the failed state.
 	Email struct {
-		Id         uint64     `db:"id"`
+		ID         uint64     `db:"id"`
 		Status     int32      `db:"status"`
 		Retries    int32      `db:"retries"`
 		RetryAfter *time.Time `db:"retry_after"`
@@ -128,6 +134,8 @@ type (
 		UpdatedAt  time.Time  `db:"updated_at"`
 		Job        []byte
 	}
+	// SchemaMigrations database record. Contains information
+	// about state of database migrations.
 	SchemaMigrations struct {
 		Version uint64 `db:"version"`
 		Dirty   bool   `db:"dirty"`
@@ -219,7 +227,7 @@ type Database interface {
 	GetAircraftByIcao(icao string) (*Aircraft, error)
 	// GetAircraftById searches for an Aircraft using it's ID. If the
 	// Aircraft exists it will be returned. Otherwise an error is returned.
-	GetAircraftById(id uint64) (*Aircraft, error)
+	GetAircraftByID(id uint64) (*Aircraft, error)
 	// CreateAircraft creates an Aircraft for the specified icao.
 	CreateAircraft(icao string) (sql.Result, error)
 
@@ -232,11 +240,11 @@ type Database interface {
 	CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircraft) (sql.Result, error)
 	// GetSightingById searches for a Sighting with the provided ID. The Sighting is returned
 	// if one was found. Otherwise an error is returned.
-	GetSightingById(sightingId uint64) (*Sighting, error)
+	GetSightingByID(sightingID uint64) (*Sighting, error)
 	// GetSightingById searches for a Sighting with the provided ID, executing the query
 	// with the provided transaction. The Sighting is returned if one was found. Otherwise
 	// an error is returned.
-	GetSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error)
+	GetSightingByIDTx(tx *sqlx.Tx, sightingID uint64) (*Sighting, error)
 	// GetLastSighting searches for a Sighting for ac in the provided Session. The Sighting
 	// is returned if one was found. Otherwise an error is returned.
 	GetLastSighting(session *Session, ac *Aircraft) (*Sighting, error)
@@ -272,17 +280,17 @@ type Database interface {
 
 	// CreateSightingLocation inserts a new SightingCallSign for a sighting. A sql.Result is
 	// returned if the query was successful. Otherwise an error is returned.
-	CreateSightingLocation(sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
+	CreateSightingLocation(sightingID uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
 	// CreateSightingLocationTx inserts a new SightingLocation for a sighting, executing
 	// the query on the provided tx. A sql.Result is returned if the query was successful.
 	// Otherwise an error is returned.
-	CreateSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
+	CreateSightingLocationTx(tx *sqlx.Tx, sightingID uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error)
 	// LoadLocationHistory searches for SightingLocation records for the provided Sighting.
-	// lastId should initially be zero, and in subsequent calls the ID of the last processed
+	// lastID should initially be zero, and in subsequent calls the ID of the last processed
 	// row should be used instead. At most batchSize results will be returned. If the query
 	// succeeds, the rows are returned (and must be closed by the caller). If unsuccessful
 	// an error is returned.
-	LoadLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error)
+	LoadLocationHistory(sighting *Sighting, lastID int64, batchSize int64) (*sqlx.Rows, error)
 	// WalkLocationHistoryBatch searches for SightingLocation records by loading at most
 	// batchSize results at a time, invoking f with each batch of results. An error is returned
 	// if we were unsuccessful.
@@ -378,7 +386,7 @@ func (d *DatabaseImpl) CreateSession(project *Project, identifier string, withSq
 		Prepared(true).
 		Cols("project_id", "identifier", "with_squawks", "with_transmission_types",
 			"with_callsigns", "created_at", "updated_at", "closed_at").
-		Vals(goqu.Vals{project.Id, identifier, withSquawks, withTxTypes, withCallSigns, now, now, nil}).
+		Vals(goqu.Vals{project.ID, identifier, withSquawks, withTxTypes, withCallSigns, now, now, nil}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -396,7 +404,7 @@ func (d *DatabaseImpl) GetSessionByIdentifier(project *Project, identifier strin
 		From(sessionTable).
 		Prepared(true).
 		Where(goqu.Ex{
-			"project_id": project.Id,
+			"project_id": project.ID,
 			"identifier": identifier,
 		}).
 		ToSQL()
@@ -422,7 +430,7 @@ func (d *DatabaseImpl) CloseSession(session *Session) (sql.Result, error) {
 		Set(goqu.Ex{
 			"closed_at": now,
 		}).
-		Where(goqu.C("id").Eq(session.Id)).
+		Where(goqu.C("id").Eq(session.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -454,8 +462,8 @@ func (d *DatabaseImpl) GetAircraftByIcao(icao string) (*Aircraft, error) {
 	return aircraft, nil
 }
 
-// GetAircraftById - see Database.GetAircraftById
-func (d *DatabaseImpl) GetAircraftById(id uint64) (*Aircraft, error) {
+// GetAircraftByID - see Database.GetAircraftByID
+func (d *DatabaseImpl) GetAircraftByID(id uint64) (*Aircraft, error) {
 	s, p, err := d.dialect.
 		From(aircraftTable).
 		Prepared(true).
@@ -497,7 +505,7 @@ func (d *DatabaseImpl) CreateSighting(session *Session, ac *Aircraft) (sql.Resul
 		Insert(sightingTable).
 		Prepared(true).
 		Cols("project_id", "session_id", "aircraft_id", "created_at", "updated_at").
-		Vals(goqu.Vals{session.ProjectId, session.Id, ac.Id, &now, &now}).
+		Vals(goqu.Vals{session.ProjectID, session.ID, ac.ID, &now, &now}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -513,7 +521,7 @@ func (d *DatabaseImpl) CreateSightingTx(tx *sqlx.Tx, session *Session, ac *Aircr
 		Insert(sightingTable).
 		Prepared(true).
 		Cols("project_id", "session_id", "aircraft_id", "created_at", "updated_at").
-		Vals(goqu.Vals{session.ProjectId, session.Id, ac.Id, &now, &now}).
+		Vals(goqu.Vals{session.ProjectID, session.ID, ac.ID, &now, &now}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -529,7 +537,7 @@ func (d *DatabaseImpl) ReopenSighting(sighting *Sighting) (sql.Result, error) {
 		Set(goqu.Ex{
 			"closed_at": nil,
 		}).
-		Where(goqu.C("id").Eq(sighting.Id)).
+		Where(goqu.C("id").Eq(sighting.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -550,7 +558,7 @@ func (d *DatabaseImpl) ReopenSightingTx(tx *sqlx.Tx, sighting *Sighting) (sql.Re
 		Set(goqu.Ex{
 			"closed_at": nil,
 		}).
-		Where(goqu.C("id").Eq(sighting.Id)).
+		Where(goqu.C("id").Eq(sighting.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -569,8 +577,8 @@ func (d *DatabaseImpl) GetLastSighting(session *Session, ac *Aircraft) (*Sightin
 		From(sightingTable).
 		Prepared(true).
 		Where(goqu.Ex{
-			"session_id":  session.Id,
-			"aircraft_id": ac.Id,
+			"session_id":  session.ID,
+			"aircraft_id": ac.ID,
 		}).
 		Order(goqu.C("id").Desc()).
 		Limit(1).
@@ -593,8 +601,8 @@ func (d *DatabaseImpl) GetLastSightingTx(tx *sqlx.Tx, session *Session, ac *Airc
 		From(sightingTable).
 		Prepared(true).
 		Where(goqu.Ex{
-			"session_id":  session.Id,
-			"aircraft_id": ac.Id,
+			"session_id":  session.ID,
+			"aircraft_id": ac.ID,
 		}).
 		Order(goqu.C("id").Desc()).
 		Limit(1).
@@ -619,7 +627,7 @@ func (d *DatabaseImpl) UpdateSightingCallsignTx(tx *sqlx.Tx, sighting *Sighting,
 		Set(goqu.Ex{
 			"callsign": callsign,
 		}).
-		Where(goqu.C("id").Eq(sighting.Id)).
+		Where(goqu.C("id").Eq(sighting.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -640,7 +648,7 @@ func (d *DatabaseImpl) UpdateSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting, s
 		Set(goqu.Ex{
 			"squawk": squawk,
 		}).
-		Where(goqu.C("id").Eq(sighting.Id)).
+		Where(goqu.C("id").Eq(sighting.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -662,7 +670,7 @@ func (d *DatabaseImpl) CloseSightingBatch(sightings []*Sighting, closedAt time.T
 	err := d.Transaction(func(tx *sqlx.Tx) error {
 		var ids []uint64
 		for i := 0; i < n; i++ {
-			ids = append(ids, sightings[i].Id)
+			ids = append(ids, sightings[i].ID)
 		}
 
 		s, p, err := d.dialect.
@@ -691,7 +699,7 @@ func (d *DatabaseImpl) CloseSightingBatch(sightings []*Sighting, closedAt time.T
 	return nil
 }
 
-// GetSightingById - see Database.GetSightingById
+// GetSchemaMigration - see Database.GetSchemaMigration
 func (d *DatabaseImpl) GetSchemaMigration() (*SchemaMigrations, error) {
 	s, p, err := d.dialect.
 		From(schemaMigrationsTable).
@@ -709,12 +717,12 @@ func (d *DatabaseImpl) GetSchemaMigration() (*SchemaMigrations, error) {
 	return sm, nil
 }
 
-// GetSightingById - see Database.GetSightingById
-func (d *DatabaseImpl) GetSightingById(sightingId uint64) (*Sighting, error) {
+// GetSightingByID - see Database.GetSightingByID
+func (d *DatabaseImpl) GetSightingByID(sightingID uint64) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From(sightingTable).
 		Prepared(true).
-		Where(goqu.C("id").Eq(sightingId)).
+		Where(goqu.C("id").Eq(sightingID)).
 		Limit(1).
 		ToSQL()
 	if err != nil {
@@ -730,12 +738,12 @@ func (d *DatabaseImpl) GetSightingById(sightingId uint64) (*Sighting, error) {
 	return sighting, nil
 }
 
-// GetSightingByIdTx - see Database.GetSightingByIdTx
-func (d *DatabaseImpl) GetSightingByIdTx(tx *sqlx.Tx, sightingId uint64) (*Sighting, error) {
+// GetSightingByIDTx - see Database.GetSightingByIDTx
+func (d *DatabaseImpl) GetSightingByIDTx(tx *sqlx.Tx, sightingID uint64) (*Sighting, error) {
 	s, p, err := d.dialect.
 		From(sightingTable).
 		Prepared(true).
-		Where(goqu.C("id").Eq(sightingId)).
+		Where(goqu.C("id").Eq(sightingID)).
 		Limit(1).
 		ToSQL()
 	if err != nil {
@@ -757,7 +765,7 @@ func (d *DatabaseImpl) CreateNewSightingCallSignTx(tx *sqlx.Tx, sighting *Sighti
 		Insert(sightingCallsignTable).
 		Prepared(true).
 		Cols("sighting_id", "callsign", "observed_at").
-		Vals(goqu.Vals{sighting.Id, callsign, observedAt}).
+		Vals(goqu.Vals{sighting.ID, callsign, observedAt}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -770,7 +778,7 @@ func (d *DatabaseImpl) GetLastSightingCallSignTx(tx *sqlx.Tx, sighting *Sighting
 	s, p, err := d.dialect.
 		From(sightingCallsignTable).
 		Prepared(true).
-		Where(goqu.C("sighting_id").Eq(sighting.Id)).
+		Where(goqu.C("sighting_id").Eq(sighting.ID)).
 		Order(goqu.C("id").Desc()).
 		Limit(1).
 		ToSQL()
@@ -787,12 +795,12 @@ func (d *DatabaseImpl) GetLastSightingCallSignTx(tx *sqlx.Tx, sighting *Sighting
 }
 
 // CreateSightingLocation - see Database.CreateSightingLocation
-func (d *DatabaseImpl) CreateSightingLocation(sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
+func (d *DatabaseImpl) CreateSightingLocation(sightingID uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert(sightingLocationTable).
 		Prepared(true).
 		Cols("sighting_id", "timestamp", "altitude", "latitude", "longitude").
-		Vals(goqu.Vals{sightingId, t, altitude, lat, long}).
+		Vals(goqu.Vals{sightingID, t, altitude, lat, long}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -802,12 +810,12 @@ func (d *DatabaseImpl) CreateSightingLocation(sightingId uint64, t time.Time, al
 }
 
 // CreateSightingLocationTx - see Database.CreateSightingLocationTx
-func (d *DatabaseImpl) CreateSightingLocationTx(tx *sqlx.Tx, sightingId uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
+func (d *DatabaseImpl) CreateSightingLocationTx(tx *sqlx.Tx, sightingID uint64, t time.Time, altitude int64, lat float64, long float64) (sql.Result, error) {
 	s, p, err := d.dialect.
 		Insert(sightingLocationTable).
 		Prepared(true).
 		Cols("sighting_id", "timestamp", "altitude", "latitude", "longitude").
-		Vals(goqu.Vals{sightingId, t, altitude, lat, long}).
+		Vals(goqu.Vals{sightingID, t, altitude, lat, long}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -817,13 +825,13 @@ func (d *DatabaseImpl) CreateSightingLocationTx(tx *sqlx.Tx, sightingId uint64, 
 }
 
 // LoadLocationHistory - see Database.LoadLocationHistory
-func (d *DatabaseImpl) LoadLocationHistory(sighting *Sighting, lastId int64, batchSize int64) (*sqlx.Rows, error) {
+func (d *DatabaseImpl) LoadLocationHistory(sighting *Sighting, lastID int64, batchSize int64) (*sqlx.Rows, error) {
 	s, p, err := d.dialect.
 		From(sightingLocationTable).
 		Prepared(true).
 		Where(goqu.Ex{
-			"sighting_id": sighting.Id,
-			"id":          goqu.Op{"gt": lastId},
+			"sighting_id": sighting.ID,
+			"id":          goqu.Op{"gt": lastID},
 		}).
 		Limit(uint(batchSize)).
 		ToSQL()
@@ -839,11 +847,11 @@ func (d *DatabaseImpl) LoadLocationHistory(sighting *Sighting, lastId int64, bat
 
 // WalkLocationHistoryBatch - see Database.WalkLocationHistoryBatch
 func (d *DatabaseImpl) WalkLocationHistoryBatch(sighting *Sighting, batchSize int64, f func([]SightingLocation)) error {
-	lastId := int64(-1)
+	lastID := int64(-1)
 	batch := make([]SightingLocation, 0, batchSize)
 	for {
 		// res - needs closing
-		res, err := d.LoadLocationHistory(sighting, lastId, batchSize)
+		res, err := d.LoadLocationHistory(sighting, lastID, batchSize)
 		if err != nil {
 			return errors.Wrap(err, "failed to fetch location history")
 		}
@@ -864,7 +872,7 @@ func (d *DatabaseImpl) WalkLocationHistoryBatch(sighting *Sighting, batchSize in
 		}
 
 		f(batch)
-		lastId = int64(batch[len(batch)-1].Id)
+		lastID = int64(batch[len(batch)-1].ID)
 		batch = make([]SightingLocation, 0, batchSize)
 	}
 }
@@ -887,7 +895,7 @@ func (d *DatabaseImpl) CreateNewSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting
 		Insert(sightingSquawkTable).
 		Prepared(true).
 		Cols("sighting_id", "squawk", "observed_at").
-		Vals(goqu.Vals{sighting.Id, squawk, observedAt}).
+		Vals(goqu.Vals{sighting.ID, squawk, observedAt}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -900,7 +908,7 @@ func (d *DatabaseImpl) GetLastSightingSquawkTx(tx *sqlx.Tx, sighting *Sighting) 
 	s, p, err := d.dialect.
 		From(sightingSquawkTable).
 		Prepared(true).
-		Where(goqu.C("sighting_id").Eq(sighting.Id)).
+		Where(goqu.C("sighting_id").Eq(sighting.ID)).
 		Order(goqu.C("id").Desc()).
 		Limit(1).
 		ToSQL()
@@ -922,7 +930,7 @@ func (d *DatabaseImpl) GetSightingKml(sighting *Sighting) (*SightingKml, error) 
 		From(sightingKmlTable).
 		Prepared(true).
 		Where(goqu.Ex{
-			"sighting_id": sighting.Id,
+			"sighting_id": sighting.ID,
 		}).
 		ToSQL()
 	if err != nil {
@@ -946,7 +954,7 @@ func (d *DatabaseImpl) UpdateSightingKml(sightingKml *SightingKml) (sql.Result, 
 			"kml":          sightingKml.Kml,
 			"content_type": sightingKml.ContentType,
 		}).
-		Where(goqu.C("id").Eq(sightingKml.Id)).
+		Where(goqu.C("id").Eq(sightingKml.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -977,7 +985,7 @@ func (d *DatabaseImpl) CreateSightingKmlContent(sighting *Sighting, kmlData []by
 		Insert(sightingKmlTable).
 		Prepared(true).
 		Cols("sighting_id", "content_type", "kml").
-		Vals(goqu.Vals{sighting.Id, KmlGzipContentType, b.Bytes()}).
+		Vals(goqu.Vals{sighting.ID, KmlGzipContentType, b.Bytes()}).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -1037,7 +1045,7 @@ func (d *DatabaseImpl) DeleteCompletedEmailTx(tx *sqlx.Tx, job Email) (sql.Resul
 	s, p, err := d.dialect.
 		Delete(emailTable).
 		Prepared(true).
-		Where(goqu.C("id").Eq(job.Id)).
+		Where(goqu.C("id").Eq(job.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -1053,7 +1061,7 @@ func (d *DatabaseImpl) MarkEmailFailedTx(tx *sqlx.Tx, job *Email) (sql.Result, e
 		Set(goqu.Ex{
 			"status": EmailFailed,
 		}).
-		Where(goqu.C("id").Eq(job.Id)).
+		Where(goqu.C("id").Eq(job.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err
@@ -1077,7 +1085,7 @@ func (d *DatabaseImpl) RetryEmailAfterTx(tx *sqlx.Tx, job *Email, retryAfter tim
 			"retry_after": retryAfter,
 			"retries":     job.Retries + 1,
 		}).
-		Where(goqu.C("id").Eq(job.Id)).
+		Where(goqu.C("id").Eq(job.ID)).
 		ToSQL()
 	if err != nil {
 		return nil, err

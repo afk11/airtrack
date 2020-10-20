@@ -24,18 +24,18 @@ const (
 	DefaultHistoryFileCount = 60
 )
 
-// UnknownProject is returned by MapAccess.GetProjectAircraft
-var UnknownProject = errors.New("unknown project")
+// ErrUnknownProject is returned by MapAccess.GetProjectAircraft
+var ErrUnknownProject = errors.New("unknown project")
 
 type (
 	// MapAccess provides access to the current map view
 	MapAccess interface {
 		// GetProjectAircraft loads the subset of aircraft in
 		// view for this project, and the current message count
-		// and []*JsonAircraft is passed to the provided closure.
+		// and []*JSONAircraft is passed to the provided closure.
 		// The aircraft are locked for the lifetime of the closure
 		// and must be copied to be safely used elsewhere.
-		GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error
+		GetProjectAircraft(projectName string, f func(int64, []*JSONAircraft) error) error
 	}
 
 	// MapHistoryUpdateScheduler defines an interface allowing
@@ -99,13 +99,13 @@ func (l *MapProjectAircraftUpdateListener) NewAircraft(p *Project, s *Sighting) 
 	l.m.projectNewAircraft(p, s)
 }
 
-// NewAircraft informs map about updated aircraft. Implements
+// UpdatedAircraft informs map about updated aircraft. Implements
 // ProjectAircraftUpdateListener.UpdatedAircraft
 func (l *MapProjectAircraftUpdateListener) UpdatedAircraft(p *Project, s *Sighting) {
 	l.m.projectUpdatedAircraft(p, s)
 }
 
-// NewAircraft informs map about lost aircraft. Implements
+// LostAircraft informs map about lost aircraft. Implements
 // ProjectAircraftUpdateListener.LostAircraft
 func (l *MapProjectAircraftUpdateListener) LostAircraft(p *Project, s *Sighting) {
 	l.m.projectLostAircraft(p, s)
@@ -119,8 +119,8 @@ type projectState struct {
 	aircraft []string
 }
 
-// JsonAircraft is a dump1090 aircraft structure
-type JsonAircraft struct {
+// JSONAircraft is a dump1090 aircraft structure
+type JSONAircraft struct {
 	sync.RWMutex
 	// referenceCount tracks how many projects currently refer
 	// to this aircraft
@@ -224,8 +224,8 @@ type JsonAircraft struct {
 	Rssi float64 `json:"rssi"`
 }
 
-// UpdateWithState updates JsonAircraft with the latest state
-func (j *JsonAircraft) UpdateWithState(state *pb.State) {
+// UpdateWithState updates JSONAircraft with the latest state
+func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	j.Flight = state.CallSign
 	if state.HaveLocation {
 		j.Latitude = state.Latitude
@@ -259,7 +259,7 @@ type AircraftMap struct {
 	s               *http.Server
 	r               *mux.Router
 	historyInterval time.Duration
-	ac              map[string]*JsonAircraft
+	ac              map[string]*JSONAircraft
 	acMu            sync.RWMutex
 	projMu          sync.RWMutex
 	projects        map[string]*projectState
@@ -273,7 +273,7 @@ type AircraftMap struct {
 // configuration
 func NewAircraftMap(cfg *config.MapSettings) (*AircraftMap, error) {
 	m := &AircraftMap{
-		ac:              make(map[string]*JsonAircraft),
+		ac:              make(map[string]*JSONAircraft),
 		projects:        make(map[string]*projectState),
 		r:               mux.NewRouter(),
 		historyInterval: DefaultHistoryInterval,
@@ -375,7 +375,7 @@ func (m *AircraftMap) projectNewAircraft(p *Project, s *Sighting) error {
 
 	m.acMu.Lock()
 	if _, ok := m.ac[s.State.Icao]; !ok {
-		ac := &JsonAircraft{
+		ac := &JSONAircraft{
 			lastMsgTime: time.Now(),
 			Hex:         s.State.Icao,
 			Messages:    1,
@@ -448,8 +448,8 @@ func (m *AircraftMap) projectLostAircraft(p *Project, s *Sighting) error {
 	return nil
 }
 
-// Implements MapAccess.GetProjectAircraft.
-func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*JsonAircraft) error) error {
+// GetProjectAircraft - Implements MapAccess.GetProjectAircraft.
+func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*JSONAircraft) error) error {
 	m.projMu.RLock()
 	defer m.projMu.RUnlock()
 	m.acMu.RLock()
@@ -457,14 +457,14 @@ func (m *AircraftMap) GetProjectAircraft(projectName string, f func(int64, []*Js
 
 	proj, ok := m.projects[projectName]
 	if !ok {
-		return UnknownProject
+		return ErrUnknownProject
 	}
 
 	proj.RLock()
 	defer proj.RUnlock()
 
 	numAC := len(proj.aircraft)
-	l := make([]*JsonAircraft, numAC)
+	l := make([]*JSONAircraft, numAC)
 	for i := 0; i < numAC; i++ {
 		l[i] = m.ac[proj.aircraft[i]]
 		l[i].RLock()
@@ -489,17 +489,17 @@ func (m *AircraftMap) Serve() {
 	m.wg.Add(1)
 	ctx, canceller := context.WithCancel(context.Background())
 	m.canceller = canceller
-	go m.updateJson(ctx)
+	go m.updateJSON(ctx)
 	go func() {
 		m.s.ListenAndServe()
 	}()
 }
 
-// updateJson does time based functions - every second it
+// updateJSON does time based functions - every second it
 // adjusts Seen and SeenPos to the corrent number of seconds
 // since the last message/position. Every `m.historyInterval`
 // it writes a new history file.
-func (m *AircraftMap) updateJson(ctx context.Context) {
+func (m *AircraftMap) updateJSON(ctx context.Context) {
 	defer m.wg.Done()
 	lastHistoryUpdate := time.Now()
 	firstRun := true

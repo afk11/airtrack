@@ -5,20 +5,22 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db/migrations"
-	_ "github.com/go-sql-driver/mysql"
 	"github.com/pkg/errors"
 	"os"
 )
 
 type (
+	// MigrateUpCmd - executes migrate up
 	MigrateUpCmd struct {
 		Config string `help:"Configuration file path"`
 		Force  bool   `help:"Proceed with task without user confirmation'"`
 	}
+	// MigrateDownCmd - executes migrate down
 	MigrateDownCmd struct {
 		Config string `help:"Configuration file path"`
 		Force  bool   `help:"Proceed with task without user confirmation'"`
 	}
+	// MigrateStepsCmd - executes n migration steps
 	MigrateStepsCmd struct {
 		Config string `help:"Configuration file path"`
 		Force  bool   `help:"Proceed with task without user confirmation'"`
@@ -26,6 +28,7 @@ type (
 	}
 )
 
+// Run - triggers up migrations
 func (c *MigrateUpCmd) Run() error {
 	// Call the Run() method of the selected parsed command.
 	cfg, err := config.ReadConfigFromFile(c.Config)
@@ -57,6 +60,7 @@ func (c *MigrateUpCmd) Run() error {
 	return nil
 }
 
+// Run - triggers down migrations
 func (c *MigrateDownCmd) Run() error {
 	// Call the Run() method of the selected parsed command.
 	cfg, err := config.ReadConfigFromFile(c.Config)
@@ -87,6 +91,7 @@ func (c *MigrateDownCmd) Run() error {
 	return nil
 }
 
+// Run - triggers migration n steps
 func (c *MigrateStepsCmd) Run() error {
 	if c.N == 0 {
 		return errors.Errorf("cannot set n=0 (stay where we are)")

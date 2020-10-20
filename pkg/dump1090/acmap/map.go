@@ -15,7 +15,7 @@ func NewDump1090Map(ma tracker.MapAccess) *Dump1090Map {
 	return &Dump1090Map{m: ma}
 }
 
-// Dump1090Map. Implements tracker.MapService.
+// Dump1090Map - Implements tracker.MapService.
 type Dump1090Map struct {
 	m tracker.MapAccess
 }
@@ -29,7 +29,7 @@ func (d *Dump1090Map) MapService() string {
 // See MapService.UpdateHistory.
 func (d *Dump1090Map) UpdateHistory(projNames []string) error {
 	for i := range projNames {
-		err := d.m.GetProjectAircraft(projNames[i], func(messageCount int64, fields []*tracker.JsonAircraft) error {
+		err := d.m.GetProjectAircraft(projNames[i], func(messageCount int64, fields []*tracker.JSONAircraft) error {
 			ac := jsonAircraft{
 				Now:      float64(time.Now().Unix()),
 				Messages: messageCount,
@@ -41,7 +41,7 @@ func (d *Dump1090Map) UpdateHistory(projNames []string) error {
 			}
 			return nil
 		})
-		if err == tracker.UnknownProject {
+		if err == tracker.ErrUnknownProject {
 			// todo: should this bubble up?
 		} else if err != nil {
 			panic(err)
@@ -74,8 +74,8 @@ func (h assetResponseHandler) responseHandler(w http.ResponseWriter, r *http.Req
 
 // RegisterRoutes registers the routes for dump1090 on r.
 func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
-	r.HandleFunc("/{project}/data/aircraft.json", d.AircraftJsonHandler)
-	r.HandleFunc("/{project}/data/receiver.json", d.ReceiverJsonHandler)
+	r.HandleFunc("/{project}/data/aircraft.json", d.AircraftJSONHandler)
+	r.HandleFunc("/{project}/data/receiver.json", d.ReceiverJSONHandler)
 	assetNames := AssetNames()
 	for i := range assetNames {
 		_, err := Asset(assetNames[i])
@@ -88,8 +88,8 @@ func (d *Dump1090Map) RegisterRoutes(r *mux.Router) error {
 	return nil
 }
 
-// ReceiverJsonHandler implements the HTTP handler for receiver.json
-func (d *Dump1090Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request) {
+// ReceiverJSONHandler implements the HTTP handler for receiver.json
+func (d *Dump1090Map) ReceiverJSONHandler(w http.ResponseWriter, r *http.Request) {
 	_, err := w.Write([]byte("{ \"version\" : \"v3.8.3\", \"refresh\" : 1000, \"history\" : 32 }"))
 	if err != nil {
 		w.WriteHeader(500)
@@ -97,10 +97,10 @@ func (d *Dump1090Map) ReceiverJsonHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
-// AircraftJsonHandler implements the HTTP handler for aircraft.json
-func (d *Dump1090Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request) {
+// AircraftJSONHandler implements the HTTP handler for aircraft.json
+func (d *Dump1090Map) AircraftJSONHandler(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	err := d.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JsonAircraft) error {
+	err := d.m.GetProjectAircraft(vars["project"], func(messageCount int64, fields []*tracker.JSONAircraft) error {
 		ac := jsonAircraft{
 			Now:      float64(time.Now().Unix()),
 			Messages: messageCount,
@@ -113,7 +113,7 @@ func (d *Dump1090Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request
 		_, err = w.Write(data)
 		return err
 	})
-	if err == tracker.UnknownProject {
+	if err == tracker.ErrUnknownProject {
 		w.WriteHeader(404)
 	} else if err != nil {
 		w.WriteHeader(500)
@@ -125,5 +125,5 @@ func (d *Dump1090Map) AircraftJsonHandler(w http.ResponseWriter, r *http.Request
 type jsonAircraft struct {
 	Now      float64                 `json:"now"`
 	Messages int64                   `json:"messages"`
-	Aircraft []*tracker.JsonAircraft `json:"aircraft"`
+	Aircraft []*tracker.JSONAircraft `json:"aircraft"`
 }

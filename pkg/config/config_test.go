@@ -158,12 +158,12 @@ email:
 		assert.Equal(t, "UTC", *cfg.TimeZone, "parsed timezone should match")
 		assert.NotNil(t, cfg.EmailSettings)
 		assert.Equal(t, "smtp", cfg.EmailSettings.Driver)
-		assert.Equal(t, "mylogin", cfg.EmailSettings.Smtp.Username)
-		assert.Equal(t, "mypassword", cfg.EmailSettings.Smtp.Password)
-		assert.Equal(t, "email@website.local", cfg.EmailSettings.Smtp.Sender)
-		assert.Equal(t, "website.local", cfg.EmailSettings.Smtp.Host)
-		assert.Equal(t, 587, cfg.EmailSettings.Smtp.Port)
-		assert.Equal(t, true, cfg.EmailSettings.Smtp.MandatoryStartTLS)
+		assert.Equal(t, "mylogin", cfg.EmailSettings.SMTP.Username)
+		assert.Equal(t, "mypassword", cfg.EmailSettings.SMTP.Password)
+		assert.Equal(t, "email@website.local", cfg.EmailSettings.SMTP.Sender)
+		assert.Equal(t, "website.local", cfg.EmailSettings.SMTP.Host)
+		assert.Equal(t, 587, cfg.EmailSettings.SMTP.Port)
+		assert.Equal(t, true, cfg.EmailSettings.SMTP.MandatoryStartTLS)
 	})
 
 	t.Run("projects", func(t *testing.T) {

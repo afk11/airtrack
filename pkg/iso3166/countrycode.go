@@ -3,7 +3,7 @@ package iso3166
 type (
 	// AlphaTwoCountryCode - data type containing two character ISO3166 alpha-2 code
 	AlphaTwoCountryCode string
-	// AlphaTwoCountryCode - data type containing three character ISO3166 alpha-3 code
+	// AlphaThreeCountryCode - data type containing three character ISO3166 alpha-3 code
 	AlphaThreeCountryCode string
 )
 

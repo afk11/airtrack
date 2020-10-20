@@ -57,7 +57,7 @@ type (
 const (
 	// TrackTxTypes - track ADSB message types (only for BEAST messages)
 	TrackTxTypes Feature = "track_tx_types"
-	// TrackCallsigns - track current callsign and maintain history
+	// TrackCallSigns - track current callsign and maintain history
 	TrackCallSigns Feature = "track_callsigns"
 	// TrackSquawks - track current squawk and maintain history
 	TrackSquawks Feature = "track_squawks"

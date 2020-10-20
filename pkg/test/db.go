@@ -5,16 +5,11 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/db/migrations"
-	"github.com/afk11/airtrack/pkg/db/migrations_mysql"
-	"github.com/afk11/airtrack/pkg/db/migrations_sqlite3"
 	"github.com/doug-martin/goqu/v9"
+	// imported here to ensure it's available for tests
 	_ "github.com/doug-martin/goqu/v9/dialect/mysql"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
-	"github.com/golang-migrate/migrate"
-	"github.com/golang-migrate/migrate/database/mysql"
-	"github.com/golang-migrate/migrate/database/sqlite3"
-	bindata "github.com/golang-migrate/migrate/source/go_bindata"
 	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"os"
@@ -23,11 +18,9 @@ import (
 	"time"
 )
 
-type TestTimeZone struct {
-	Tz *time.Location
-}
-
-func LoadTestTimeZone() (*TestTimeZone, error) {
+// LoadTestTimeZone returns the configured
+// timezone or uses UTC if none is set.
+func LoadTestTimeZone() (*time.Location, error) {
 	var v string
 	var found bool
 	if v, found = os.LookupEnv("AIRTRACK_TEST_TIMEZONE"); !found {
@@ -37,11 +30,12 @@ func LoadTestTimeZone() (*TestTimeZone, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &TestTimeZone{
-		Tz: l,
-	}, nil
+	return l, nil
 }
-func MustLoadTestTimeZone() *TestTimeZone {
+
+// MustLoadTestTimeZone loads a timezone using LoadTestTimeZone
+// but will panic if an error is returned
+func MustLoadTestTimeZone() *time.Location {
 	tz, err := LoadTestTimeZone()
 	if err != nil {
 		panic(err)
@@ -49,7 +43,8 @@ func MustLoadTestTimeZone() *TestTimeZone {
 	return tz
 }
 
-type TestDbConfig struct {
+// DbConfig defines information about the test database
+type DbConfig struct {
 	Driver      string
 	DatabaseFmt string
 	Username    string
@@ -59,13 +54,8 @@ type TestDbConfig struct {
 	NumDbs      int
 }
 
-func MustLoadTestDbConfig() *config.Database {
-	c, err := LoadTestDbConfig()
-	if err != nil {
-		panic(err)
-	}
-	return c
-}
+// LoadTestDbConfig can be called to create a database configuration
+// based on environment variables.
 func LoadTestDbConfig() (*config.Database, error) {
 	cfg := &config.Database{
 		Driver:   "mysql",
@@ -96,84 +86,34 @@ func LoadTestDbConfig() (*config.Database, error) {
 	return cfg, nil
 }
 
-func InitMysqlMigration(database string, db *sql.DB) (*migrate.Migrate, error) {
-	s := bindata.Resource(migrations_mysql.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations_mysql.Asset(name)
-		})
-	d, err := bindata.WithInstance(s)
-	if err != nil {
-		return nil, err
-	}
-	driver, err := mysql.WithInstance(db, &mysql.Config{})
-	if err != nil {
-		return nil, err
-	}
-	m, err := migrate.NewWithInstance(
-		"go-bindata",
-		d,
-		database,
-		driver,
-	)
-	if err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-func InitSqliteMigration(database string, sqliteFile string, db *sql.DB) (*migrate.Migrate, error) {
-	dbUrl := fmt.Sprintf("file:" + sqliteFile)
-	db, err := sql.Open("sqlite3", dbUrl)
-	if err != nil {
-		return nil, errors.Wrapf(err, "opening sqlite file")
-	}
-	driver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
-	if err != nil {
-		return nil, errors.Wrapf(err, "setup migrate sqlite3 driver")
-	}
-	s := bindata.Resource(migrations_sqlite3.AssetNames(),
-		func(name string) ([]byte, error) {
-			return migrations_sqlite3.Asset(name)
-		})
-	src, err := bindata.WithInstance(s)
-	if err != nil {
-		return nil, errors.Wrapf(err, "bindata source with instance")
-	}
-	m, err := migrate.NewWithInstance(
-		"go-bindata",
-		src,
-		database,
-		driver,
-	)
-	if err != nil {
-		return nil, errors.Wrapf(err, "init migrate instance")
-	}
-	return m, nil
-}
-
-type TestDB struct {
-	conf  *TestDbConfig
+// DB contains structures for a test database
+type DB struct {
+	conf  *DbConfig
 	tz    *time.Location
 	db    string
 	inUse bool
 }
 
-var dbs []*TestDB
+var dbs []*DB
 
 var claimNextDBLock = &sync.Mutex{}
 
 func init() {
 	tz := MustLoadTestTimeZone()
 
-	dbs = make([]*TestDB, 4)
+	dbs = make([]*DB, 4)
 	for i := 0; i < 4; i++ {
-		dbs[i] = &TestDB{
+		dbs[i] = &DB{
 			db:    fmt.Sprintf("airtrack_test_%d", i),
-			tz:    tz.Tz,
+			tz:    tz,
 			inUse: false}
 	}
 }
 
-func ClaimNextDB() *TestDB {
+// ClaimNextDB returns the first free database. You should
+// limit concurrency to the number of DB's you want to use,
+// otherwise this function will panic.
+func ClaimNextDB() *DB {
 	claimNextDBLock.Lock()
 	defer claimNextDBLock.Unlock()
 
@@ -185,10 +125,10 @@ func ClaimNextDB() *TestDB {
 	}
 
 	panic("Failed to claim a DB")
-
-	return nil
 }
 
+// DropTablesPostgres deletes all tables in the database db
+// is connected to
 func DropTablesPostgres(db *sqlx.DB) error {
 	rows, err := db.Query(`SELECT table_name
 FROM information_schema.tables
@@ -217,7 +157,10 @@ AND table_type='BASE TABLE';`)
 	}
 	return nil
 }
-func DropTables(db *sqlx.DB) error {
+
+// DropTablesMysql deletes all tables in the database db
+// is connected to
+func DropTablesMysql(db *sqlx.DB) error {
 	rows, err := db.Query(`SHOW TABLES`)
 	if err != nil {
 		return errors.Wrapf(err, "querying for tables")
@@ -243,10 +186,10 @@ func DropTables(db *sqlx.DB) error {
 	return nil
 }
 
-func sqliteTempFile(testDB *TestDB) string {
+func sqliteTempFile(testDB *DB) string {
 	return "/tmp/" + testDB.db + ".sqlite3"
 }
-func initDb(testDB *TestDB, migrate bool) (*sqlx.DB, *config.Database, goqu.DialectWrapper, string, func()) {
+func initDb(testDB *DB, migrate bool) (*sqlx.DB, *config.Database, goqu.DialectWrapper, string, func()) {
 	_, ok := os.LookupEnv("AIRTRACK_TEST_DB_DRIVER")
 	var dbConf *config.Database
 	var err error
@@ -263,7 +206,7 @@ func initDb(testDB *TestDB, migrate bool) (*sqlx.DB, *config.Database, goqu.Dial
 		}
 	}
 
-	dbUrl, err := dbConf.DataSource(testDB.tz)
+	dbURL, err := dbConf.DataSource(testDB.tz)
 	if dbConf.Driver == config.DatabaseDriverSqlite3 {
 		if _, err := os.Stat(dbConf.Database); err == nil {
 			err = os.Remove(dbConf.Database)
@@ -273,10 +216,10 @@ func initDb(testDB *TestDB, migrate bool) (*sqlx.DB, *config.Database, goqu.Dial
 		}
 	} else if dbConf.Driver == config.DatabaseDriverPostgresql {
 		// only need this for circleci really
-		dbUrl = dbUrl + " sslmode=disable"
+		dbURL = dbURL + " sslmode=disable"
 	}
 
-	sqlConn, err := sql.Open(dbConf.Driver, dbUrl)
+	sqlConn, err := sql.Open(dbConf.Driver, dbURL)
 	if err != nil {
 		panic(err)
 	}
@@ -290,7 +233,7 @@ func initDb(testDB *TestDB, migrate bool) (*sqlx.DB, *config.Database, goqu.Dial
 	if migrate {
 		switch dbConf.Driver {
 		case config.DatabaseDriverMySQL:
-			err = DropTables(dbConn)
+			err = DropTablesMysql(dbConn)
 			if err != nil {
 				panic(err)
 			}
@@ -320,12 +263,17 @@ func initDb(testDB *TestDB, migrate bool) (*sqlx.DB, *config.Database, goqu.Dial
 
 	return dbConn, dbConf, dialect, testDB.db, closeFn
 }
+
+// InitDB claims a DB and creates a connection. The resulting database
+// will NOT be initialized with migrations.
 func InitDB() (*sqlx.DB, *config.Database, goqu.DialectWrapper, string, func()) {
 	testDB := ClaimNextDB()
 	dbConn, dbConf, dialect, dbName, closeFn := initDb(testDB, false)
 	return dbConn, dbConf, dialect, dbName, closeFn
 }
 
+// InitDBUp claims a DB and creates a connection. The resulting database
+// will be initialized with migrations.
 func InitDBUp() (*sqlx.DB, goqu.DialectWrapper, string, func()) {
 	testDB := ClaimNextDB()
 	dbConn, _, dialect, dbName, closeFn := initDb(testDB, true)

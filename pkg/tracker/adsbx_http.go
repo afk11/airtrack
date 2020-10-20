@@ -1,5 +1,7 @@
 package tracker
 
+// AdsbxAircraftResponse - structure containing list of
+// aircraft and some general infomration
 //easyjson:json
 type AdsbxAircraftResponse struct {
 	Aircraft []AdsbxAircraft `json:"ac"`
@@ -9,6 +11,7 @@ type AdsbxAircraftResponse struct {
 	PTime    int64           `json:"ptime"`
 }
 
+// AdsbxAircraft - structure of an aircraft object
 //easyjson:json
 type AdsbxAircraft struct {
 	PosTime      string `json:"postime"`

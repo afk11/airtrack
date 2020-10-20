@@ -227,6 +227,7 @@ import (
 )
 
 type (
+	// HeadingType - defines different sources for headings
 	HeadingType int
 
 	// Aircraft simply wraps a readsb aircraft pointer so we can pass it around
@@ -258,28 +259,37 @@ var (
 )
 
 const (
+
+	// ModeACMsgBytes - mode message length
 	ModeACMsgBytes = int(C.MODEAC_MSG_BYTES)
 
+	// ModeSShortMsgBytes - short msg byte length
 	ModeSShortMsgBytes = int(C.MODES_SHORT_MSG_BYTES)
-	ModeSShortMsgBits  = int(C.MODES_SHORT_MSG_BITS)
-
+	// ModeSShortMsgBits - short msg bit length
+	ModeSShortMsgBits = int(C.MODES_SHORT_MSG_BITS)
+	// ModeSLongMsgBytes - long msg byte length
 	ModeSLongMsgBytes = int(C.MODES_LONG_MSG_BYTES)
-	ModeSLongMsgBits  = int(C.MODES_LONG_MSG_BITS)
+	// ModeSLongMsgBits - long msg bit length
+	ModeSLongMsgBits = int(C.MODES_LONG_MSG_BITS)
 
-	// Set on addresses to indicate they are not ICAO addresses
+	// ModeSNonIcaoAddress - Set on addresses to indicate they are not ICAO addresses
 	ModeSNonIcaoAddress = int(C.MODES_NON_ICAO_ADDRESS)
 
-	// AsciiIntZero - '0' in ASCII
-	AsciiIntZero = 0x30
+	// ASCIIIntZero - '0' in ASCII
+	ASCIIIntZero = 0x30
 
+	// ModesReadsbVariant - version of readsb library
+	ModesReadsbVariant = string(C.MODES_READSB_VARIANT)
+)
+
+// Values for HeadingType
+const (
 	HeadingInvalid        HeadingType = C.HEADING_INVALID
 	HeadingGroundTrack    HeadingType = C.HEADING_GROUND_TRACK
 	HeadingTrue           HeadingType = C.HEADING_TRUE
 	HeadingMagnetic       HeadingType = C.HEADING_MAGNETIC
 	HeadingMagneticOrTrue HeadingType = C.HEADING_MAGNETIC_OR_TRUE
 	HeadingTrackOrHeading HeadingType = C.HEADING_TRACK_OR_HEADING
-
-	ModesReadsbVariant = string(C.MODES_READSB_VARIANT)
 )
 
 // IcaoFilterInit calls the readsb function icaoFilterInit which
@@ -341,7 +351,7 @@ func DfToString(df uint) string {
 	return C.GoString(C.df_to_string(C.uint(df)))
 }
 
-// TrackPeriodicUpdate - Update aircraft state with message info, and update
+// TrackUpdateFromMessage - Update aircraft state with message info, and update
 // message information with supplemental info
 func TrackUpdateFromMessage(d *Decoder, mm *ModesMessage) *Aircraft {
 	ac := C.trackUpdateFromMessage(d.modes, mm.msg)
@@ -356,6 +366,7 @@ func TrackPeriodicUpdate(d *Decoder) {
 	C.trackPeriodicUpdate(d.modes)
 }
 
+// GetCategory returns the ADSB emitter category, or ErrNoData if unknown
 func (a *Aircraft) GetCategory() (string, error) {
 	if a.a.fatsv_emitted_category == 0 {
 		return "", ErrNoData
@@ -499,15 +510,15 @@ func ParseMessage(d *Decoder, b []byte) ([]*ModesMessage, int, error) {
 			break
 		}
 		switch b[p] {
-		case AsciiIntZero + 1:
+		case ASCIIIntZero + 1:
 			eom = p + ModeACMsgBytes + 8
-		case AsciiIntZero + 2:
+		case ASCIIIntZero + 2:
 			eom = p + ModeSShortMsgBytes + 8
-		case AsciiIntZero + 3:
+		case ASCIIIntZero + 3:
 			eom = p + ModeSLongMsgBytes + 8
-		case AsciiIntZero + 4:
+		case ASCIIIntZero + 4:
 			eom = p + ModeSLongMsgBytes + 8
-		case AsciiIntZero + 5:
+		case ASCIIIntZero + 5:
 			eom = p + ModeSLongMsgBytes + 8
 		default:
 			som = som + 1
@@ -547,13 +558,13 @@ func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.st
 	ch = m[p]
 	p++
 
-	if ch == AsciiIntZero+1 && withModeAC {
+	if ch == ASCIIIntZero+1 && withModeAC {
 		msgLen = ModeACMsgBytes
-	} else if ch == AsciiIntZero+2 {
+	} else if ch == ASCIIIntZero+2 {
 		msgLen = ModeSShortMsgBytes
-	} else if ch == AsciiIntZero+3 {
+	} else if ch == ASCIIIntZero+3 {
 		msgLen = ModeSLongMsgBytes
-	} else if ch == AsciiIntZero+5 {
+	} else if ch == ASCIIIntZero+5 {
 		// special case for radarscape position messages
 		//var lat, lon, alt float64
 		for j = 0; j < 21; j++ {
@@ -610,7 +621,6 @@ func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.st
 			mm := C.struct_modesMessage{}
 			// is a void function
 			C.decodeModeAMessage((*C.struct_modesMessage)(unsafe.Pointer(&mm)), C.int((C.int(msg[0])<<8)|C.int(msg[1])))
-			return &mm, nil
 		} else {
 			mm := C.struct_modesMessage{}
 			ret := int(C.decodeModesMessage(decoder.modes, (*C.struct_modesMessage)(unsafe.Pointer(&mm)), (*C.uchar)(unsafe.Pointer(&msg[0]))))
@@ -623,8 +633,8 @@ func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.st
 					return nil, errors.New("decode error")
 				}
 			}
-			return &mm, nil
 		}
+		return &mm, nil
 	}
 
 	return nil, nil

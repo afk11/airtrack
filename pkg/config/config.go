@@ -11,11 +11,14 @@ import (
 )
 
 const (
-	// MailDriverSmtp - the only support SMTP driver
-	MailDriverSmtp           = "smtp"
-	DatabaseDriverMySQL      = "mysql"
+	// MailDriverSMTP - the only support SMTP driver
+	MailDriverSMTP = "smtp"
+	// DatabaseDriverMySQL - name of the mysql driver
+	DatabaseDriverMySQL = "mysql"
+	// DatabaseDriverPostgresql - name of the postgres driver
 	DatabaseDriverPostgresql = "postgres"
-	DatabaseDriverSqlite3    = "sqlite3"
+	// DatabaseDriverSqlite3 - name of the sqlite3 driver
+	DatabaseDriverSqlite3 = "sqlite3"
 )
 
 type (
@@ -30,8 +33,8 @@ type (
 		CupDirectories []string `yaml:"cup"`
 	}
 
-	// SmtpSettings - contains connection information for SMTP server.
-	SmtpSettings struct {
+	// SMTPSettings - contains connection information for SMTP server.
+	SMTPSettings struct {
 		// Username - the SMTP username
 		Username string `yaml:"username"`
 		// Password - the SMTP password
@@ -74,9 +77,9 @@ type (
 	EmailSettings struct {
 		// Driver - currently only 'smtp' is supported
 		Driver string `yaml:"driver"`
-		// Smtp points to a SmtpSettings struct for use with
+		// SMTP points to a SMTPSettings struct for use with
 		// the 'smtp' driver
-		Smtp *SmtpSettings `yaml:"smtp"`
+		SMTP *SMTPSettings `yaml:"smtp"`
 	}
 
 	// Notifications - contains configuration of events to
@@ -152,9 +155,9 @@ type (
 	AdsbxConfig struct {
 		// Custom ADSB Exchange URL (not required, but useful if
 		// you've a proxy setup)
-		ApiUrl string `yaml:"url"`
+		APIURL string `yaml:"url"`
 		// ADSB Exchange API key
-		ApiKey string `yaml:"apikey"`
+		APIKey string `yaml:"apikey"`
 	}
 
 	// BeastConfig contains configuration for a single BEAST server
@@ -268,7 +271,7 @@ func ReadConfig(r io.Reader) (*Config, error) {
 	return &cfg, nil
 }
 
-// ReadConfigFromFile will read `filepath` and attempt to parse into
+// ReadProjectsConfigFromFile will read `filepath` and attempt to parse into
 // a Config structure. An error will be returned if duplicated project
 // names are encountered.
 func ReadProjectsConfigFromFile(filepath string) (*ProjectsConfig, error) {
@@ -281,7 +284,7 @@ func ReadProjectsConfigFromFile(filepath string) (*ProjectsConfig, error) {
 	return ReadProjectsConfig(f)
 }
 
-// ReadConfig will decode the provided reader into a ProjectsConfig structure.
+// ReadProjectsConfig will decode the provided reader into a ProjectsConfig structure.
 // An error will be returned if duplicated project names are encountered.
 func ReadProjectsConfig(r io.Reader) (*ProjectsConfig, error) {
 	cfg := ProjectsConfig{}

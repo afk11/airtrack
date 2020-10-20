@@ -13,12 +13,14 @@ import (
 	"time"
 )
 
+// TestEmail - sends a test email for a certain sighting
 type TestEmail struct {
 	To       string `help:"send test email to"`
 	Type     string `help:"notification type"`
 	Sighting uint64 `help:"sighting ID"`
 }
 
+// Run - attempts to send email for a certian sighting
 func (e *TestEmail) Run(ctx *Context) error {
 	if e.To == "" {
 		return errors.New("missing to email address")
@@ -34,16 +36,16 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return err
 	}
 
-	dbUrl, err := cfg.Database.DataSource(loc)
+	dbURL, err := cfg.Database.DataSource(loc)
 	if err != nil {
 		return err
 	}
-	dbConn, err := sqlx.Connect(cfg.Database.Driver, dbUrl)
+	dbConn, err := sqlx.Connect(cfg.Database.Driver, dbURL)
 	if err != nil {
 		return err
 	}
 	database := db.NewDatabase(dbConn, goqu.Dialect(cfg.Database.Driver))
-	settings := cfg.EmailSettings.Smtp
+	settings := cfg.EmailSettings.SMTP
 	dialer := mail.NewDialer(
 		settings.Host, settings.Port, settings.Username, settings.Password)
 	if settings.MandatoryStartTLS {
@@ -57,11 +59,11 @@ func (e *TestEmail) Run(ctx *Context) error {
 		return err
 	}
 
-	sighting, err := database.GetSightingById(e.Sighting)
+	sighting, err := database.GetSightingByID(e.Sighting)
 	if err != nil {
 		return err
 	}
-	ac, err := database.GetAircraftById(sighting.AircraftId)
+	ac, err := database.GetAircraftByID(sighting.AircraftID)
 	if err != nil {
 		return err
 	}
@@ -87,7 +89,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 
 		var numPoints int
 		var firstLocation, lastLocation *db.SightingLocation
-		err := database.WalkLocationHistoryBatch(sighting, tracker.LocationFetchBatchSize, func(location []db.SightingLocation) {
+		err := database.WalkLocationHistoryBatch(sighting, 50, func(location []db.SightingLocation) {
 			w.Write(location)
 			if firstLocation == nil {
 				firstLocation = &location[0]
@@ -133,7 +135,7 @@ func (e *TestEmail) Run(ctx *Context) error {
 			return err
 		}
 	case tracker.SpottedInFlight:
-		history, err := database.GetFullLocationHistory(sighting, tracker.LocationFetchBatchSize)
+		history, err := database.GetFullLocationHistory(sighting, 50)
 		if err != nil {
 			return err
 		}

@@ -103,18 +103,18 @@ func TestTracker(t *testing.T) {
 			assert.NoError(t, err, "expecting aircraft to exist")
 			assert.NotNil(t, ac, "expecting aircraft to be returned")
 			assert.Equal(t, p.Icao, ac.Icao)
-			assert.Equal(t, s.a.Id, ac.Id)
+			assert.Equal(t, s.a.ID, ac.ID)
 
 			// no sighting yet (until db processing takes place)
 			ourSighting, err := tr.database.GetLastSighting(proj.Session, ac)
 			assert.Error(t, sql.ErrNoRows, err, "expected last sighting, not error")
 			assert.Nil(t, ourSighting, "last sighting should be nil")
 
-			ob, ok := s.observedBy[proj.Session.Id]
+			ob, ok := s.observedBy[proj.Session.ID]
 			assert.True(t, ok, "should find observation by our project on Sighting")
-			assert.Equal(t, *proj, *ob.project, "observation project should match our project")
+			assert.Equal(t, proj.Name, ob.project.Name, "observation project should match our project")
 			assert.Nil(t, ob.sighting, "sigthing db.Sighting should be nil on init")
-			//assert.Equal(t, ourSighting.Id, ob.sighting.Id)
+			//assert.Equal(t, ourSighting.ID, ob.sighting.ID)
 
 			return nil
 		})

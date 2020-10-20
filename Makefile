@@ -42,10 +42,10 @@ build-bindata-readsb-db: resources/readsb-src
 		cp resources/readsb-src/webapp/src/db/*.json build/aircraft_db/
 		go run contrib/split_db_file/main.go ./build/aircraft_db/aircrafts.json ./build/aircraft_db/
 		rm ./build/aircraft_db/aircrafts.json
-		go-bindata $(BINDATAARGS) -pkg aircraft_db -o ./pkg/readsb/aircraft_db/assets.go -prefix build/aircraft_db/ build/aircraft_db/
+		go-bindata $(BINDATAARGS) -pkg aircraftdb -o ./pkg/readsb/aircraftdb/assets.go -prefix build/aircraft_db/ build/aircraft_db/
 build-bindata: build-bindata-assets build-bindata-email build-bindata-migrations-mysql build-bindata-migrations-sqlite3 build-bindata-migrations-postgres build-bindata-dump1090 build-bindata-tar1090 build-bindata-openaip build-bindata-readsb-db
 build-easyjson:
-		easyjson ./pkg/readsb/aircraft_db/db.go ./pkg/tracker/adsbx_http.go
+		easyjson ./pkg/readsb/aircraftdb/db.go ./pkg/tracker/adsbx_http.go
 
 build-protobuf:
 		protoc -I=./pb/ --go_out=$(GOPATH)/src ./pb/message.proto

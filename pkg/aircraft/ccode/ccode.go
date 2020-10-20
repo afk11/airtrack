@@ -25,6 +25,9 @@ func icaoToInt(icao string) (uint32, error) {
 		uint32(bs[2]), nil
 }
 
+// LoadCountryAllocations takes a reader r containing a CSV file with
+// country codes, and attempts to extract and register each country to store
+// Returns the CountryAllocationSearcher if successful, otherwise an error
 func LoadCountryAllocations(r io.Reader, store *iso3166.Store) (CountryAllocationSearcher, error) {
 	scanner := bufio.NewScanner(r)
 	ccodes := iradix.New()
@@ -78,14 +81,21 @@ func LoadCountryAllocations(r io.Reader, store *iso3166.Store) (CountryAllocatio
 	return &RadixCountryAllocationSearcher{tree: ccodes}, nil
 }
 
+// CountryAllocationSearcher exposes methods for associating
+// a HEX ICAO with a country
 type CountryAllocationSearcher interface {
+	// DetermineCountryCode returns the AlphaTwoCountryCode for the country
+	// the hex ICAO belongs to, or returns an error
 	DetermineCountryCode(icao string) (*iso3166.AlphaTwoCountryCode, error)
 }
 
+// RadixCountryAllocationSearcher - Implements CountryAllocationSearcher
+// using a radix tree to optimize searches.
 type RadixCountryAllocationSearcher struct {
 	tree *iradix.Tree
 }
 
+// DetermineCountryCode - see CountryAllocationSearcher.DetermineCountryCode
 func (cc *RadixCountryAllocationSearcher) DetermineCountryCode(k string) (*iso3166.AlphaTwoCountryCode, error) {
 	icao, err := icaoToInt(k)
 	if err != nil {

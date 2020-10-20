@@ -7,20 +7,21 @@ import (
 	"os"
 )
 
-type Aircraft struct {
+type aircraft struct {
 	Registration string `json:"r"`
 	TypeCode     string `json:"t"`
 	F            string `json:"f"`
 	Description  string `json:"d"`
 }
 
-type AcJsonAsSlice Aircraft
+type acJSONAsSlice aircraft
 
-func (t AcJsonAsSlice) MarshalJSON() ([]byte, error) {
+// MarshalJSON - custom json marshalling - returns array of strings
+func (t acJSONAsSlice) MarshalJSON() ([]byte, error) {
 	return json.Marshal([]string{t.Registration, t.TypeCode, t.F, t.Description})
 }
 
-type dbJson map[string]*AcJsonAsSlice
+type dbJSON map[string]*acJSONAsSlice
 
 func main() {
 	if len(os.Args) < 2 {
@@ -41,7 +42,7 @@ func main() {
 		panic(err)
 	}
 
-	db := dbJson{}
+	db := dbJSON{}
 	err = json.Unmarshal(dat, &db)
 	if err != nil {
 		panic(err)
@@ -57,9 +58,9 @@ func main() {
 	}
 
 	// Init each shard
-	shardDb := map[string]dbJson{}
+	shardDb := map[string]dbJSON{}
 	for _, shard := range shards {
-		shardDb[shard] = dbJson{}
+		shardDb[shard] = dbJSON{}
 	}
 
 	// Split out DB into separate shards
@@ -73,7 +74,7 @@ func main() {
 				}
 			}
 		}
-		// Trim off shard from key in dbJson
+		// Trim off shard from key in dbJSON
 		shardDb[bestShard][icao[len(bestShard):]] = ac
 	}
 
