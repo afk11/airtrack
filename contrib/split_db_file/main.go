@@ -103,6 +103,7 @@ func buildDb(shards []string, db dbJSON) map[string]dbJSON {
 	}
 	return shardDb
 }
+
 // writeDbShardFile writes shardDb to a file named using fileChar, in outDirectory
 func writeDbShardFile(outDirectory string, fileChar string, shardDb dbJSON) error {
 	// find children for this shard

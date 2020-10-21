@@ -1262,6 +1262,21 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 
 	return nil
 }
+func (t *Tracker) getObservation(project *Project, s *Sighting, msgTime time.Time) (*ProjectObservation, bool) {
+	observation, ok := s.observedBy[project.Session.ID]
+	var sightingOpened bool
+	if !ok {
+		observation = NewProjectObservation(project, s, msgTime)
+		project.obsMu.Lock()
+		s.observedBy[project.Session.ID] = observation
+		project.Observations[s.State.Icao] = observation
+		project.obsMu.Unlock()
+		sightingOpened = true
+		log.Infof("[session %d] %s: new sighting", project.Session.ID, s.State.Icao)
+	}
+	observation.mu.Lock()
+	return observation, sightingOpened
+}
 
 // ProcessMessage is called to process the updated Sighting in the context
 // of the provided project.
@@ -1294,23 +1309,29 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 	}
 
 	// Initialize project sighting, if not already done
-	observation, ok := s.observedBy[project.Session.ID]
-	var sightingOpened bool
-	if !ok {
-		observation = NewProjectObservation(project, s, now)
-		project.obsMu.Lock()
-		s.observedBy[project.Session.ID] = observation
-		project.Observations[s.State.Icao] = observation
-		project.obsMu.Unlock()
-		sightingOpened = true
-		log.Infof("[session %d] %s: new sighting", project.Session.ID, s.State.Icao)
-	}
-	observation.mu.Lock()
+	observation, sightingOpened := t.getObservation(project, s, now)
 	defer observation.mu.Unlock()
 
 	// Update Projects information in DB
 	observation.lastSeen = now
 
+	err := t.updateObservation(project, observation, s, sightingOpened, now)
+	if err != nil {
+		return err
+	}
+
+	numListeners := len(t.projectAcUpdateListeners)
+	for i := 0; i < numListeners; i++ {
+		if sightingOpened {
+			t.projectAcUpdateListeners[i].NewAircraft(project, s)
+		} else {
+			t.projectAcUpdateListeners[i].UpdatedAircraft(project, s)
+		}
+	}
+
+	return nil
+}
+func (t *Tracker) updateObservation(project *Project, observation *ProjectObservation, s *Sighting, sightingOpened bool, now time.Time) error {
 	var updatedAltBaro, updatedAltGeom, updatedLocation, updatedGS, updatedTrack bool
 	if s.State.HaveAltitudeBarometric {
 		updatedAltBaro = !observation.HaveAltitudeBarometric() || s.State.AltitudeBarometric != observation.AltitudeBarometric()
@@ -1495,16 +1516,6 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 			observation.origin = location
 		}
 	}
-
-	numListeners := len(t.projectAcUpdateListeners)
-	for i := 0; i < numListeners; i++ {
-		if sightingOpened {
-			t.projectAcUpdateListeners[i].NewAircraft(project, s)
-		} else {
-			t.projectAcUpdateListeners[i].UpdatedAircraft(project, s)
-		}
-	}
-
 	return nil
 }
 
