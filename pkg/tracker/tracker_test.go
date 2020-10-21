@@ -83,7 +83,7 @@ func TestTracker(t *testing.T) {
 		err = doTest(opt, proj, func(tr *Tracker) error {
 			p := pb.Message{Source: beastSource, Icao: "444444"}
 			now := time.Now()
-			s := tr.getSighting(p.Icao)
+			s := tr.getSighting(p.Icao, now)
 			defer s.mu.Unlock()
 			err := tr.ProcessMessage(proj, s, now, &p)
 			if err != nil {
@@ -120,4 +120,145 @@ func TestTracker(t *testing.T) {
 		})
 		assert.NoError(t, err)
 	})
+}
+
+func TestProjectObservation(t *testing.T) {
+	projCfg := config.Project{
+		Name: "testproj",
+	}
+	proj, err := InitProject(projCfg)
+	assert.NoError(t, err)
+	proj.Session = &db.Session{ID: 1}
+	s1 := &Sighting{
+		State: pb.State{
+			Icao: "424242",
+		},
+	}
+	s2 := &Sighting{
+		State: pb.State{
+			Icao: "080800",
+		},
+	}
+	s3 := &Sighting{
+		State: pb.State{
+			Icao: "421234",
+		},
+	}
+	msgTime := time.Now()
+	po1 := NewProjectObservation(proj, s1, msgTime)
+	assert.NotNil(t, po1)
+	assert.Equal(t, msgTime, po1.firstSeen)
+	assert.Equal(t, msgTime, po1.lastSeen)
+
+	assert.False(t, po1.HaveCallSign())
+	assert.False(t, po1.HaveSquawk())
+	assert.False(t, po1.HaveLocation())
+	assert.False(t, po1.HaveAltitudeBarometric())
+	assert.False(t, po1.HaveAltitudeGeometric())
+	assert.Equal(t, "", po1.CallSign())
+	assert.Equal(t, "", po1.Squawk())
+	assert.Equal(t, int64(0), po1.AltitudeBarometric())
+	assert.Equal(t, int64(0), po1.AltitudeGeometric())
+	lat, lon := po1.Location()
+	assert.Equal(t, float64(0.0), lat)
+	assert.Equal(t, float64(0.0), lon)
+	assert.False(t, po1.dirty)
+
+	mta := time.Now()
+	assert.NoError(t, po1.SetCallSign("cs1", false, mta))
+	assert.True(t, po1.haveCallsign)
+	assert.True(t, po1.HaveCallSign())
+	assert.Equal(t, "cs1", po1.CallSign())
+	assert.Equal(t, 0, len(po1.csLogs))
+	assert.False(t, po1.dirty)
+
+	mtb := time.Now().Add(time.Second)
+	assert.NoError(t, po1.SetCallSign("cs2", true, mtb))
+	assert.True(t, po1.HaveCallSign())
+	assert.Equal(t, "cs2", po1.CallSign())
+	assert.True(t, po1.dirty)
+	assert.Equal(t, 1, len(po1.csLogs))
+	assert.Equal(t, "cs2", po1.csLogs[0].callsign)
+	assert.Equal(t, mtb, po1.csLogs[0].time)
+	assert.Nil(t, po1.csLogs[0].sighting)
+
+	po2 := NewProjectObservation(proj, s2, msgTime)
+	assert.NotNil(t, po2)
+	assert.Equal(t, msgTime, po2.firstSeen)
+	assert.Equal(t, msgTime, po2.lastSeen)
+	assert.False(t, po2.dirty)
+	assert.False(t, po2.HaveSquawk())
+
+	mtc := time.Now().Add(time.Second * 2)
+	assert.NoError(t, po2.SetSquawk("7700", false, mtc))
+	assert.Equal(t, "7700", po2.Squawk())
+	assert.Equal(t, 0, len(po2.squawkLogs))
+	assert.False(t, po2.dirty)
+	assert.True(t, po2.HaveSquawk())
+
+	mtd := time.Now().Add(time.Second * 3)
+	assert.NoError(t, po2.SetSquawk("7701", true, mtd))
+	assert.Equal(t, "7701", po2.Squawk())
+	assert.True(t, po2.dirty)
+	assert.Equal(t, 1, len(po2.squawkLogs))
+	assert.Equal(t, "7701", po2.squawkLogs[0].squawk)
+	assert.Equal(t, mtd, po2.squawkLogs[0].time)
+	assert.Nil(t, po2.squawkLogs[0].sighting)
+	assert.True(t, po2.HaveSquawk())
+
+	po3 := NewProjectObservation(proj, s3, msgTime)
+	assert.NotNil(t, po3)
+	assert.Equal(t, msgTime, po3.firstSeen)
+	assert.Equal(t, msgTime, po3.lastSeen)
+	assert.False(t, po3.dirty)
+	assert.False(t, po3.haveLocation)
+	assert.False(t, po3.HaveLocation())
+
+	assert.NoError(t, po3.SetAltitudeBarometric(10000))
+	assert.True(t, po3.HaveAltitudeBarometric())
+	assert.Equal(t, int64(10000), po3.AltitudeBarometric())
+
+	mte := time.Now()
+	assert.NoError(t, po3.SetLocation(1.00, 2.00, false, mte))
+	assert.InDelta(t, 1.00, po3.latitude, 0.00000001)
+	assert.InDelta(t, 2.00, po3.longitude, 0.00000001)
+	assert.Equal(t, 0, len(po3.locationLogs))
+	assert.False(t, po3.dirty)
+	assert.True(t, po3.haveLocation)
+	assert.True(t, po3.HaveLocation())
+
+	mtf := time.Now().Add(3 * time.Second)
+	assert.NoError(t, po3.SetLocation(1.01, 2.01, true, mtf))
+	assert.InDelta(t, 1.01, po3.latitude, 0.00000001)
+	assert.InDelta(t, 2.01, po3.longitude, 0.00000001)
+	assert.Equal(t, 1, len(po3.locationLogs))
+	assert.InDelta(t, 1.01, po3.locationLogs[0].lat, 0.00000001)
+	assert.InDelta(t, 2.01, po3.locationLogs[0].lon, 0.00000001)
+	assert.Equal(t, int64(10000), po3.locationLogs[0].alt)
+	assert.Equal(t, mtf, po3.locationLogs[0].time)
+	assert.True(t, po3.dirty)
+	assert.True(t, po3.haveLocation)
+	assert.True(t, po3.HaveLocation())
+
+	assert.NoError(t, po3.SetAltitudeBarometric(10016))
+	assert.True(t, po3.HaveAltitudeBarometric())
+	assert.Equal(t, int64(10016), po3.AltitudeBarometric())
+
+	mtg := time.Now().Add(7 * time.Second)
+	assert.NoError(t, po3.SetLocation(1.02, 2.02, true, mtg))
+	assert.InDelta(t, 1.02, po3.latitude, 100)
+	assert.InDelta(t, 2.02, po3.longitude, 100)
+	assert.Equal(t, 2, len(po3.locationLogs))
+	assert.InDelta(t, 1.01, po3.locationLogs[0].lat, 0.00000001)
+	assert.InDelta(t, 2.01, po3.locationLogs[0].lon, 0.00000001)
+	assert.Equal(t, int64(10000), po3.locationLogs[0].alt)
+	assert.Equal(t, mtf, po3.locationLogs[0].time)
+	assert.InDelta(t, 1.02, po3.locationLogs[1].lat, 0.00000001)
+	assert.InDelta(t, 2.02, po3.locationLogs[1].lon, 0.00000001)
+	assert.Equal(t, int64(10016), po3.locationLogs[1].alt)
+	assert.Equal(t, mtg, po3.locationLogs[1].time)
+
+	assert.NoError(t, po3.SetAltitudeGeometric(10028))
+	assert.True(t, po3.HaveAltitudeGeometric())
+	assert.Equal(t, int64(10028), po3.AltitudeGeometric())
 }
