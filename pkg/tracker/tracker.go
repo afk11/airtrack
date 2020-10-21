@@ -147,6 +147,14 @@ type (
 		locationCount int64
 		mu            sync.RWMutex
 	}
+	// FlightTime contains calculated information about the flight time
+	FlightTime struct {
+		StartTime        time.Time
+		StartTimeFmt     string
+		EndTime          time.Time
+		EndTimeFmt       string
+		SightingDuration time.Duration
+	}
 	// Sighting represents an aircraft we are receiving messages about
 	Sighting struct {
 		// State represents everything we know about the aircraft. It
@@ -207,6 +215,18 @@ func NewProjectObservation(p *Project, s *Sighting, msgTime time.Time) *ProjectO
 		project:   p,
 		firstSeen: msgTime,
 		lastSeen:  msgTime,
+	}
+}
+
+// GetFlightTime creates a FlightTime structure containing calculated
+// time information for the flight
+func (o *ProjectObservation) GetFlightTime() FlightTime {
+	return FlightTime{
+		StartTime:        o.firstSeen,
+		StartTimeFmt:     o.firstSeen.Format(time.RFC822),
+		EndTime:          o.lastSeen,
+		EndTimeFmt:       o.lastSeen.Format(time.RFC822),
+		SightingDuration: o.lastSeen.Sub(o.firstSeen),
 	}
 }
 
@@ -943,58 +963,14 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 	if observation.sighting == nil {
 		return nil
 	}
-	var ac string
-	var source = "Source"
-	var destination = "Destination"
+
 	project := observation.project
-	startTimeFmt := observation.firstSeen.Format(time.RFC822)
-	endTimeFmt := observation.lastSeen.Format(time.RFC822)
-	sightingDuration := observation.lastSeen.Sub(observation.firstSeen)
-	if observation.HaveCallSign() {
-		ac = observation.CallSign()
-	} else {
-		ac = sighting.State.Icao
-	}
-	if observation.origin != nil && observation.origin.ok {
-		source += fmt.Sprintf(": near %s", observation.origin.address)
-	}
-	if observation.destination != nil && observation.destination.ok {
-		destination += fmt.Sprintf(": near %s", observation.destination.address)
-	}
-	w := kml.NewWriter(kml.WriterOptions{
-		RouteName:        fmt.Sprintf("%s flight", ac),
-		RouteDescription: fmt.Sprintf("Departure: %s<br />Arrival: %s<br />Flight duration: %s<br />", startTimeFmt, endTimeFmt, sightingDuration),
+	flightTime := observation.GetFlightTime()
 
-		SourceName:        source,
-		SourceDescription: fmt.Sprintf("Departed at %s", startTimeFmt),
-
-		DestinationName:        destination,
-		DestinationDescription: fmt.Sprintf("Arrived at %s", endTimeFmt),
-	})
-
-	var numPoints int
-	var firstPos, lastPos *db.SightingLocation
-	err := t.database.WalkLocationHistoryBatch(observation.sighting, locationFetchBatchSize, func(location []db.SightingLocation) {
-		if firstPos == nil {
-			firstPos = &location[0]
-		}
-		lastPos = &location[len(location)-1]
-		w.Write(location)
-		numPoints += len(location)
-	})
+	plainTextKml, firstPos, lastPos, err := buildKml(t.database, project, sighting, observation, &flightTime)
 	if err != nil {
-		return errors.Wrapf(err, "error walking location history")
+		return err
 	}
-
-	log.Debugf("[session %d] location history for %s had %d points",
-		project.Session.ID, sighting.State.Icao, numPoints)
-
-	kmlStr, err := w.Final()
-	if err != nil {
-		return errors.Wrapf(err, "generating KML file")
-	}
-
-	plainTextKml := []byte(kmlStr)
 
 	var mapUpdated bool
 	sightingKml, err := t.database.GetSightingKml(observation.sighting)
@@ -1008,7 +984,7 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 	} else if err == nil {
 		mapUpdated = true
 		log.Debugf("[session %d] updating KML for %s", project.Session.ID, sighting.State.Icao)
-		err := sightingKml.UpdateKml(plainTextKml)
+		err = sightingKml.UpdateKml(plainTextKml)
 		if err != nil {
 			return errors.Wrapf(err, "updating kml")
 		}
@@ -1019,38 +995,62 @@ func (t *Tracker) processLostAircraftMap(sighting *Sighting, observation *Projec
 	}
 
 	if project.IsEmailNotificationEnabled(MapProduced) {
-		sp := email.MapProducedParameters{
-			Project:      project.Name,
-			Icao:         sighting.State.Icao,
-			StartTimeFmt: startTimeFmt,
-			EndTimeFmt:   endTimeFmt,
-			DurationFmt:  sightingDuration.String(),
-			StartLocation: email.Location{
-				Latitude:  firstPos.Latitude,
-				Longitude: firstPos.Longitude,
-				Altitude:  firstPos.Altitude,
-			},
-			EndLocation: email.Location{
-				Latitude:  lastPos.Latitude,
-				Longitude: lastPos.Longitude,
-				Altitude:  lastPos.Altitude,
-			},
-			MapUpdated: mapUpdated,
-		}
-		if observation.HaveCallSign() {
-			sp.CallSign = observation.CallSign()
-		}
 		log.Debugf("[session %d] %s: sending %s notification", project.Session.ID, sighting.State.Icao, MapProduced)
-		msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, plainTextKml, sp)
+		err = t.sendMapProducedEmail(project, sighting, observation, &flightTime, plainTextKml, mapUpdated, firstPos, lastPos)
 		if err != nil {
-			return errors.Wrapf(err, "creating MapProduced email")
-		}
-		err = t.opt.Mailer.Queue(*msg)
-		if err != nil {
-			return errors.Wrapf(err, "queueing MapProduced email for delivery")
+			return err
 		}
 	}
 	return nil
+}
+func buildKml(database db.Database, project *Project, sighting *Sighting, observation *ProjectObservation, flightTime *FlightTime) ([]byte, *db.SightingLocation, *db.SightingLocation, error) {
+	var ac string
+	var source = "Source"
+	var destination = "Destination"
+	if observation.HaveCallSign() {
+		ac = observation.CallSign()
+	} else {
+		ac = sighting.State.Icao
+	}
+	if observation.origin != nil && observation.origin.ok {
+		source += fmt.Sprintf(": near %s", observation.origin.address)
+	}
+	if observation.destination != nil && observation.destination.ok {
+		destination += fmt.Sprintf(": near %s", observation.destination.address)
+	}
+	w := kml.NewWriter(kml.WriterOptions{
+		RouteName:        fmt.Sprintf("%s flight", ac),
+		RouteDescription: fmt.Sprintf("Departure: %s<br />Arrival: %s<br />Flight duration: %s<br />", flightTime.StartTimeFmt, flightTime.EndTimeFmt, flightTime.SightingDuration),
+
+		SourceName:        source,
+		SourceDescription: fmt.Sprintf("Departed at %s", flightTime.StartTimeFmt),
+
+		DestinationName:        destination,
+		DestinationDescription: fmt.Sprintf("Arrived at %s", flightTime.EndTimeFmt),
+	})
+
+	var numPoints int
+	var firstPos, lastPos *db.SightingLocation
+	err := database.WalkLocationHistoryBatch(observation.sighting, locationFetchBatchSize, func(location []db.SightingLocation) {
+		if firstPos == nil {
+			firstPos = &location[0]
+		}
+		lastPos = &location[len(location)-1]
+		w.Write(location)
+		numPoints += len(location)
+	})
+	if err != nil {
+		return nil, nil, nil, errors.Wrapf(err, "error walking location history")
+	}
+
+	log.Debugf("[session %d] location history for %s had %d points",
+		project.Session.ID, sighting.State.Icao, numPoints)
+
+	kmlStr, err := w.Final()
+	if err != nil {
+		return nil, nil, nil, errors.Wrapf(err, "generating KML file")
+	}
+	return []byte(kmlStr), firstPos, lastPos, nil
 }
 
 // startConsumer is a goroutine that reads from the messages channel
@@ -1404,43 +1404,16 @@ func (t *Tracker) updateObservation(project *Project, observation *ProjectObserv
 				if geocodeOK && project.IsEmailNotificationEnabled(TakeoffFromAirport) {
 					// takeoff start
 					log.Debugf("[session %d] %s: sending %s notification", project.Session.ID, s.State.Icao, TakeoffFromAirport)
-					msg, err := email.PrepareTakeoffFromAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffParams{
-						Project:      project.Name,
-						Icao:         s.State.Icao,
-						CallSign:     s.State.CallSign,
-						AirportName:  observation.origin.address,
-						StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
-						StartLocation: email.Location{
-							Latitude:  s.State.Latitude,
-							Longitude: s.State.Longitude,
-						},
-					})
+					err := t.sendTakeoffFromAirportEmail(project, s, observation)
 					if err != nil {
-						return errors.Wrapf(err, "preparing TakeoffFromAirport email")
-					}
-					err = t.opt.Mailer.Queue(*msg)
-					if err != nil {
-						return errors.Wrapf(err, "queueing TakeoffFromAirport email")
+						return err
 					}
 				} else if !geocodeOK && project.IsEmailNotificationEnabled(TakeoffUnknownAirport) {
 					// didn't geocode origin airport
 					log.Debugf("[session %d] %s: sending %s notification", project.Session.ID, s.State.Icao, TakeoffUnknownAirport)
-					msg, err := email.PrepareTakeoffUnknownAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffUnknownAirportParams{
-						Project:      project.Name,
-						Icao:         s.State.Icao,
-						CallSign:     s.State.CallSign,
-						StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
-						StartLocation: email.Location{
-							Latitude:  s.State.Latitude,
-							Longitude: s.State.Longitude,
-						},
-					})
+					err := t.sendTakeoffUnknownAirportEmail(project, s, observation)
 					if err != nil {
-						return errors.Wrapf(err, "preparing TakeoffUnknownAirport email")
-					}
-					err = t.opt.Mailer.Queue(*msg)
-					if err != nil {
-						return errors.Wrapf(err, "queueing TakeoffUnknownAirport email")
+						return err
 					}
 				}
 			} else {
@@ -1453,23 +1426,9 @@ func (t *Tracker) updateObservation(project *Project, observation *ProjectObserv
 					if geocodeOK {
 						airport = observation.origin.address
 					}
-					msg, err := email.PrepareTakeoffComplete(t.mailTemplates, project.NotifyEmail, email.TakeoffCompleteParams{
-						Project:      project.Name,
-						Icao:         s.State.Icao,
-						CallSign:     s.State.CallSign,
-						StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
-						AirportName:  airport,
-						StartLocation: email.Location{
-							Latitude:  s.State.Latitude,
-							Longitude: s.State.Longitude,
-						},
-					})
+					err := t.sendTakeoffCompleteEmail(project, s, observation, airport)
 					if err != nil {
-						return errors.Wrapf(err, "preparing TakeoffComplete email")
-					}
-					err = t.opt.Mailer.Queue(*msg)
-					if err != nil {
-						return errors.Wrapf(err, "queueing TakeoffComplete email")
+						return err
 					}
 				}
 			}
@@ -1478,21 +1437,12 @@ func (t *Tracker) updateObservation(project *Project, observation *ProjectObserv
 
 	if sightingOpened && project.IsEmailNotificationEnabled(SpottedInFlight) {
 		log.Debugf("[session %d] %s: sending %s notification", project.Session.ID, s.State.Icao, SpottedInFlight)
-		msg, err := email.PrepareSpottedInFlightEmail(t.mailTemplates, project.NotifyEmail, email.SpottedInFlightParameters{
-			Project:      project.Name,
-			Icao:         s.State.Icao,
-			CallSign:     s.State.CallSign,
-			StartTime:    s.firstSeen,
-			StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
-		})
+		err := t.sendSpottedInFlightEmail(project, s, observation)
 		if err != nil {
-			return errors.Wrapf(err, "preparing SpottedInFlight email")
-		}
-		err = t.opt.Mailer.Queue(*msg)
-		if err != nil {
-			return errors.Wrapf(err, "queueing SpottedInFlight email")
+			return err
 		}
 	}
+
 	if project.IsFeatureEnabled(GeocodeEndpoints) && observation.origin == nil && observation.HaveLocation() {
 		if observation.altitudeBaro > t.opt.NearestAirportMaxAltitude {
 			// too high for an airport
@@ -1515,6 +1465,117 @@ func (t *Tracker) updateObservation(project *Project, observation *ProjectObserv
 			}
 			observation.origin = location
 		}
+	}
+	return nil
+}
+func (t *Tracker) sendTakeoffFromAirportEmail(project *Project, s *Sighting, observation *ProjectObservation) error {
+	msg, err := email.PrepareTakeoffFromAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffParams{
+		Project:      project.Name,
+		Icao:         s.State.Icao,
+		CallSign:     s.State.CallSign,
+		AirportName:  observation.origin.address,
+		StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+		StartLocation: email.Location{
+			Latitude:  s.State.Latitude,
+			Longitude: s.State.Longitude,
+		},
+	})
+	if err != nil {
+		return errors.Wrapf(err, "preparing TakeoffFromAirport email")
+	}
+	err = t.opt.Mailer.Queue(*msg)
+	if err != nil {
+		return errors.Wrapf(err, "queueing TakeoffFromAirport email")
+	}
+	return nil
+}
+func (t *Tracker) sendTakeoffUnknownAirportEmail(project *Project, s *Sighting, observation *ProjectObservation) error {
+	msg, err := email.PrepareTakeoffUnknownAirport(t.mailTemplates, project.NotifyEmail, email.TakeoffUnknownAirportParams{
+		Project:      project.Name,
+		Icao:         s.State.Icao,
+		CallSign:     s.State.CallSign,
+		StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+		StartLocation: email.Location{
+			Latitude:  s.State.Latitude,
+			Longitude: s.State.Longitude,
+		},
+	})
+	if err != nil {
+		return errors.Wrapf(err, "preparing TakeoffUnknownAirport email")
+	}
+	err = t.opt.Mailer.Queue(*msg)
+	if err != nil {
+		return errors.Wrapf(err, "queueing TakeoffUnknownAirport email")
+	}
+	return nil
+}
+func (t *Tracker) sendTakeoffCompleteEmail(project *Project, s *Sighting, observation *ProjectObservation, airport string) error {
+	msg, err := email.PrepareTakeoffComplete(t.mailTemplates, project.NotifyEmail, email.TakeoffCompleteParams{
+		Project:      project.Name,
+		Icao:         s.State.Icao,
+		CallSign:     s.State.CallSign,
+		StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+		AirportName:  airport,
+		StartLocation: email.Location{
+			Latitude:  s.State.Latitude,
+			Longitude: s.State.Longitude,
+		},
+	})
+	if err != nil {
+		return errors.Wrapf(err, "preparing TakeoffComplete email")
+	}
+	err = t.opt.Mailer.Queue(*msg)
+	if err != nil {
+		return errors.Wrapf(err, "queueing TakeoffComplete email")
+	}
+	return nil
+}
+func (t *Tracker) sendSpottedInFlightEmail(project *Project, s *Sighting, observation *ProjectObservation) error {
+	msg, err := email.PrepareSpottedInFlightEmail(t.mailTemplates, project.NotifyEmail, email.SpottedInFlightParameters{
+		Project:      project.Name,
+		Icao:         s.State.Icao,
+		CallSign:     s.State.CallSign,
+		StartTime:    s.firstSeen,
+		StartTimeFmt: s.firstSeen.Format(time.RFC1123Z),
+	})
+	if err != nil {
+		return errors.Wrapf(err, "preparing SpottedInFlight email")
+	}
+	err = t.opt.Mailer.Queue(*msg)
+	if err != nil {
+		return errors.Wrapf(err, "queueing SpottedInFlight email")
+	}
+	return err
+}
+func (t *Tracker) sendMapProducedEmail(project *Project, s *Sighting, observation *ProjectObservation, ft *FlightTime, plainTextKml []byte, mapUpdated bool, firstPos, lastPos *db.SightingLocation) error {
+	sp := email.MapProducedParameters{
+		Project:      project.Name,
+		Icao:         s.State.Icao,
+		StartTimeFmt: ft.StartTimeFmt,
+		EndTimeFmt:   ft.EndTimeFmt,
+		DurationFmt:  ft.SightingDuration.String(),
+		StartLocation: email.Location{
+			Latitude:  firstPos.Latitude,
+			Longitude: firstPos.Longitude,
+			Altitude:  firstPos.Altitude,
+		},
+		EndLocation: email.Location{
+			Latitude:  lastPos.Latitude,
+			Longitude: lastPos.Longitude,
+			Altitude:  lastPos.Altitude,
+		},
+		MapUpdated: mapUpdated,
+	}
+	if observation.HaveCallSign() {
+		sp.CallSign = observation.CallSign()
+	}
+	msg, err := email.PrepareMapProducedEmail(t.mailTemplates, project.NotifyEmail, plainTextKml, sp)
+	if err != nil {
+		return errors.Wrapf(err, "creating MapProduced email")
+	}
+	err = t.opt.Mailer.Queue(*msg)
+	if err != nil {
+		return errors.Wrapf(err, "queueing MapProduced email for delivery")
 	}
 	return nil
 }
