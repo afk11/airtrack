@@ -87,6 +87,11 @@ message Source {
   // Type - type of producer that produced this message
   SourceType Type = 2;
 };
+// Signal contains signal strength information about the received message
+message Signal {
+  // Rssi - signal strength
+  double Rssi = 1;
+};
 // AircraftInfo represents an entry in the readsb database, containing
 // information about the aircraft
 message AircraftInfo {
@@ -111,8 +116,11 @@ message Operator {
 }
 // Message - a payload produced by one of our receivers
 message Message {
-  // Source identifiers the receiver which produced the message
+  // Source identifies the receiver which produced the message
   Source Source = 1;
+  // Signal contains information about the signal strength. Only
+  // set for BEAST messages currently.
+  Signal Signal = 2;
 
   // Icao - 6 character hex identifier for aircraft
   string Icao = 10;
