@@ -1211,7 +1211,6 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 		}
 		s.State.GroundSpeed = gs
 		s.State.HaveGroundSpeed = true
-
 	}
 	if s.State.IsOnGround != msg.IsOnGround {
 		if s.onGroundCandidate == msg.IsOnGround {

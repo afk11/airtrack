@@ -20,6 +20,7 @@ require (
 	github.com/gorilla/mux v1.7.4
 	github.com/hashicorp/go-immutable-radix v1.2.0
 	github.com/jmoiron/sqlx v1.2.0
+	github.com/jteeuwen/go-bindata v3.0.7+incompatible // indirect
 	github.com/lib/pq v1.2.0
 	github.com/mailru/easyjson v0.7.6
 	github.com/mattn/go-sqlite3 v1.11.0
