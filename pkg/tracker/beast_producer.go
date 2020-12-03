@@ -188,7 +188,7 @@ func (p *BeastProducer) producer(ctx context.Context) {
 					proto.IsOnGround = onground
 				}
 				if signalLevel, err := msg.GetSignalLevel(); err == nil {
-					proto.Rssi = &pb.Signal{Rssi: 10*math.Log10(signalLevel)}
+					proto.Signal = &pb.Signal{Rssi: 10*math.Log10(signalLevel)}
 				}
 				if lat, lon, err := msg.GetDecodeLocation(); err == nil {
 					proto.Latitude = strconv.FormatFloat(lat, 'f', 8, 64)

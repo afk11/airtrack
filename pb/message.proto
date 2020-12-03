@@ -44,7 +44,7 @@ message Operator {
 message Message {
   // Source identifiers the receiver which produced the message
   Source Source = 1;
-  Signal Rssi = 2;
+  Signal Signal = 2;
 
   // Icao - 6 character hex identifier for aircraft
   string Icao = 10;

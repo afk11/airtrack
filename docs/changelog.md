@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+ - Adds a `Signal` proto message, which contains RSSI signal information about
+   a message.
+ - `Message` proto message has new field `Signal` of type `Signal`. Since its
+   an object type, filters can test whether the field is set with `has()`
+
+### Changed
+
+ - Fixes BEAST message processing - call `TrackUpdateFromMessage` ASAP so our message
+   is updated with the processed information.
+
 ## [0.0.1] - 2020-10-09
 
 ### Added
