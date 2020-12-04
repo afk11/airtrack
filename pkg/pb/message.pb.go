@@ -131,11 +131,13 @@ func (x *Source) GetType() Source_SourceType {
 	return Source_AdsbExchange
 }
 
+// Signal contains signal strength information about the received message
 type Signal struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
+	// Rssi - signal strength
 	Rssi float64 `protobuf:"fixed64,1,opt,name=Rssi,proto3" json:"Rssi,omitempty"`
 }
 
@@ -329,8 +331,10 @@ type Message struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	// Source identifiers the receiver which produced the message
+	// Source identifies the receiver which produced the message
 	Source *Source `protobuf:"bytes,1,opt,name=Source,proto3" json:"Source,omitempty"`
+	// Signal contains information about the signal strength. Only
+	// set for BEAST messages currently.
 	Signal *Signal `protobuf:"bytes,2,opt,name=Signal,proto3" json:"Signal,omitempty"`
 	// Icao - 6 character hex identifier for aircraft
 	Icao string `protobuf:"bytes,10,opt,name=Icao,proto3" json:"Icao,omitempty"`

@@ -493,6 +493,15 @@ func (m *ModesMessage) GetFmsAltitude() (int64, error) {
 	}
 	return int64(m.msg.nav.fms_altitude), nil
 }
+// GetMCPAltitude returns the MCP selected altitude, or ErrNoData
+// if the data is not set.
+// todo: units?
+func (m *ModesMessage) GetMCPAltitude() (int64, error) {
+	if C.modesmessage_is_nav_mcp_altitude_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return int64(m.msg.nav.mcp_altitude), nil
+}
 func (m *ModesMessage) GetMsg() ([]byte, error) {
 	return C.GoBytes(unsafe.Pointer(&m.msg.msg), 14), nil
 }

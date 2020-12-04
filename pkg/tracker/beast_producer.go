@@ -140,7 +140,6 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				msg := msgs[i]
 				// call this early so we initialize msg with processed state
 				ac := readsb.TrackUpdateFromMessage(p.decoder, msg)
-
 				proto := &pb.Message{
 					Icao:   msg.GetIcaoHex(),
 					Source: &source,
