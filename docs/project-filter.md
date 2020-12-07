@@ -162,6 +162,11 @@ message Message {
   // FmsAltitude - the target altitude set on the aircrafts navigation
   int64 FmsAltitude = 61;
 
+  // HaveNavHeading - used to indicate that NavHeading is set
+  bool HaveNavHeading = 65;
+  // NavHeading - heading set in navigation
+  double NavHeading = 66;
+
   // HaveCategory - used to indicate that Category is set
   bool HaveCategory = 70;
   // Category - type of the transponder
@@ -169,6 +174,12 @@ message Message {
 
   // GroundSpeed - speed in knots
   string GroundSpeed = 90;
+
+  // HaveTrueAirSpeed indicates whether TrueAirSpeed is set
+  bool HaveTrueAirSpeed = 91;
+  // TrueAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 TrueAirSpeed = 92;
 }
 
 // State contains general information about a sighting.
@@ -184,6 +195,9 @@ message State {
   // Operator information contains the name of the operator and its country.
   // It will only be set if the `OperatorCode` is found in the database.
   Operator Operator = 4;
+
+  // LastSignal contains the signal strength from the last message.
+  Signal LastSignal = 5;
 
   // barometric altitude in feet
   bool HaveAltitudeBarometric = 10;
@@ -240,10 +254,20 @@ message State {
   // FmsAltitude - the target altitude set on navigation instruments
   int64 FmsAltitude = 86;
 
+  // HaveNavHeading indicates whether NavHeading is set.
+  bool HaveNavHeading = 87;
+  // NavHeading - the heading set in navigation
+  double NavHeading = 88;
+
   // HaveGroundSpeed indicates whether GroundSpeed is set.
   bool HaveGroundSpeed = 90;
   // GroundSpeed - the ground speed in knots
   double GroundSpeed = 91;
+  // HaveTrueAirSpeed indicates whether TrueAirSpeed is set
+  bool HaveTrueAirSpeed = 92;
+  // TrueAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 TrueAirSpeed = 93;
 
   // HaveCategory indicates whether Category is set.
   bool HaveCategory = 100;

@@ -183,6 +183,18 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				if gs, err := msg.GetGroundSpeed(); err == nil {
 					proto.GroundSpeed = strconv.FormatFloat(gs, 'f', 1, 64)
 				}
+				if alt, err := msg.GetFmsAltitude(); err == nil {
+					proto.HaveFmsAltitude = true
+					proto.FmsAltitude = alt
+				}
+				if navHeading, err := msg.GetNavHeading(); err == nil {
+					proto.HaveNavHeading = true
+					proto.NavHeading = navHeading
+				}
+				if tas, err := msg.GetTrueAirSpeed(); err == nil {
+					proto.HaveTrueAirSpeed = true
+					proto.TrueAirSpeed = tas
+				}
 				if onground, err := msg.IsOnGround(); err == nil {
 					proto.IsOnGround = onground
 				}

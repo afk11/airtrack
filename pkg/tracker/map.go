@@ -152,7 +152,7 @@ type JSONAircraft struct {
 	// IndicatedAirSpeed: indicated air speed in knots
 	IndicatedAirSpeed int64 `json:"ias,omitempty"`
 	// TrueAirSpeed: true air speed in knots
-	TrueAirSpeed int64 `json:"tas,omitempty"`
+	TrueAirSpeed uint64 `json:"tas,omitempty"`
 	// Mach: Mach number
 	Mach float64 `json:"mach,omitempty"`
 	// Track: true track over ground in degrees (0-359)
@@ -182,7 +182,7 @@ type JSONAircraft struct {
 	// NavAltitudeFMS: selected altitude from the Flight Manaagement System (FMS) (2.2.3.2.7.1.3.3)
 	NavAltitudeFMS int64 `json:"nav_altitude_fms,omitempty"`
 	// NavHeading: selected heading (True or Magnetic is not defined in DO-260B, mostly Magnetic as that is the de facto standard) (2.2.3.2.7.1.3.7)
-	NavHeading string `json:"nav_heading,omitempty"`
+	NavHeading float64 `json:"nav_heading,omitempty"`
 	// NavModes: set of engaged automation modes: 'autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'
 	NavModes string `json:"nav_modes,omitempty"`
 	// Latitude: the aircraft position in decimal degrees
@@ -252,8 +252,14 @@ func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	if state.HaveFmsAltitude {
 		j.NavAltitudeFMS = state.FmsAltitude
 	}
+	if state.HaveNavHeading {
+		j.NavHeading = state.NavHeading
+	}
 	if state.HaveGroundSpeed {
 		j.GroundSpeed = state.GroundSpeed
+	}
+	if state.HaveTrueAirSpeed {
+		j.TrueAirSpeed = state.TrueAirSpeed
 	}
 }
 

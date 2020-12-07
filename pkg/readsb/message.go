@@ -453,6 +453,15 @@ func (m *ModesMessage) GetGroundSpeed() (float64, error) {
 	return float64(m.msg.gs.selected), nil
 }
 
+// GetTrueAirSpeed returns the true airspeed in knots, or ErrNoData
+// if the data is not set.
+func (m *ModesMessage) GetTrueAirSpeed() (uint64, error) {
+	if C.modesmessage_is_tas_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return uint64(m.msg.tas), nil
+}
+
 // GetDecodeLocation will return the position from this message, or ErrNoData if unknown.
 // This field is only set if the message has been processed by TrackUpdateFromMessage as
 // to successfully decode a location you need two consecutive odd + even messages.
@@ -495,6 +504,15 @@ func (m *ModesMessage) GetFmsAltitude() (int64, error) {
 		return 0, ErrNoData
 	}
 	return int64(m.msg.nav.fms_altitude), nil
+}
+
+// GetNavHeading returns the navigation selected heading, or ErrNoData
+// if the data is not set
+func (m *ModesMessage) GetNavHeading() (float64, error) {
+	if C.modesmessage_is_nav_heading_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return float64(m.msg.nav.heading), nil
 }
 
 // GetMCPAltitude returns the MCP selected altitude, or ErrNoData
