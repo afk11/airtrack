@@ -262,3 +262,139 @@ func TestProjectObservation(t *testing.T) {
 	assert.True(t, po3.HaveAltitudeGeometric())
 	assert.Equal(t, int64(10028), po3.AltitudeGeometric())
 }
+
+func TestProjectObservation_LocationUpdateInterval(t *testing.T) {
+	var locationUpdateInterval int64 = 3
+	projCfg := config.Project{
+		Name: "testproj",
+		LocationUpdateInterval: &locationUpdateInterval,
+	}
+	proj, err := InitProject(projCfg)
+	assert.NoError(t, err)
+	proj.Session = &db.Session{ID: 1}
+	s1 := &Sighting{
+		State: pb.State{
+			Icao: "424242",
+		},
+	}
+
+	msgTime := time.Now()
+	po1 := NewProjectObservation(proj, s1, msgTime)
+	assert.NotNil(t, po1)
+
+	// Accepted as there's none there
+	lat1 := 1.1112
+	lon1 := 52.123123
+	assert.NoError(t, po1.SetLocation(lat1, lon1, false, msgTime))
+	assert.Equal(t, msgTime, po1.lastLocation)
+	assert.Equal(t, lat1, po1.latitude)
+	assert.Equal(t, lon1, po1.longitude)
+
+	// Stays the same
+	lat2 := 1.1113
+	lon2 := 52.123120
+	msgTime2 := msgTime.Add(time.Second)
+	assert.NoError(t, po1.SetLocation(lat2, lon2, false, msgTime2))
+	assert.Equal(t, msgTime, po1.lastLocation)
+	assert.Equal(t, lat1, po1.latitude)
+	assert.Equal(t, lon1, po1.longitude)
+
+	// 3 seconds have passed, proceed
+	lat3 := 1.1115
+	lon3 := 52.12318
+	msgTime3 := msgTime.Add(time.Second*3)
+	assert.NoError(t, po1.SetLocation(lat3, lon3, false, msgTime3))
+	assert.Equal(t, msgTime3, po1.lastLocation)
+	assert.Equal(t, lat3, po1.latitude)
+	assert.Equal(t, lon3, po1.longitude)
+}
+
+func TestProjectObservation_LocationUpdateInterval_Zero(t *testing.T) {
+	var locationUpdateInterval int64 = 0
+	projCfg := config.Project{
+		Name: "testproj",
+		LocationUpdateInterval: &locationUpdateInterval,
+	}
+	proj, err := InitProject(projCfg)
+	assert.NoError(t, err)
+	proj.Session = &db.Session{ID: 1}
+	s1 := &Sighting{
+		State: pb.State{
+			Icao: "424242",
+		},
+	}
+
+	msgTime := time.Now()
+	po1 := NewProjectObservation(proj, s1, msgTime)
+	assert.NotNil(t, po1)
+
+	// Accepted as there's none there
+	lat1 := 1.1112
+	lon1 := 52.123123
+	assert.NoError(t, po1.SetLocation(lat1, lon1, false, msgTime))
+	assert.Equal(t, msgTime, po1.lastLocation)
+	assert.Equal(t, lat1, po1.latitude)
+	assert.Equal(t, lon1, po1.longitude)
+
+	// Accepted
+	lat2 := 1.1113
+	lon2 := 52.123120
+	msgTime2 := msgTime.Add(time.Second)
+	assert.NoError(t, po1.SetLocation(lat2, lon2, false, msgTime2))
+	assert.Equal(t, msgTime2, po1.lastLocation)
+	assert.Equal(t, lat2, po1.latitude)
+	assert.Equal(t, lon2, po1.longitude)
+
+	// Accepted
+	lat3 := 1.1115
+	lon3 := 52.12318
+	msgTime3 := msgTime.Add(time.Second*3)
+	assert.NoError(t, po1.SetLocation(lat3, lon3, false, msgTime3))
+	assert.Equal(t, msgTime3, po1.lastLocation)
+	assert.Equal(t, lat3, po1.latitude)
+	assert.Equal(t, lon3, po1.longitude)
+}
+
+func TestProjectObservation_LocationUpdateInterval_NotSet(t *testing.T) {
+	projCfg := config.Project{
+		Name: "testproj",
+	}
+	proj, err := InitProject(projCfg)
+	assert.NoError(t, err)
+	proj.Session = &db.Session{ID: 1}
+	s1 := &Sighting{
+		State: pb.State{
+			Icao: "424242",
+		},
+	}
+
+	msgTime := time.Now()
+	po1 := NewProjectObservation(proj, s1, msgTime)
+	assert.NotNil(t, po1)
+
+	// Accepted as there's none there
+	lat1 := 1.1112
+	lon1 := 52.123123
+	assert.NoError(t, po1.SetLocation(lat1, lon1, false, msgTime))
+	assert.Equal(t, msgTime, po1.lastLocation)
+	assert.Equal(t, lat1, po1.latitude)
+	assert.Equal(t, lon1, po1.longitude)
+
+	// Accepted
+	lat2 := 1.1113
+	lon2 := 52.123120
+	msgTime2 := msgTime.Add(time.Second)
+	assert.NoError(t, po1.SetLocation(lat2, lon2, false, msgTime2))
+	assert.Equal(t, msgTime2, po1.lastLocation)
+	assert.Equal(t, lat2, po1.latitude)
+	assert.Equal(t, lon2, po1.longitude)
+
+	// Accepted
+	lat3 := 1.1115
+	lon3 := 52.12318
+	msgTime3 := msgTime.Add(time.Second*3)
+	assert.NoError(t, po1.SetLocation(lat3, lon3, false, msgTime3))
+	assert.Equal(t, msgTime3, po1.lastLocation)
+	assert.Equal(t, lat3, po1.latitude)
+	assert.Equal(t, lon3, po1.longitude)
+}

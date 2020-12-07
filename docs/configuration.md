@@ -351,6 +351,10 @@ features:
 # is on the ground. The `onground_update_threshold` defines the number of consecutive
 # messages to wait before accepting a new `onground` value.
 [ onground_update_threshold: <int> | default = 6 ]
+
+# Set a minimum interval in seconds between accepting locations. When zero, all locations
+# are accepted. Unit: seconds
+[ location_update_interval: <int> | default = 0 ]
 ```
 
 ### `<notification_config>`

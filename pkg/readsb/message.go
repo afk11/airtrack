@@ -374,6 +374,11 @@ func (a *Aircraft) GetCategory() (string, error) {
 	return fmt.Sprintf("%02x", a.a.fatsv_emitted_category), nil
 }
 
+// GetMessageType returns the message type decoded from the message
+func (m *ModesMessage) GetMessageType() int {
+	return int(m.msg.msgtype)
+}
+
 // GetIcaoHex returns the ICAO as a hex string in upper case
 func (m *ModesMessage) GetIcaoHex() string {
 	icao := [3]byte{}
@@ -452,8 +457,7 @@ func (m *ModesMessage) GetGroundSpeed() (float64, error) {
 // This field is only set if the message has been processed by TrackUpdateFromMessage as
 // to successfully decode a location you need two consecutive odd + even messages.
 func (m *ModesMessage) GetDecodeLocation() (float64, float64, error) {
-	if C.modesmessage_is_cpr_valid(m.msg) != 1 ||
-		C.modesmessage_is_cpr_decoded(m.msg) != 1 {
+	if C.modesmessage_is_cpr_decoded(m.msg) != 1 {
 		return 0, 0, ErrNoData
 	}
 	lat := float64(m.msg.decoded_lat)
@@ -469,6 +473,9 @@ func (m *ModesMessage) IsOnGround() (bool, error) {
 		return false, ErrNoData
 	}
 	return m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_GROUND, nil
+}
+func (m *ModesMessage) GetSignalLevel() (float64, error) {
+	return float64(C.double(m.msg.signalLevel)), nil
 }
 
 // GetHeading returns the heading from the message.
@@ -488,6 +495,19 @@ func (m *ModesMessage) GetFmsAltitude() (int64, error) {
 		return 0, ErrNoData
 	}
 	return int64(m.msg.nav.fms_altitude), nil
+}
+
+// GetMCPAltitude returns the MCP selected altitude, or ErrNoData
+// if the data is not set.
+// todo: units?
+func (m *ModesMessage) GetMCPAltitude() (int64, error) {
+	if C.modesmessage_is_nav_mcp_altitude_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return int64(m.msg.nav.mcp_altitude), nil
+}
+func (m *ModesMessage) GetMsg() ([]byte, error) {
+	return C.GoBytes(unsafe.Pointer(&m.msg.msg), 14), nil
 }
 
 // ParseMessage attempts to decode and process any messages it can find in b.
@@ -540,7 +560,7 @@ func ParseMessage(d *Decoder, b []byte) ([]*ModesMessage, int, error) {
 		som = eom
 		// this ignores errors from messages, some are just CRC decode
 		// errors and so on
-		if err == nil {
+		if err == nil && mm != nil {
 			ret = append(ret, &ModesMessage{msg: mm})
 		}
 	}
@@ -618,12 +638,12 @@ func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.st
 		}
 
 		if msgLen == ModeACMsgBytes {
-			mm := C.struct_modesMessage{}
 			// is a void function
 			C.decodeModeAMessage((*C.struct_modesMessage)(unsafe.Pointer(&mm)), C.int((C.int(msg[0])<<8)|C.int(msg[1])))
+
 		} else {
-			mm := C.struct_modesMessage{}
 			ret := int(C.decodeModesMessage(decoder.modes, (*C.struct_modesMessage)(unsafe.Pointer(&mm)), (*C.uchar)(unsafe.Pointer(&msg[0]))))
+
 			if ret < 0 {
 				if ret == -1 {
 					return nil, errors.New("couldn't validate CRC against known ICAO")
@@ -645,6 +665,9 @@ func NewDecoder() *Decoder {
 	return &Decoder{
 		modes: &C.struct__Modes{},
 	}
+}
+func (d *Decoder) NumBitsToCorrect(nbits int) {
+	d.modes.nfix_crc = C.int8_t(nbits)
 }
 
 // DebugModesMessage writes debug information about the message to w.

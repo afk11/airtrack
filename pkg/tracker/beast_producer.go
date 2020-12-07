@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/pb"
 	"github.com/afk11/airtrack/pkg/readsb"
+	"math"
 	"net"
 	"strconv"
 	"sync"
@@ -87,7 +88,6 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				return
 			}
 		}
-
 		connBuf := make([]byte, 2048)
 		for {
 			// Stop if we received the close signal.
@@ -136,16 +136,19 @@ func (p *BeastProducer) producer(ctx context.Context) {
 			if err != nil {
 				panic(err)
 			}
-			for _, msg := range msgs {
+			for i := range msgs {
+				msg := msgs[i]
+				// call this early so we initialize msg with processed state
 				ac := readsb.TrackUpdateFromMessage(p.decoder, msg)
-
 				proto := &pb.Message{
 					Icao:   msg.GetIcaoHex(),
 					Source: &source,
 				}
-				if category, err := ac.GetCategory(); err == nil {
-					proto.HaveCategory = true
-					proto.Category = category
+				if ac != nil {
+					if category, err := ac.GetCategory(); err == nil {
+						proto.HaveCategory = true
+						proto.Category = category
+					}
 				}
 				if squawk, err := msg.GetSquawk(); err == nil {
 					proto.Squawk = squawk
@@ -183,17 +186,16 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				if onground, err := msg.IsOnGround(); err == nil {
 					proto.IsOnGround = onground
 				}
+				if signalLevel, err := msg.GetSignalLevel(); err == nil {
+					proto.Signal = &pb.Signal{Rssi: 10 * math.Log10(signalLevel)}
+				}
 				if lat, lon, err := msg.GetDecodeLocation(); err == nil {
 					proto.Latitude = strconv.FormatFloat(lat, 'f', 8, 64)
 					proto.Longitude = strconv.FormatFloat(lon, 'f', 8, 64)
 				}
-				if alt, err := msg.GetFmsAltitude(); err == nil {
-					proto.HaveFmsAltitude = true
-					proto.FmsAltitude = alt
-				}
+
 				p.messages <- proto
 			}
-
 			// If we did parse anything, move the tail of the message to
 			// the start of the connection buffer for next time.
 			if som > 0 {
