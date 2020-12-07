@@ -168,9 +168,8 @@ type (
 		searchedOperator bool
 		searchedInfo     bool
 
-		a          *db.Aircraft
-		observedBy map[uint64]*ProjectObservation
-
+		a                 *db.Aircraft
+		observedBy        map[uint64]*ProjectObservation
 		onGroundCandidate bool
 		onGroundCounter   int64
 
@@ -1134,6 +1133,8 @@ func AirlineCodeFromCallsign(callSign string) (string, bool) {
 // UpdateStateFromMessage takes msg and applies new or updated data to the sighting.
 func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
 	s.lastSeen = now
+
+	s.State.LastSignal = msg.Signal
 
 	// Update Sighting state
 	var err error

@@ -113,6 +113,9 @@ message State {
   // It will only be set if the `OperatorCode` is found in the database.
   Operator Operator = 4;
 
+  // LastSignal contains the signal strength from the last message.
+  Signal LastSignal = 5;
+
   // barometric altitude in feet
   bool HaveAltitudeBarometric = 10;
   int64 AltitudeBarometric = 11;
