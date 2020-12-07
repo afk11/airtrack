@@ -1211,6 +1211,14 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 		s.State.HaveTrueAirSpeed = true
 		s.State.TrueAirSpeed = msg.TrueAirSpeed
 	}
+	if msg.HaveIndicatedAirSpeed {
+		s.State.HaveIndicatedAirSpeed = true
+		s.State.IndicatedAirSpeed = msg.IndicatedAirSpeed
+	}
+	if msg.HaveMach {
+		s.State.HaveMach = true
+		s.State.Mach = msg.Mach
+	}
 	if msg.Track != "" {
 		track, err := strconv.ParseFloat(msg.Track, 64)
 		if err != nil {

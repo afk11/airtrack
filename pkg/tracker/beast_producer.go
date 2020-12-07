@@ -195,6 +195,14 @@ func (p *BeastProducer) producer(ctx context.Context) {
 					proto.HaveTrueAirSpeed = true
 					proto.TrueAirSpeed = tas
 				}
+				if ias, err := msg.GetIndicatedAirSpeed(); err == nil {
+					proto.HaveIndicatedAirSpeed = true
+					proto.IndicatedAirSpeed = ias
+				}
+				if mach, err := msg.GetMach(); err == nil {
+					proto.HaveMach = true
+					proto.Mach = mach
+				}
 				if onground, err := msg.IsOnGround(); err == nil {
 					proto.IsOnGround = onground
 				}

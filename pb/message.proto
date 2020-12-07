@@ -108,6 +108,17 @@ message Message {
   // TrueAirSpeed is the true airspeed in knots
   // todo: units?
   uint64 TrueAirSpeed = 92;
+
+  // HaveIndicatedAirSpeed indicates whether IndicatedAirSpeed is set
+  bool HaveIndicatedAirSpeed = 93;
+  // IndicatedAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 IndicatedAirSpeed = 94;
+
+  // HaveMach indicates whether Mach is set
+  bool HaveMach = 95;
+  // Mach is the airspeed in mach
+  double Mach = 96;
 }
 
 // State contains general information about a sighting.
@@ -196,6 +207,17 @@ message State {
   // TrueAirSpeed is the true airspeed in knots
   // todo: units?
   uint64 TrueAirSpeed = 93;
+
+  // HaveIndicatedAirSpeed indicates whether IndicatedAirSpeed is set
+  bool HaveIndicatedAirSpeed = 94;
+  // IndicatedAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 IndicatedAirSpeed = 95;
+
+  // HaveMach indicates whether Mach is set
+  bool HaveMach = 96;
+  // Mach is the airspeed in mach
+  double Mach = 97;
 
   // HaveCategory indicates whether Category is set.
   bool HaveCategory = 100;

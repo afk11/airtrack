@@ -150,7 +150,7 @@ type JSONAircraft struct {
 	// GroundSpeed: ground speed in knots
 	GroundSpeed float64 `json:"gs,omitempty"`
 	// IndicatedAirSpeed: indicated air speed in knots
-	IndicatedAirSpeed int64 `json:"ias,omitempty"`
+	IndicatedAirSpeed uint64 `json:"ias,omitempty"`
 	// TrueAirSpeed: true air speed in knots
 	TrueAirSpeed uint64 `json:"tas,omitempty"`
 	// Mach: Mach number
@@ -260,6 +260,12 @@ func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	}
 	if state.HaveTrueAirSpeed {
 		j.TrueAirSpeed = state.TrueAirSpeed
+	}
+	if state.HaveIndicatedAirSpeed {
+		j.IndicatedAirSpeed = state.IndicatedAirSpeed
+	}
+	if state.HaveMach {
+		j.Mach = state.Mach
 	}
 }
 

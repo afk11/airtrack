@@ -462,6 +462,23 @@ func (m *ModesMessage) GetTrueAirSpeed() (uint64, error) {
 	return uint64(m.msg.tas), nil
 }
 
+// GetIndicatedAirSpeed returns the indicated airspeed in knots, or ErrNoData
+// if the data is not set.
+func (m *ModesMessage) GetIndicatedAirSpeed() (uint64, error) {
+	if C.modesmessage_is_ias_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return uint64(m.msg.ias), nil
+}
+
+// GetMach returns the mach speed, or ErrNoData if the data is not set
+func (m *ModesMessage) GetMach() (float64, error) {
+	if C.modesmessage_is_mach_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return float64(m.msg.mach), nil
+}
+
 // GetDecodeLocation will return the position from this message, or ErrNoData if unknown.
 // This field is only set if the message has been processed by TrackUpdateFromMessage as
 // to successfully decode a location you need two consecutive odd + even messages.
