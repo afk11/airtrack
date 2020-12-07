@@ -7,19 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
- - Adds 'location_update_interval' option to project configuration. Enables frequency
-   of location updates to be managed to one per interval
- - Adds a `Signal` proto message, which contains RSSI signal information about
-   a message.
- - `Message` proto message has new field `Signal` of type `Signal`. Since its
-   an object type, filters can test whether the field is set with `has()`
-
-### Changed
-
- - Fixes BEAST message processing - call `TrackUpdateFromMessage` ASAP so our message
-   is updated with the processed information.
-
 ## [0.0.1] - 2020-10-09
 
 ### Added
@@ -38,3 +25,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - Include openAIP data with distributed releases
  - Add `version` command to airtrack
+
+## [0.0.4] - 2020-12-07
+
+### Added
+
+ - Adds `location_update_interval` option to project configuration. Enables frequency
+   of location updates to be managed to one per interval
+ - Adds a `Signal` proto message, which contains RSSI signal information about
+   a message.
+ - `Message` proto message has new field `Signal` of type `Signal`. Since its
+   an object type, filters can test whether the field is set with `has()`
+ - `State` proto message has new field `LastSignal` of type `Signal`. It contains
+   the `Signal` value of the most recent message
+ - `AircraftMap` now includes RSSI in the aircraft.json
+
+### Changed
+
+ - Fixes BEAST message processing - call `TrackUpdateFromMessage` ASAP so our message
+   is updated with the processed information.
