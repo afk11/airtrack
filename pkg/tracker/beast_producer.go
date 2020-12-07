@@ -140,15 +140,23 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				msg := msgs[i]
 				// call this early so we initialize msg with processed state
 				ac := readsb.TrackUpdateFromMessage(p.decoder, msg)
+				if ac == nil {
+					continue
+				}
 				proto := &pb.Message{
 					Icao:   msg.GetIcaoHex(),
 					Source: &source,
 				}
-				if ac != nil {
-					if category, err := ac.GetCategory(); err == nil {
-						proto.HaveCategory = true
-						proto.Category = category
-					}
+
+				if category, err := ac.GetCategory(); err == nil {
+					proto.HaveCategory = true
+					proto.Category = category
+				}
+				if adsbVersion, err := ac.GetAdsbVersion(); err == nil {
+					proto.ADSBVersion = adsbVersion
+				}
+				if navModes, err := msg.GetNavModes(); err == nil {
+					proto.NavModes = uint32(navModes)
 				}
 				if squawk, err := msg.GetSquawk(); err == nil {
 					proto.Squawk = squawk
@@ -202,6 +210,10 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				if mach, err := msg.GetMach(); err == nil {
 					proto.HaveMach = true
 					proto.Mach = mach
+				}
+				if roll, err := msg.GetRoll(); err == nil {
+					proto.HaveRoll = true
+					proto.Roll = roll
 				}
 				if onground, err := msg.IsOnGround(); err == nil {
 					proto.IsOnGround = onground

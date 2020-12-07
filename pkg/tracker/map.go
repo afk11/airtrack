@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/readsb"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -184,7 +185,7 @@ type JSONAircraft struct {
 	// NavHeading: selected heading (True or Magnetic is not defined in DO-260B, mostly Magnetic as that is the de facto standard) (2.2.3.2.7.1.3.7)
 	NavHeading float64 `json:"nav_heading,omitempty"`
 	// NavModes: set of engaged automation modes: 'autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'
-	NavModes string `json:"nav_modes,omitempty"`
+	NavModes []string `json:"nav_modes,omitempty"`
 	// Latitude: the aircraft position in decimal degrees
 	Latitude float64 `json:"lat,omitempty"`
 	// Longitude: the aircraft longitude in decimal degrees
@@ -266,6 +267,15 @@ func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	}
 	if state.HaveMach {
 		j.Mach = state.Mach
+	}
+	if state.HaveRoll {
+		j.Roll = state.Roll
+	}
+	if state.NavModes != 0 {
+		j.NavModes = readsb.NavModes(state.NavModes).NavModesList()
+	}
+	if state.ADSBVersion != 0 {
+		j.Version = state.ADSBVersion
 	}
 }
 

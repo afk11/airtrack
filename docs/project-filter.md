@@ -180,6 +180,28 @@ message Message {
   // TrueAirSpeed is the true airspeed in knots
   // todo: units?
   uint64 TrueAirSpeed = 92;
+
+  // HaveIndicatedAirSpeed indicates whether IndicatedAirSpeed is set
+  bool HaveIndicatedAirSpeed = 93;
+  // IndicatedAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 IndicatedAirSpeed = 94;
+
+  // HaveMach indicates whether Mach is set
+  bool HaveMach = 95;
+  // Mach is the airspeed in mach
+  double Mach = 96;
+
+  // HaveRoll indicates whether Roll is set
+  bool HaveRoll = 97;
+  // The roll angle in degrees (negative is left roll),
+  double Roll = 98;
+
+  // NavModes - bitmap of NavModes
+  uint32 NavModes = 99;
+
+  // ADSBVersion - ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
+  int64 ADSBVersion = 100;
 }
 
 // State contains general information about a sighting.
@@ -269,9 +291,31 @@ message State {
   // todo: units?
   uint64 TrueAirSpeed = 93;
 
+  // HaveIndicatedAirSpeed indicates whether IndicatedAirSpeed is set
+  bool HaveIndicatedAirSpeed = 94;
+  // IndicatedAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 IndicatedAirSpeed = 95;
+
+  // HaveMach indicates whether Mach is set
+  bool HaveMach = 96;
+  // Mach is the airspeed in mach
+  double Mach = 97;
+
+  // NavModes - bitmap of NavModes
+  uint32 NavModes = 99;
+
   // HaveCategory indicates whether Category is set.
   bool HaveCategory = 100;
   // Category - the transponder type
   string Category = 101;
+
+  // HaveRoll indicates whether Roll is set
+  bool HaveRoll = 105;
+  // The roll angle in degrees (negative is left roll),
+  double Roll = 106;
+
+  // ADSBVersion - ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
+  int64 ADSBVersion = 107;
 }
 ```

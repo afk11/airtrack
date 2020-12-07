@@ -12,6 +12,7 @@ import (
 	"github.com/afk11/airtrack/pkg/kml"
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/readsb"
 	"github.com/afk11/airtrack/pkg/readsb/aircraftdb"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -1195,6 +1196,7 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 				s.State.Icao, s.State.AltitudeBarometric, msg.VerticalRateBarometric)
 		}
 	}
+
 	if msg.HaveVerticalRateGeometric {
 		s.State.HaveVerticalRateGeometric = true
 		s.State.VerticalRateGeometric = msg.VerticalRateBarometric
@@ -1218,6 +1220,20 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	if msg.HaveMach {
 		s.State.HaveMach = true
 		s.State.Mach = msg.Mach
+	}
+	if msg.HaveRoll {
+		s.State.HaveRoll = true
+		s.State.Roll = msg.Roll
+	}
+	if msg.NavModes != 0 {
+		for navMode := range readsb.NavModeNames {
+			if (readsb.NavModes(msg.NavModes) & navMode) != 0 {
+				s.State.NavModes |= uint32(navMode)
+			}
+		}
+	}
+	if msg.ADSBVersion != 0 {
+		s.State.ADSBVersion = msg.ADSBVersion
 	}
 	if msg.Track != "" {
 		track, err := strconv.ParseFloat(msg.Track, 64)

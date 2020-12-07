@@ -229,7 +229,7 @@ import (
 type (
 	// HeadingType - defines different sources for headings
 	HeadingType int
-
+	NavModes    int
 	// Aircraft simply wraps a readsb aircraft pointer so we can pass it around
 	Aircraft struct {
 		a *C.struct_aircraft
@@ -291,6 +291,35 @@ const (
 	HeadingMagneticOrTrue HeadingType = C.HEADING_MAGNETIC_OR_TRUE
 	HeadingTrackOrHeading HeadingType = C.HEADING_TRACK_OR_HEADING
 )
+
+// Values for NavModes
+const (
+	NavModeAutopilot NavModes = 1
+	NavModeVNAV      NavModes = 2
+	NavModeAltHold   NavModes = 4
+	NavModeApproach  NavModes = 8
+	NavModeLNAV      NavModes = 16
+	NavModeTCAS      NavModes = 32
+)
+
+var NavModeNames = map[NavModes]string{
+	NavModeAutopilot: "autopilot",
+	NavModeVNAV:      "vnav",
+	NavModeAltHold:   "althold",
+	NavModeApproach:  "approach",
+	NavModeLNAV:      "lnav",
+	NavModeTCAS:      "tcas",
+}
+
+func (nm NavModes) NavModesList() []string {
+	var strs []string
+	for navMode := NavModes(1); navMode <= NavModeTCAS; navMode <<= 1 {
+		if (navMode & nm) != 0 {
+			strs = append(strs, NavModeNames[navMode])
+		}
+	}
+	return strs
+}
 
 // IcaoFilterInit calls the readsb function icaoFilterInit which
 // initializes an internal filter data structure
@@ -372,6 +401,14 @@ func (a *Aircraft) GetCategory() (string, error) {
 		return "", ErrNoData
 	}
 	return fmt.Sprintf("%02x", a.a.fatsv_emitted_category), nil
+}
+
+// GetAdsbVersion returns the ADSB version, or ErrNoData if unknown
+func (a *Aircraft) GetAdsbVersion() (int64, error) {
+	if a.a.adsb_version > 0 {
+		return 0, ErrNoData
+	}
+	return int64(a.a.adsb_version), nil
 }
 
 // GetMessageType returns the message type decoded from the message
@@ -477,6 +514,23 @@ func (m *ModesMessage) GetMach() (float64, error) {
 		return 0, ErrNoData
 	}
 	return float64(m.msg.mach), nil
+}
+
+// GetRoll returns the roll angle in degrees (negative is left roll),
+// or ErrNoData if the data is not set
+func (m *ModesMessage) GetRoll() (float64, error) {
+	if C.modesmessage_is_roll_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return float64(m.msg.roll), nil
+}
+
+func (m *ModesMessage) GetNavModes() (NavModes, error) {
+	if C.modesmessage_is_nav_modes_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+
+	return NavModes(m.msg.nav.modes), nil
 }
 
 // GetDecodeLocation will return the position from this message, or ErrNoData if unknown.

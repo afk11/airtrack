@@ -39,6 +39,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - `State` proto message has new field `LastSignal` of type `Signal`. It contains
    the `Signal` value of the most recent message
  - `AircraftMap` now includes RSSI in the aircraft.json
+ - `State` and `Message` are updated with new fields: `IndicatedAirSpeed`, `TrueAirSpeed`,
+   `Mach`, `Roll`, `NavHeading`, `NavRoll`, `ADSBVersion`
 
 ### Changed
 
