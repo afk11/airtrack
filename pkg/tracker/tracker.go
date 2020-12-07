@@ -114,11 +114,11 @@ type (
 		sighting     *db.Sighting
 		firstSeen    time.Time
 		lastSeen     time.Time
+		lastLocation time.Time
 		haveCallsign bool
 		callsign     string
-
-		haveSquawk bool
-		squawk     string
+		haveSquawk   bool
+		squawk       string
 
 		origin      *GeocodeLocation
 		destination *GeocodeLocation
@@ -339,6 +339,11 @@ func (o *ProjectObservation) Location() (float64, float64) {
 // SetLocation updates the current location for the sighting, and if track
 // is true, creates a location log to be written to the database.
 func (o *ProjectObservation) SetLocation(lat, lon float64, track bool, msgTime time.Time) error {
+	// if locationUpdateInterval is set, only proceed if msgTime - last location time >= locationUpdateInterval
+	if o.project.LocationUpdateInterval != 0 && msgTime.Sub(o.lastLocation) < o.project.LocationUpdateInterval {
+		return nil
+	}
+
 	if track && o.haveAltBaro {
 		o.dirty = true
 		o.locationLogs = append(o.locationLogs, locationLog{
@@ -348,6 +353,7 @@ func (o *ProjectObservation) SetLocation(lat, lon float64, track bool, msgTime t
 			o.project.Session.ID, o.mem.State.Icao, o.AltitudeBarometric(), lat, lon, o.locationCount)
 		o.locationCount++
 	}
+	o.lastLocation = msgTime
 	o.latitude = lat
 	o.longitude = lon
 	if !o.haveLocation {

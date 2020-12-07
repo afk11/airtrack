@@ -123,6 +123,10 @@ type (
 		// OnGroundUpdateThreshold - how many on_ground messages before we propagate
 		// the change in status
 		OnGroundUpdateThreshold *int64 `yaml:"onground_update_threshold"`
+		// LocationUpdateInterval enforces a minimum duration between location updates.
+		// When set to zero, all location messages are accepted.
+		// Units are seconds.
+		LocationUpdateInterval *int64 `yaml:"location_update_interval"`
 	}
 
 	// Database - connection information about the database

@@ -373,10 +373,12 @@ func (a *Aircraft) GetCategory() (string, error) {
 	}
 	return fmt.Sprintf("%02x", a.a.fatsv_emitted_category), nil
 }
+
 // GetMessageType returns the message type decoded from the message
 func (m *ModesMessage) GetMessageType() int {
 	return int(m.msg.msgtype)
 }
+
 // GetIcaoHex returns the ICAO as a hex string in upper case
 func (m *ModesMessage) GetIcaoHex() string {
 	icao := [3]byte{}
@@ -475,6 +477,7 @@ func (m *ModesMessage) IsOnGround() (bool, error) {
 func (m *ModesMessage) GetSignalLevel() (float64, error) {
 	return float64(C.double(m.msg.signalLevel)), nil
 }
+
 // GetHeading returns the heading from the message.
 // this field is only set if the mesage has been processed by TrackUpdateFromMEssage
 func (m *ModesMessage) GetHeading() (float64, HeadingType, error) {
@@ -493,6 +496,7 @@ func (m *ModesMessage) GetFmsAltitude() (int64, error) {
 	}
 	return int64(m.msg.nav.fms_altitude), nil
 }
+
 // GetMCPAltitude returns the MCP selected altitude, or ErrNoData
 // if the data is not set.
 // todo: units?

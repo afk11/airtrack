@@ -47,6 +47,9 @@ type (
 		// flag before we accept it
 		OnGroundUpdateThreshold int64
 
+		// LocationUpdateInterval - sets a minimum time between location updates.
+		LocationUpdateInterval time.Duration
+
 		// Observations is a map of aircraft ICAO to it's state
 		Observations map[string]*ProjectObservation
 
@@ -162,6 +165,9 @@ func InitProject(cfg config.Project) (*Project, error) {
 	}
 	if cfg.OnGroundUpdateThreshold != nil {
 		p.OnGroundUpdateThreshold = *cfg.OnGroundUpdateThreshold
+	}
+	if cfg.LocationUpdateInterval != nil {
+		p.LocationUpdateInterval = time.Second * time.Duration(*cfg.LocationUpdateInterval)
 	}
 	for _, f := range cfg.Features {
 		feature, err := FeatureFromString(f)
