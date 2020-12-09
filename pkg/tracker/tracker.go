@@ -1196,7 +1196,6 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 				s.State.Icao, s.State.AltitudeBarometric, msg.VerticalRateBarometric)
 		}
 	}
-
 	if msg.HaveVerticalRateGeometric {
 		s.State.HaveVerticalRateGeometric = true
 		s.State.VerticalRateGeometric = msg.VerticalRateBarometric
@@ -1208,6 +1207,10 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	if msg.HaveNavHeading {
 		s.State.HaveNavHeading = true
 		s.State.NavHeading = msg.NavHeading
+	}
+	if msg.HaveNavQNH {
+		s.State.HaveNavQNH = true
+		s.State.NavQNH = msg.NavQNH
 	}
 	if msg.HaveTrueAirSpeed {
 		s.State.HaveTrueAirSpeed = true
@@ -1225,15 +1228,37 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 		s.State.HaveRoll = true
 		s.State.Roll = msg.Roll
 	}
+	if msg.Category != "" {
+		s.State.HaveCategory = true
+		s.State.Category = msg.Category
+	}
 	if msg.NavModes != 0 {
-		for navMode := range readsb.NavModeNames {
-			if (readsb.NavModes(msg.NavModes) & navMode) != 0 {
+		nm := readsb.NavModes(msg.NavModes)
+		for navMode := readsb.NavModes(0); navMode <= readsb.NavModeTCAS; navMode <<= 1 {
+			if (nm & navMode) != 0 {
 				s.State.NavModes |= uint32(navMode)
 			}
 		}
 	}
 	if msg.ADSBVersion != 0 {
 		s.State.ADSBVersion = msg.ADSBVersion
+	}
+	if msg.HaveNACP {
+		s.State.HaveNACP = true
+		s.State.NACP = msg.NACP
+	}
+	if msg.HaveNACV {
+		s.State.HaveNACV = true
+		s.State.NACV = msg.NACV
+	}
+	if msg.HaveNICBaro {
+		s.State.HaveNICBaro = true
+		s.State.NICBaro = msg.NICBaro
+	}
+	if msg.HaveSIL {
+		s.State.HaveSIL = true
+		s.State.SIL = msg.SIL
+		s.State.SILType = msg.SILType
 	}
 	if msg.Track != "" {
 		track, err := strconv.ParseFloat(msg.Track, 64)

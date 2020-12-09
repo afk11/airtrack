@@ -143,20 +143,52 @@ func (p *BeastProducer) producer(ctx context.Context) {
 				if ac == nil {
 					continue
 				}
+				recvTime := msg.SysMessageTime()
 				proto := &pb.Message{
 					Icao:   msg.GetIcaoHex(),
 					Source: &source,
 				}
-
 				if category, err := ac.GetCategory(); err == nil {
 					proto.HaveCategory = true
 					proto.Category = category
+				} else if category, err := msg.GetCategory(); err == nil {
+					proto.HaveCategory = true
+					proto.Category = category
 				}
+
 				if adsbVersion, err := ac.GetAdsbVersion(); err == nil {
 					proto.ADSBVersion = adsbVersion
 				}
+				if sil, silType, err := ac.GetSIL(recvTime); err == nil {
+					proto.HaveSIL = true
+					proto.SIL = sil
+					proto.SILType = uint32(silType)
+				}
+				if sil, silType, err := msg.GetSIL(); err == nil {
+					proto.HaveSIL = true
+					proto.SIL = sil
+					proto.SILType = uint32(silType)
+				}
+
+				if nacp, err := msg.GetNACP(); err == nil {
+					proto.HaveNACP = true
+					proto.NACP = nacp
+				}
+				if nacv, err := msg.GetNACV(); err == nil {
+					proto.HaveNACV = true
+					proto.NACV = nacv
+				}
+				if nacv, err := msg.GetNICBaro(); err == nil {
+					proto.HaveNICBaro = true
+					proto.NICBaro = nacv
+				}
+
 				if navModes, err := msg.GetNavModes(); err == nil {
 					proto.NavModes = uint32(navModes)
+				}
+				if qnh, err := msg.GetNavQNH(); err == nil {
+					proto.HaveNavQNH = true
+					proto.NavQNH = qnh
 				}
 				if squawk, err := msg.GetSquawk(); err == nil {
 					proto.Squawk = squawk

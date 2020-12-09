@@ -177,7 +177,7 @@ type JSONAircraft struct {
 	// Category: emitter category to identify particular aircraft or vehicle classes (values A0 - D7) (2.2.3.2.5.2)
 	Category string `json:"category,omitempty"`
 	// NavQNH: altimeter setting (QFE or QNH/QNE), hPa
-	NavQNH string `json:"nav_qnh,omitempty"`
+	NavQNH float64 `json:"nav_qnh,omitempty"`
 	// NavAltitudeMCP: selected altitude from the Mode Control Panel / Flight Control Unit (MCP/FCU) or equivalent equipment
 	NavAltitudeMCP int64 `json:"nav_altitude_mcp,omitempty"`
 	// NavAltitudeFMS: selected altitude from the Flight Manaagement System (FMS) (2.2.3.2.7.1.3.3)
@@ -199,15 +199,15 @@ type JSONAircraft struct {
 	// Version: ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
 	Version int64 `json:"version,omitempty"`
 	// NicBaro: Navigation Integrity Category for Barometric Altitude (2.2.5.1.35)
-	NicBaro int64 `json:"nic_baro,omitempty"`
+	NicBaro uint32 `json:"nic_baro,omitempty"`
 	// NacP: Navigation Accuracy for Position (2.2.5.1.35)
-	NacP int64 `json:"nac_p,omitempty"`
+	NacP uint32 `json:"nac_p,omitempty"`
 	// NacV: Navigation Accuracy for Velocity (2.2.5.1.19)
-	NacV string `json:"nac_v,omitempty"`
+	NacV uint32 `json:"nac_v,omitempty"`
 	// Sil: Source Integity Level (2.2.5.1.40)
-	Sil int64 `json:"sil,omitempty"`
+	Sil uint32 `json:"sil,omitempty"`
 	// SilType: interpretation of SIL: unknown, perhour, persample
-	SilType string `json:"sil_type,omitempty"`
+	SilType uint32 `json:"sil_type,omitempty"`
 	// GVA: Geometric Vertical Accuracy  (2.2.3.2.7.2.8)
 	GVA int64 `json:"gva,omitempty"`
 	// SDA: System Design Assurance (2.2.3.2.7.2.4.6)
@@ -256,6 +256,9 @@ func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	if state.HaveNavHeading {
 		j.NavHeading = state.NavHeading
 	}
+	if state.HaveNavQNH {
+		j.NavQNH = state.NavQNH
+	}
 	if state.HaveGroundSpeed {
 		j.GroundSpeed = state.GroundSpeed
 	}
@@ -276,6 +279,19 @@ func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	}
 	if state.ADSBVersion != 0 {
 		j.Version = state.ADSBVersion
+	}
+	if state.HaveNACP {
+		j.NacP = state.NACP
+	}
+	if state.HaveNACV {
+		j.NacV = state.NACV
+	}
+	if state.HaveNICBaro {
+		j.NicBaro = state.NICBaro
+	}
+	if state.HaveSIL {
+		j.Sil = state.SIL
+		j.SilType = state.SILType
 	}
 }
 
