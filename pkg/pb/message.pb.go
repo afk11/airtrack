@@ -420,7 +420,8 @@ type Message struct {
 	// HaveSIL indicates whether SIL is set
 	HaveSIL bool `protobuf:"varint,107,opt,name=HaveSIL,proto3" json:"HaveSIL,omitempty"`
 	// SIL: Source Integity Level (2.2.5.1.40)
-	SIL     uint32 `protobuf:"varint,108,opt,name=SIL,proto3" json:"SIL,omitempty"`
+	SIL uint32 `protobuf:"varint,108,opt,name=SIL,proto3" json:"SIL,omitempty"`
+	// SILType: interpretation of SIL: unknown, perhour, persample
 	SILType uint32 `protobuf:"varint,109,opt,name=SILType,proto3" json:"SILType,omitempty"`
 }
 
@@ -901,7 +902,8 @@ type State struct {
 	// HaveSIL indicates whether SIL is set
 	HaveSIL bool `protobuf:"varint,114,opt,name=HaveSIL,proto3" json:"HaveSIL,omitempty"`
 	// SIL: Source Integity Level (2.2.5.1.40)
-	SIL     uint32 `protobuf:"varint,115,opt,name=SIL,proto3" json:"SIL,omitempty"`
+	SIL uint32 `protobuf:"varint,115,opt,name=SIL,proto3" json:"SIL,omitempty"`
+	// SILType: interpretation of SIL: unknown, perhour, persample
 	SILType uint32 `protobuf:"varint,116,opt,name=SILType,proto3" json:"SILType,omitempty"`
 }
 
