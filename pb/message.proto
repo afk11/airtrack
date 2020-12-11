@@ -155,6 +155,7 @@ message Message {
   bool HaveSIL = 107;
   // SIL: Source Integity Level (2.2.5.1.40)
   uint32 SIL = 108;
+  // SILType: interpretation of SIL: unknown, perhour, persample
   uint32 SILType = 109;
 }
 
@@ -296,5 +297,6 @@ message State {
   bool HaveSIL = 114;
   // SIL: Source Integity Level (2.2.5.1.40)
   uint32 SIL = 115;
+  // SILType: interpretation of SIL: unknown, perhour, persample
   uint32 SILType = 116;
 }
