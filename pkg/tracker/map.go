@@ -567,18 +567,21 @@ func (m *AircraftMap) updateJSON(ctx context.Context) {
 				firstRun = false
 			}
 
+			// note: release projMu asap, UpdateHistory triggers codepaths
+			// which require projMu also
 			m.projMu.RLock()
 			projects := make([]string, 0, len(m.projects))
 			for projName := range m.projects {
 				projects = append(projects, projName)
 			}
+			m.projMu.RUnlock()
 			for sk := range m.services {
 				err := m.services[sk].UpdateHistory(projects)
 				if err != nil {
 					panic(err)
 				}
 			}
-			m.projMu.RUnlock()
+
 			lastHistoryUpdate = time.Now()
 		}
 	}

@@ -1075,6 +1075,7 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 			s.mu.Unlock()
 			panic(err)
 		}
+
 		for _, proj := range t.projects {
 			err = t.ProcessMessage(proj, s, now, msg)
 			if err != nil {
@@ -1134,7 +1135,6 @@ func AirlineCodeFromCallsign(callSign string) (string, bool) {
 // UpdateStateFromMessage takes msg and applies new or updated data to the sighting.
 func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
 	s.lastSeen = now
-
 	s.State.LastSignal = msg.Signal
 
 	// Update Sighting state

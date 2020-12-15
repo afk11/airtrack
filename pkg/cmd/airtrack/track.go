@@ -199,7 +199,7 @@ func (l *Loader) Load(c *TrackCmd) error {
 	database := db.NewDatabase(l.dbConn, dialect)
 
 	opt := tracker.Options{
-		Workers:                   64,
+		Workers:                   8,
 		SightingTimeout:           time.Second * 60,
 		OnGroundUpdateThreshold:   tracker.DefaultOnGroundUpdateThreshold,
 		NearestAirportMaxDistance: tracker.DefaultNearestAirportMaxDistance,
