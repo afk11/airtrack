@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
  - Include openAIP data with distributed releases
  - Add `version` command to airtrack
 
-## [0.0.4] - 2020-12-07
+## [0.0.4] - 2020-12-15
 
 ### Added
 
@@ -47,3 +47,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - Fixes BEAST message processing - call `TrackUpdateFromMessage` ASAP so our message
    is updated with the processed information.
+ - Fixes deadlock in tracker/map.go:updateJSON. Release projMu ASAP since ProjectHistory
+   also needs it. Debugged using go-deadlock.
