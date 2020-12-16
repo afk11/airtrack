@@ -49,3 +49,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
    is updated with the processed information.
  - Fixes deadlock in tracker/map.go:updateJSON. Release projMu ASAP since ProjectHistory
    also needs it. Debugged using go-deadlock.
+ - BEAST Server configuration: default to 30005 if nothing provided
