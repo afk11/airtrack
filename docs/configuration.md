@@ -104,8 +104,9 @@ BEAST format messages are produced by dump1090 on port 30005 by default.
 name: <string>
 # Hostname or IP for server
 host: <host>
-# Port for connection (probably 30005)
-port: <port>
+# Port for connection (probably 30005). Optional, as defaults
+# to 30005
+[ port: <port> | default = 30005 ]
 ```
 
 ### `<airports_config>`
