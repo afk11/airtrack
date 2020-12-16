@@ -4,6 +4,7 @@ import (
 	"github.com/afk11/airtrack/pkg/config"
 	assert "github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func featuresToString(features ...Feature) []string {
@@ -66,7 +67,17 @@ func TestInitProject(t *testing.T) {
 
 	assert.NotNil(t, p.Program)
 }
-
+func TestInitProject_LocationUpdateInterval(t *testing.T) {
+	for _, updateInterval := range []int64{1, 10, 30} {
+		cfg := config.Project{
+			Name:                   "myproj",
+			LocationUpdateInterval: &updateInterval,
+		}
+		p, err := InitProject(cfg)
+		assert.NoError(t, err)
+		assert.Equal(t, time.Duration(updateInterval)*time.Second, p.LocationUpdateInterval)
+	}
+}
 func TestInitProject_FewerOptions(t *testing.T) {
 	cfg := config.Project{
 		Name:                    "myproj",

@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
  - Adds `location_update_interval` option to project configuration. Enables frequency
    of location updates to be managed to one per interval
+ - Add `location_update_interval` option to global sightings configuration. Allows
+   control of the default `location_update_interval` if a project has none configured.
  - Adds a `Signal` proto message, which contains RSSI signal information about
    a message.
  - `Message` proto message has new field `Signal` of type `Signal`. Since its

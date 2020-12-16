@@ -208,6 +208,9 @@ func (l *Loader) Load(c *TrackCmd) error {
 	if l.cfg.Sighting.Timeout != nil {
 		opt.SightingTimeout = time.Second * time.Duration(*l.cfg.Sighting.Timeout)
 	}
+	if l.cfg.Sighting.LocationUpdateInterval != nil {
+		opt.LocationUpdateInterval = time.Second * time.Duration(*l.cfg.Sighting.LocationUpdateInterval)
+	}
 
 	if l.cfg.EmailSettings != nil {
 		switch l.cfg.EmailSettings.Driver {

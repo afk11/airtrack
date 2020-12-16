@@ -64,6 +64,9 @@ beast:
 # Configuration for prometheus metrics
 [ metrics: <metrics_config> | default = none ]
 
+# Configure system-wide defaults for all projects
+[ sightings: <sightings_config> | default = none ]
+
 # Project configurations
 projects:
 [ - <project_config> | default = none ]
@@ -353,8 +356,9 @@ features:
 # messages to wait before accepting a new `onground` value.
 [ onground_update_threshold: <int> | default = 6 ]
 
-# Set a minimum interval in seconds between accepting locations. When zero, all locations
-# are accepted. Unit: seconds
+# Set a minimum interval in seconds between accepting locations. When this is zero or
+# not provided, the system-wide default is used (configured in <sightings_config>)
+# Unit: seconds
 [ location_update_interval: <int> | default = 0 ]
 ```
 
@@ -384,4 +388,21 @@ Currently the only available option is to opt the project out of the map.
 ```yaml
 # Disabled can be used to prevent a projects map being visible on the map.
 [ disabled: <boolean> | default = false ]
+```
+
+### `<sightings_config>`
+
+The `<sightings_config>` block allows sighting related defaults to be modified.
+
+```yaml
+# Control the sighting timeout (how long after the last message until the
+# sighting will be closed). A project can also configure a custom timeout.
+# Unit: seconds
+[ timeout: <int> | default = 60s ]
+
+# Control how often location updates are saved. Defaults to zero so all
+# locations are recoded. If non-zero, this number of seconds must pass
+# before another location will be recorded. A project can also configure
+# a custom location_update_interval.
+[ location_update_interval: <int> | default = 0s ]
 ```

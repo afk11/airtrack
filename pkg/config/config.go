@@ -195,6 +195,9 @@ type (
 		// Sighting - some global defaults for sighting configuration
 		Sighting struct {
 			Timeout *int64 `yaml:"timeout"`
+			// LocationUpdateInterval sets a default LocationUpdateInterval
+			// to be used by projects which don't specify
+			LocationUpdateInterval *int64 `yaml:"location_update_interval"`
 		} `yaml:"sighting"`
 		// Projects - list of project configurations
 		Projects []Project `yaml:"projects"`

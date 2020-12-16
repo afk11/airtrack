@@ -64,6 +64,12 @@ type (
 
 		OnGroundUpdateThreshold int64
 
+		// LocationUpdateInterval is the system-wide default location update interval.
+		// If a project has no LocationUpdateInterval configured, this value will be used.
+		// By default, this is zero, so all location updates are accepted. It can be
+		// configured with the Sightings.LocationUpdateInterval configuration option.
+		LocationUpdateInterval time.Duration
+
 		AirportGeocoder *geo.NearestAirportGeocoder
 		Mailer          mailer.MailSender
 
@@ -565,6 +571,11 @@ func (t *Tracker) AddProject(p *Project) error {
 	}
 	p.Project = project
 	p.Session = session
+	// If project hasn't configured a custom LocationUpdateInterval,
+	// ensure we use the system wide one.
+	if !p.HasLocationUpdateInterval {
+		p.LocationUpdateInterval = t.opt.LocationUpdateInterval
+	}
 	t.projects = append(t.projects, p)
 
 	numListeners := len(t.projectStatusListeners)
