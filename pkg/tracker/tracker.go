@@ -1234,7 +1234,7 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	}
 	if msg.NavModes != 0 {
 		nm := readsb.NavModes(msg.NavModes)
-		for navMode := readsb.NavModes(0); navMode <= readsb.NavModeTCAS; navMode <<= 1 {
+		for _, navMode := range readsb.AllNavModes {
 			if (nm & navMode) != 0 {
 				s.State.NavModes |= uint32(navMode)
 			}
