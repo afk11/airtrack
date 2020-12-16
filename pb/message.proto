@@ -90,6 +90,16 @@ message Message {
   // FmsAltitude - the target altitude set on the aircrafts navigation
   int64 FmsAltitude = 61;
 
+  // HaveNavHeading - used to indicate that NavHeading is set
+  bool HaveNavHeading = 65;
+  // NavHeading - heading set in navigation
+  double NavHeading = 66;
+
+  // HaveNavQNH indicates whether NavQNH is set
+  bool HaveNavQNH = 67;
+  // NavQNH - altimeter setting (QFE or QNH/QNE), millibars
+  double NavQNH = 68;
+
   // HaveCategory - used to indicate that Category is set
   bool HaveCategory = 70;
   // Category - type of the transponder
@@ -97,6 +107,56 @@ message Message {
 
   // GroundSpeed - speed in knots
   string GroundSpeed = 90;
+
+  // HaveTrueAirSpeed indicates whether TrueAirSpeed is set
+  bool HaveTrueAirSpeed = 91;
+  // TrueAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 TrueAirSpeed = 92;
+
+  // HaveIndicatedAirSpeed indicates whether IndicatedAirSpeed is set
+  bool HaveIndicatedAirSpeed = 93;
+  // IndicatedAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 IndicatedAirSpeed = 94;
+
+  // HaveMach indicates whether Mach is set
+  bool HaveMach = 95;
+  // Mach is the airspeed in mach
+  double Mach = 96;
+
+  // HaveRoll indicates whether Roll is set
+  bool HaveRoll = 97;
+  // The roll angle in degrees (negative is left roll),
+  double Roll = 98;
+
+  // NavModes - bitmap of NavModes
+  uint32 NavModes = 99;
+
+  // ADSBVersion - ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
+  int64 ADSBVersion = 100;
+
+  // HaveNACP indicates whether NACV is set
+  bool HaveNACP = 101;
+  // NACP: Navigation Accuracy for Position (2.2.5.1.35)
+  uint32 NACP = 102;
+
+  // HaveNACV indicates whether NACV is set
+  bool HaveNACV = 103;
+  // NACV: Navigation Accuracy for Velocity (2.2.5.1.19)
+  uint32 NACV = 104;
+
+  // HaveNICBaro indicates whether NICBaro is set
+  bool HaveNICBaro = 105;
+  // NICBaro: Navigation Integrity Category for Barometric Altitude (2.2.5.1.35)
+  uint32 NICBaro = 106;
+
+  // HaveSIL indicates whether SIL is set
+  bool HaveSIL = 107;
+  // SIL: Source Integity Level (2.2.5.1.40)
+  uint32 SIL = 108;
+  // SILType: interpretation of SIL: unknown, perhour, persample
+  uint32 SILType = 109;
 }
 
 // State contains general information about a sighting.
@@ -112,6 +172,9 @@ message State {
   // Operator information contains the name of the operator and its country.
   // It will only be set if the `OperatorCode` is found in the database.
   Operator Operator = 4;
+
+  // LastSignal contains the signal strength from the last message.
+  Signal LastSignal = 5;
 
   // barometric altitude in feet
   bool HaveAltitudeBarometric = 10;
@@ -149,6 +212,11 @@ message State {
   // IsOnGround tracks whether the aircraft is on ground or in the air.
   bool IsOnGround = 60;
 
+  // HaveNavQNH indicates whether NavQNH is set
+  bool HaveNavQNH = 61;
+  // NavQNH - altimeter setting (QFE or QNH/QNE), millibars
+  double NavQNH = 62;
+
   // HaveVerticalRateBarometric indicates whether VerticalRateBarometric is set.
   bool HaveVerticalRateBarometric = 70;
   // VerticalRateBarometric - barometric change in vertical rate (+/-) in feet per minute
@@ -168,13 +236,67 @@ message State {
   // FmsAltitude - the target altitude set on navigation instruments
   int64 FmsAltitude = 86;
 
+  // HaveNavHeading indicates whether NavHeading is set.
+  bool HaveNavHeading = 87;
+  // NavHeading - the heading set in navigation
+  double NavHeading = 88;
+
   // HaveGroundSpeed indicates whether GroundSpeed is set.
   bool HaveGroundSpeed = 90;
   // GroundSpeed - the ground speed in knots
   double GroundSpeed = 91;
+  // HaveTrueAirSpeed indicates whether TrueAirSpeed is set
+  bool HaveTrueAirSpeed = 92;
+  // TrueAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 TrueAirSpeed = 93;
+
+  // HaveIndicatedAirSpeed indicates whether IndicatedAirSpeed is set
+  bool HaveIndicatedAirSpeed = 94;
+  // IndicatedAirSpeed is the true airspeed in knots
+  // todo: units?
+  uint64 IndicatedAirSpeed = 95;
+
+  // HaveMach indicates whether Mach is set
+  bool HaveMach = 96;
+  // Mach is the airspeed in mach
+  double Mach = 97;
+
+  // NavModes - bitmap of NavModes
+  uint32 NavModes = 99;
 
   // HaveCategory indicates whether Category is set.
   bool HaveCategory = 100;
   // Category - the transponder type
   string Category = 101;
+
+  // HaveRoll indicates whether Roll is set
+  bool HaveRoll = 105;
+  // The roll angle in degrees (negative is left roll),
+  double Roll = 106;
+
+  // ADSBVersion - ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
+  int64 ADSBVersion = 107;
+
+  // HaveNACP indicates whether NACV is set
+  bool HaveNACP = 108;
+  // NACP: Navigation Accuracy for Position (2.2.5.1.35)
+  uint32 NACP = 109;
+
+  // HaveNACV indicates whether NACV is set
+  bool HaveNACV = 110;
+  // NACV: Navigation Accuracy for Velocity (2.2.5.1.19)
+  uint32 NACV = 111;
+
+  // HaveNICBaro indicates whether NICBaro is set
+  bool HaveNICBaro = 112;
+  // NICBaro: Navigation Integrity Category for Barometric Altitude (2.2.5.1.35)
+  uint32 NICBaro = 113;
+
+  // HaveSIL indicates whether SIL is set
+  bool HaveSIL = 114;
+  // SIL: Source Integity Level (2.2.5.1.40)
+  uint32 SIL = 115;
+  // SILType: interpretation of SIL: unknown, perhour, persample
+  uint32 SILType = 116;
 }

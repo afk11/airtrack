@@ -12,6 +12,7 @@ import (
 	"github.com/afk11/airtrack/pkg/kml"
 	"github.com/afk11/airtrack/pkg/mailer"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/readsb"
 	"github.com/afk11/airtrack/pkg/readsb/aircraftdb"
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
@@ -168,9 +169,8 @@ type (
 		searchedOperator bool
 		searchedInfo     bool
 
-		a          *db.Aircraft
-		observedBy map[uint64]*ProjectObservation
-
+		a                 *db.Aircraft
+		observedBy        map[uint64]*ProjectObservation
 		onGroundCandidate bool
 		onGroundCounter   int64
 
@@ -1075,6 +1075,7 @@ func (t *Tracker) startConsumer(ctx context.Context, msgs chan *pb.Message) {
 			s.mu.Unlock()
 			panic(err)
 		}
+
 		for _, proj := range t.projects {
 			err = t.ProcessMessage(proj, s, now, msg)
 			if err != nil {
@@ -1134,6 +1135,7 @@ func AirlineCodeFromCallsign(callSign string) (string, bool) {
 // UpdateStateFromMessage takes msg and applies new or updated data to the sighting.
 func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.Time) error {
 	s.lastSeen = now
+	s.State.LastSignal = msg.Signal
 
 	// Update Sighting state
 	var err error
@@ -1201,6 +1203,62 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 	if msg.HaveFmsAltitude {
 		s.State.HaveFmsAltitude = true
 		s.State.FmsAltitude = msg.FmsAltitude
+	}
+	if msg.HaveNavHeading {
+		s.State.HaveNavHeading = true
+		s.State.NavHeading = msg.NavHeading
+	}
+	if msg.HaveNavQNH {
+		s.State.HaveNavQNH = true
+		s.State.NavQNH = msg.NavQNH
+	}
+	if msg.HaveTrueAirSpeed {
+		s.State.HaveTrueAirSpeed = true
+		s.State.TrueAirSpeed = msg.TrueAirSpeed
+	}
+	if msg.HaveIndicatedAirSpeed {
+		s.State.HaveIndicatedAirSpeed = true
+		s.State.IndicatedAirSpeed = msg.IndicatedAirSpeed
+	}
+	if msg.HaveMach {
+		s.State.HaveMach = true
+		s.State.Mach = msg.Mach
+	}
+	if msg.HaveRoll {
+		s.State.HaveRoll = true
+		s.State.Roll = msg.Roll
+	}
+	if msg.Category != "" {
+		s.State.HaveCategory = true
+		s.State.Category = msg.Category
+	}
+	if msg.NavModes != 0 {
+		nm := readsb.NavModes(msg.NavModes)
+		for navMode := readsb.NavModes(0); navMode <= readsb.NavModeTCAS; navMode <<= 1 {
+			if (nm & navMode) != 0 {
+				s.State.NavModes |= uint32(navMode)
+			}
+		}
+	}
+	if msg.ADSBVersion != 0 {
+		s.State.ADSBVersion = msg.ADSBVersion
+	}
+	if msg.HaveNACP {
+		s.State.HaveNACP = true
+		s.State.NACP = msg.NACP
+	}
+	if msg.HaveNACV {
+		s.State.HaveNACV = true
+		s.State.NACV = msg.NACV
+	}
+	if msg.HaveNICBaro {
+		s.State.HaveNICBaro = true
+		s.State.NICBaro = msg.NICBaro
+	}
+	if msg.HaveSIL {
+		s.State.HaveSIL = true
+		s.State.SIL = msg.SIL
+		s.State.SILType = msg.SILType
 	}
 	if msg.Track != "" {
 		track, err := strconv.ParseFloat(msg.Track, 64)

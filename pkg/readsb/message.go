@@ -147,7 +147,6 @@ int modesmessage_get_accuracy_sda(struct modesMessage *mm) {
     return mm->accuracy.sda;
 }
 
-
 int modesmessage_is_nav_heading_valid(struct modesMessage *mm) {
     return mm->nav.heading_valid;
 }
@@ -212,6 +211,10 @@ int modesmessage_is_opstatus_cc_b2_low(struct modesMessage *mm) {
 int modesmessage_is_opstatus_cc_lw_valid(struct modesMessage *mm) {
     return mm->opstatus.cc_lw_valid;
 }
+
+int aircraft_get_nac_p(struct aircraft *aircraft) {
+    return aircraft->meta.nac_p;
+}
 */
 import "C"
 
@@ -229,7 +232,12 @@ import (
 type (
 	// HeadingType - defines different sources for headings
 	HeadingType int
-
+	// SILType - interpretation of SIL: unknown, perhour, persample.
+	SILType int
+	// NavModes - bitmask of engaged automation modes.d
+	NavModes int
+	// DataSource - where the data came from
+	DataSource int
 	// Aircraft simply wraps a readsb aircraft pointer so we can pass it around
 	Aircraft struct {
 		a *C.struct_aircraft
@@ -291,6 +299,80 @@ const (
 	HeadingMagneticOrTrue HeadingType = C.HEADING_MAGNETIC_OR_TRUE
 	HeadingTrackOrHeading HeadingType = C.HEADING_TRACK_OR_HEADING
 )
+
+// Values for DataSource
+const (
+	SourceInvalid      DataSource = C.SOURCE_INVALID
+	SourceModeAC       DataSource = C.SOURCE_MODE_AC
+	SourceMLAT         DataSource = C.SOURCE_MLAT
+	SourceModeS        DataSource = C.SOURCE_MODE_S
+	SourceModeSChecked DataSource = C.SOURCE_MODE_S_CHECKED
+	SourceTISB         DataSource = C.SOURCE_TISB
+	SourceADSR         DataSource = C.SOURCE_ADSR
+	SourceADSB         DataSource = C.SOURCE_ADSB
+)
+
+// DataSource returns the type of data source as a string
+func (d DataSource) DataSource() string {
+	switch d {
+	case SourceInvalid:
+		return "invalid"
+	case SourceModeAC:
+		return "mode_ac"
+	case SourceMLAT:
+		return "mlat"
+	case SourceModeS:
+		return "mode_s"
+	case SourceModeSChecked:
+		return "mode_s_checked"
+	case SourceTISB:
+		return "tisb"
+	case SourceADSR:
+		return "adsr"
+	case SourceADSB:
+		return "adsb"
+	default:
+		return "unknown source type"
+	}
+}
+
+// Values for SILType
+const (
+	SILInvalid   SILType = 0
+	SILUnknown   SILType = 1
+	SILPerSample SILType = 2
+	SILPerHour   SILType = 3
+)
+
+// Values for NavModes
+const (
+	NavModeAutopilot NavModes = 1
+	NavModeVNAV      NavModes = 2
+	NavModeAltHold   NavModes = 4
+	NavModeApproach  NavModes = 8
+	NavModeLNAV      NavModes = 16
+	NavModeTCAS      NavModes = 32
+)
+
+var navModeNames = map[NavModes]string{
+	NavModeAutopilot: "autopilot",
+	NavModeVNAV:      "vnav",
+	NavModeAltHold:   "althold",
+	NavModeApproach:  "approach",
+	NavModeLNAV:      "lnav",
+	NavModeTCAS:      "tcas",
+}
+
+// NavModesList returns the names of enabled nav modes in a list
+func (nm NavModes) NavModesList() []string {
+	var strs []string
+	for navMode := NavModes(1); navMode <= NavModeTCAS; navMode <<= 1 {
+		if (navMode & nm) != 0 {
+			strs = append(strs, navModeNames[navMode])
+		}
+	}
+	return strs
+}
 
 // IcaoFilterInit calls the readsb function icaoFilterInit which
 // initializes an internal filter data structure
@@ -371,12 +453,61 @@ func (a *Aircraft) GetCategory() (string, error) {
 	if a.a.fatsv_emitted_category == 0 {
 		return "", ErrNoData
 	}
+	fmt.Printf("category %d to str %02x\n", a.a.fatsv_emitted_category, a.a.fatsv_emitted_category)
 	return fmt.Sprintf("%02x", a.a.fatsv_emitted_category), nil
+}
+
+// GetSIL returns the Source Integity Level (2.2.5.1.40), or ErrNoData
+// if unknown
+func (a *Aircraft) GetSIL(recvTime time.Time) (uint32, SILType, error) {
+	trackDataValid := DataSource(a.a.sil_valid.source) != SourceInvalid && uint64(recvTime.Unix()) < uint64(a.a.sil_valid.expires)
+	if !trackDataValid {
+		return 0, 0, ErrNoData
+	}
+	silType := SILType(a.a.fatsv_emitted_sil_type)
+	if silType == SILInvalid {
+		return 0, 0, ErrNoData
+	}
+	return uint32(a.a.fatsv_emitted_sil), silType, nil
+}
+
+//func trackDataValid(v *C.struct__data_validity, now time.Time) bool {
+//	return (*v.source != SourceInvalid) && (uint64(now.Unix()) < (*v.expires))
+//}
+
+// GetNACP returns the Navigation Accuracy for Position (2.2.5.1.35) or ErrNoData if not set
+func (a *Aircraft) GetNACP(recvTime time.Time) (uint32, error) {
+	trackDataValid := DataSource(a.a.nac_p_valid.source) != SourceInvalid && uint64(recvTime.Unix()) < uint64(a.a.nac_p_valid.expires)
+	if !trackDataValid {
+		return 0, ErrNoData
+	}
+	return uint32(a.a.meta.nac_p), nil
+}
+
+// GetAdsbVersion returns the ADSB version, or ErrNoData if unknown
+func (a *Aircraft) GetAdsbVersion() (int64, error) {
+	version := int64(a.a.adsb_version)
+	if version < 0 {
+		return 0, ErrNoData
+	}
+	return version, nil
 }
 
 // GetMessageType returns the message type decoded from the message
 func (m *ModesMessage) GetMessageType() int {
 	return int(m.msg.msgtype)
+}
+
+func fromMsTime(mstime int64) time.Time {
+	secs := mstime / 1000
+	ns := (mstime % 1000) * 1e6
+	return time.Unix(secs, ns)
+}
+
+// SysMessageTime returns the time the message was received
+func (m *ModesMessage) SysMessageTime() time.Time {
+	tsMsg := int64(m.msg.sysTimestampMsg)
+	return fromMsTime(tsMsg)
 }
 
 // GetIcaoHex returns the ICAO as a hex string in upper case
@@ -453,6 +584,98 @@ func (m *ModesMessage) GetGroundSpeed() (float64, error) {
 	return float64(m.msg.gs.selected), nil
 }
 
+// GetTrueAirSpeed returns the true airspeed in knots, or ErrNoData
+// if the data is not set.
+func (m *ModesMessage) GetTrueAirSpeed() (uint64, error) {
+	if C.modesmessage_is_tas_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return uint64(m.msg.tas), nil
+}
+
+// GetIndicatedAirSpeed returns the indicated airspeed in knots, or ErrNoData
+// if the data is not set.
+func (m *ModesMessage) GetIndicatedAirSpeed() (uint64, error) {
+	if C.modesmessage_is_ias_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return uint64(m.msg.ias), nil
+}
+
+// GetMach returns the mach speed, or ErrNoData if the data is not set
+func (m *ModesMessage) GetMach() (float64, error) {
+	if C.modesmessage_is_mach_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return float64(m.msg.mach), nil
+}
+
+// GetRoll returns the roll angle in degrees (negative is left roll),
+// or ErrNoData if the data is not set
+func (m *ModesMessage) GetRoll() (float64, error) {
+	if C.modesmessage_is_roll_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return float64(m.msg.roll), nil
+}
+
+// GetNavModes returns a bitmask of NavModes enabled, or ErrNoData
+// if the data is not set
+func (m *ModesMessage) GetNavModes() (NavModes, error) {
+	if C.modesmessage_is_nav_modes_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+
+	return NavModes(m.msg.nav.modes), nil
+}
+
+// GetNACP returns the Navigation Accuracy for Position (2.2.5.1.35), or ErrNoData
+// if not set
+func (m *ModesMessage) GetNACP() (uint32, error) {
+	if C.modesmessage_is_accuracy_nac_p_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return uint32(C.modesmessage_get_accuracy_nac_p(m.msg)), nil
+}
+
+// GetNACV returns the Navigation Accuracy for Velocity (2.2.5.1.19), or ErrNoData
+// if not set
+func (m *ModesMessage) GetNACV() (uint32, error) {
+	if C.modesmessage_is_accuracy_nac_v_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return uint32(C.modesmessage_get_accuracy_nac_v(m.msg)), nil
+}
+
+// GetNICBaro returns the Navigation Integrity Category for Barometric Altitude (2.2.5.1.35),
+// or ErrNoData if not set
+func (m *ModesMessage) GetNICBaro() (uint32, error) {
+	if C.modesmessage_is_accuracy_nic_baro_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return uint32(C.modesmessage_get_accuracy_nic_baro(m.msg)), nil
+}
+
+// GetCategory returns the hex encoded category, or ErrNoData if not set
+func (m *ModesMessage) GetCategory() (string, error) {
+	if C.modesmessage_is_category_valid(m.msg) != 1 {
+		return "", ErrNoData
+	}
+	return fmt.Sprintf("%02X\n", uint(m.msg.category)), nil
+}
+
+// GetSIL returns the Source Integity Level (2.2.5.1.40), or ErrNoData
+// if unknown
+func (m *ModesMessage) GetSIL() (uint32, SILType, error) {
+	silType := SILType(m.msg.accuracy.sil_type)
+
+	// C.AIRCRAFT_META__SIL_TYPE__SIL_INVALID
+	if silType == SILInvalid {
+		return 0, 0, ErrNoData
+	}
+	return uint32(C.modesmessage_get_accuracy_sil(m.msg)), silType, nil
+}
+
 // GetDecodeLocation will return the position from this message, or ErrNoData if unknown.
 // This field is only set if the message has been processed by TrackUpdateFromMessage as
 // to successfully decode a location you need two consecutive odd + even messages.
@@ -474,6 +697,8 @@ func (m *ModesMessage) IsOnGround() (bool, error) {
 	}
 	return m.msg.airground == C.AIRCRAFT_META__AIR_GROUND__AG_GROUND, nil
 }
+
+// GetSignalLevel returns the signal level field
 func (m *ModesMessage) GetSignalLevel() (float64, error) {
 	return float64(C.double(m.msg.signalLevel)), nil
 }
@@ -497,6 +722,23 @@ func (m *ModesMessage) GetFmsAltitude() (int64, error) {
 	return int64(m.msg.nav.fms_altitude), nil
 }
 
+// GetNavHeading returns the navigation selected heading, or ErrNoData
+// if the data is not set
+func (m *ModesMessage) GetNavHeading() (float64, error) {
+	if C.modesmessage_is_nav_heading_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return float64(m.msg.nav.heading), nil
+}
+
+// GetNavQNH returns the altimiter setting (QFE or QNH/QNE)
+func (m *ModesMessage) GetNavQNH() (float64, error) {
+	if C.modesmessage_is_nav_qnh_valid(m.msg) != 1 {
+		return 0, ErrNoData
+	}
+	return float64(m.msg.nav.qnh), nil
+}
+
 // GetMCPAltitude returns the MCP selected altitude, or ErrNoData
 // if the data is not set.
 // todo: units?
@@ -506,6 +748,8 @@ func (m *ModesMessage) GetMCPAltitude() (int64, error) {
 	}
 	return int64(m.msg.nav.mcp_altitude), nil
 }
+
+// GetMsg returns the raw message bytes
 func (m *ModesMessage) GetMsg() ([]byte, error) {
 	return C.GoBytes(unsafe.Pointer(&m.msg.msg), 14), nil
 }
@@ -609,13 +853,13 @@ func DecodeBinMessage(decoder *Decoder, m []byte, p int, withModeAC bool) (*C.st
 		for j = 0; j < 6; j++ {
 			ch = m[p]
 			p++
-			t = t<<8 | uint64(ch)
+			t = t<<8 | uint64(ch&255)
 			if 0x1a == ch {
 				p++
 			}
 		}
 		mm.timestampMsg = C.ulong(t)
-		mm.sysTimestampMsg = C.ulong(time.Now().Unix())
+		mm.sysTimestampMsg = C.ulong(time.Now().Unix() * 1000)
 
 		// grab the signal level
 		ch = m[p]
@@ -666,6 +910,9 @@ func NewDecoder() *Decoder {
 		modes: &C.struct__Modes{},
 	}
 }
+
+// NumBitsToCorrect sets the number of bits we should
+// correct based on the CRC
 func (d *Decoder) NumBitsToCorrect(nbits int) {
 	d.modes.nfix_crc = C.int8_t(nbits)
 }

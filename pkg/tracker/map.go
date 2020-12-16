@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/config"
 	"github.com/afk11/airtrack/pkg/pb"
+	"github.com/afk11/airtrack/pkg/readsb"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 	"github.com/pkg/errors"
@@ -150,9 +151,9 @@ type JSONAircraft struct {
 	// GroundSpeed: ground speed in knots
 	GroundSpeed float64 `json:"gs,omitempty"`
 	// IndicatedAirSpeed: indicated air speed in knots
-	IndicatedAirSpeed int64 `json:"ias,omitempty"`
+	IndicatedAirSpeed uint64 `json:"ias,omitempty"`
 	// TrueAirSpeed: true air speed in knots
-	TrueAirSpeed int64 `json:"tas,omitempty"`
+	TrueAirSpeed uint64 `json:"tas,omitempty"`
 	// Mach: Mach number
 	Mach float64 `json:"mach,omitempty"`
 	// Track: true track over ground in degrees (0-359)
@@ -176,15 +177,15 @@ type JSONAircraft struct {
 	// Category: emitter category to identify particular aircraft or vehicle classes (values A0 - D7) (2.2.3.2.5.2)
 	Category string `json:"category,omitempty"`
 	// NavQNH: altimeter setting (QFE or QNH/QNE), hPa
-	NavQNH string `json:"nav_qnh,omitempty"`
+	NavQNH float64 `json:"nav_qnh,omitempty"`
 	// NavAltitudeMCP: selected altitude from the Mode Control Panel / Flight Control Unit (MCP/FCU) or equivalent equipment
 	NavAltitudeMCP int64 `json:"nav_altitude_mcp,omitempty"`
 	// NavAltitudeFMS: selected altitude from the Flight Manaagement System (FMS) (2.2.3.2.7.1.3.3)
 	NavAltitudeFMS int64 `json:"nav_altitude_fms,omitempty"`
 	// NavHeading: selected heading (True or Magnetic is not defined in DO-260B, mostly Magnetic as that is the de facto standard) (2.2.3.2.7.1.3.7)
-	NavHeading string `json:"nav_heading,omitempty"`
+	NavHeading float64 `json:"nav_heading,omitempty"`
 	// NavModes: set of engaged automation modes: 'autopilot', 'vnav', 'althold', 'approach', 'lnav', 'tcas'
-	NavModes string `json:"nav_modes,omitempty"`
+	NavModes []string `json:"nav_modes,omitempty"`
 	// Latitude: the aircraft position in decimal degrees
 	Latitude float64 `json:"lat,omitempty"`
 	// Longitude: the aircraft longitude in decimal degrees
@@ -198,15 +199,15 @@ type JSONAircraft struct {
 	// Version: ADS-B Version Number 0, 1, 2 (3-7 are reserved) (2.2.3.2.7.5)
 	Version int64 `json:"version,omitempty"`
 	// NicBaro: Navigation Integrity Category for Barometric Altitude (2.2.5.1.35)
-	NicBaro int64 `json:"nic_baro,omitempty"`
+	NicBaro uint32 `json:"nic_baro,omitempty"`
 	// NacP: Navigation Accuracy for Position (2.2.5.1.35)
-	NacP int64 `json:"nac_p,omitempty"`
+	NacP uint32 `json:"nac_p,omitempty"`
 	// NacV: Navigation Accuracy for Velocity (2.2.5.1.19)
-	NacV string `json:"nac_v,omitempty"`
+	NacV uint32 `json:"nac_v,omitempty"`
 	// Sil: Source Integity Level (2.2.5.1.40)
-	Sil int64 `json:"sil,omitempty"`
+	Sil uint32 `json:"sil,omitempty"`
 	// SilType: interpretation of SIL: unknown, perhour, persample
-	SilType string `json:"sil_type,omitempty"`
+	SilType uint32 `json:"sil_type,omitempty"`
 	// GVA: Geometric Vertical Accuracy  (2.2.3.2.7.2.8)
 	GVA int64 `json:"gva,omitempty"`
 	// SDA: System Design Assurance (2.2.3.2.7.2.4.6)
@@ -227,6 +228,10 @@ type JSONAircraft struct {
 // UpdateWithState updates JSONAircraft with the latest state
 func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	j.Flight = state.CallSign
+	if state.LastSignal != nil {
+		j.Rssi = state.LastSignal.Rssi
+	}
+
 	if state.HaveLocation {
 		j.Latitude = state.Latitude
 		j.Longitude = state.Longitude
@@ -248,8 +253,45 @@ func (j *JSONAircraft) UpdateWithState(state *pb.State) {
 	if state.HaveFmsAltitude {
 		j.NavAltitudeFMS = state.FmsAltitude
 	}
+	if state.HaveNavHeading {
+		j.NavHeading = state.NavHeading
+	}
+	if state.HaveNavQNH {
+		j.NavQNH = state.NavQNH
+	}
 	if state.HaveGroundSpeed {
 		j.GroundSpeed = state.GroundSpeed
+	}
+	if state.HaveTrueAirSpeed {
+		j.TrueAirSpeed = state.TrueAirSpeed
+	}
+	if state.HaveIndicatedAirSpeed {
+		j.IndicatedAirSpeed = state.IndicatedAirSpeed
+	}
+	if state.HaveMach {
+		j.Mach = state.Mach
+	}
+	if state.HaveRoll {
+		j.Roll = state.Roll
+	}
+	if state.NavModes != 0 {
+		j.NavModes = readsb.NavModes(state.NavModes).NavModesList()
+	}
+	if state.ADSBVersion != 0 {
+		j.Version = state.ADSBVersion
+	}
+	if state.HaveNACP {
+		j.NacP = state.NACP
+	}
+	if state.HaveNACV {
+		j.NacV = state.NACV
+	}
+	if state.HaveNICBaro {
+		j.NicBaro = state.NICBaro
+	}
+	if state.HaveSIL {
+		j.Sil = state.SIL
+		j.SilType = state.SILType
 	}
 }
 
@@ -525,18 +567,21 @@ func (m *AircraftMap) updateJSON(ctx context.Context) {
 				firstRun = false
 			}
 
+			// note: release projMu asap, UpdateHistory triggers codepaths
+			// which require projMu also
 			m.projMu.RLock()
 			projects := make([]string, 0, len(m.projects))
 			for projName := range m.projects {
 				projects = append(projects, projName)
 			}
+			m.projMu.RUnlock()
 			for sk := range m.services {
 				err := m.services[sk].UpdateHistory(projects)
 				if err != nil {
 					panic(err)
 				}
 			}
-			m.projMu.RUnlock()
+
 			lastHistoryUpdate = time.Now()
 		}
 	}

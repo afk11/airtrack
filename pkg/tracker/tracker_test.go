@@ -266,7 +266,7 @@ func TestProjectObservation(t *testing.T) {
 func TestProjectObservation_LocationUpdateInterval(t *testing.T) {
 	var locationUpdateInterval int64 = 3
 	projCfg := config.Project{
-		Name: "testproj",
+		Name:                   "testproj",
 		LocationUpdateInterval: &locationUpdateInterval,
 	}
 	proj, err := InitProject(projCfg)
@@ -302,7 +302,7 @@ func TestProjectObservation_LocationUpdateInterval(t *testing.T) {
 	// 3 seconds have passed, proceed
 	lat3 := 1.1115
 	lon3 := 52.12318
-	msgTime3 := msgTime.Add(time.Second*3)
+	msgTime3 := msgTime.Add(time.Second * 3)
 	assert.NoError(t, po1.SetLocation(lat3, lon3, false, msgTime3))
 	assert.Equal(t, msgTime3, po1.lastLocation)
 	assert.Equal(t, lat3, po1.latitude)
@@ -312,7 +312,7 @@ func TestProjectObservation_LocationUpdateInterval(t *testing.T) {
 func TestProjectObservation_LocationUpdateInterval_Zero(t *testing.T) {
 	var locationUpdateInterval int64 = 0
 	projCfg := config.Project{
-		Name: "testproj",
+		Name:                   "testproj",
 		LocationUpdateInterval: &locationUpdateInterval,
 	}
 	proj, err := InitProject(projCfg)
@@ -348,7 +348,7 @@ func TestProjectObservation_LocationUpdateInterval_Zero(t *testing.T) {
 	// Accepted
 	lat3 := 1.1115
 	lon3 := 52.12318
-	msgTime3 := msgTime.Add(time.Second*3)
+	msgTime3 := msgTime.Add(time.Second * 3)
 	assert.NoError(t, po1.SetLocation(lat3, lon3, false, msgTime3))
 	assert.Equal(t, msgTime3, po1.lastLocation)
 	assert.Equal(t, lat3, po1.latitude)
@@ -392,7 +392,7 @@ func TestProjectObservation_LocationUpdateInterval_NotSet(t *testing.T) {
 	// Accepted
 	lat3 := 1.1115
 	lon3 := 52.12318
-	msgTime3 := msgTime.Add(time.Second*3)
+	msgTime3 := msgTime.Add(time.Second * 3)
 	assert.NoError(t, po1.SetLocation(lat3, lon3, false, msgTime3))
 	assert.Equal(t, msgTime3, po1.lastLocation)
 	assert.Equal(t, lat3, po1.latitude)
