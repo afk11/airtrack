@@ -363,10 +363,20 @@ var navModeNames = map[NavModes]string{
 	NavModeTCAS:      "tcas",
 }
 
+// AllNavModes contains a slice of all valid nav modes
+var AllNavModes = []NavModes{
+	NavModeAutopilot,
+	NavModeVNAV,
+	NavModeAltHold,
+	NavModeApproach,
+	NavModeLNAV,
+	NavModeTCAS,
+}
+
 // NavModesList returns the names of enabled nav modes in a list
 func (nm NavModes) NavModesList() []string {
 	var strs []string
-	for navMode := NavModes(1); navMode <= NavModeTCAS; navMode <<= 1 {
+	for _, navMode := range AllNavModes {
 		if (navMode & nm) != 0 {
 			strs = append(strs, navModeNames[navMode])
 		}

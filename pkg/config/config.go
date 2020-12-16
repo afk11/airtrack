@@ -170,8 +170,8 @@ type (
 		Name string `yaml:"name"`
 		// IP or hostname for beast server
 		Host string `yaml:"host"`
-		// Port for beast services (port 30005)
-		Port uint16 `yaml:"port"`
+		// Port for beast services (Optional, defaults to 30005)
+		Port *uint16 `yaml:"port"`
 	}
 
 	// Config - represents the yaml block in the main config file.

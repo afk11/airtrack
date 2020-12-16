@@ -393,7 +393,11 @@ func (l *Loader) Load(c *TrackCmd) error {
 			} else if bcfg.Host == "" {
 				return errors.Errorf("beast server '%s' is missing host field", bcfg.Name)
 			}
-			l.producers = append(l.producers, tracker.NewBeastProducer(l.msgs, bcfg.Host, bcfg.Port, bcfg.Name))
+			var port uint16 = 30005
+			if bcfg.Port != nil {
+				port = *bcfg.Port
+			}
+			l.producers = append(l.producers, tracker.NewBeastProducer(l.msgs, bcfg.Host, port, bcfg.Name))
 		}
 	}
 

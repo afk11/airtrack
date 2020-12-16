@@ -25,6 +25,22 @@ projects:
   - name: global
 ```
 
+If you run a dump1090 or readsb instance, you can receive messages from its BEAST output port.
+Add the following to your config file:
+```yaml
+beast:
+ - name: home
+   host: 10.10.10.92
+#   port: 30005   # port is optional, defaults to 30005
+```
+
+If you have an ADSB Exchange API key, you can configure that to receive information
+about aircraft worldwide from the ADSB Exchange community feeders.
+```yaml
+adsbx:
+  apikey: 42424242-4242-4242-4242-424242424242
+```
+
 ## Migrations
 
 When setting up airtrack for the first time, we'll need to create a database.
