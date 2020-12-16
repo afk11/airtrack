@@ -17,10 +17,6 @@ import (
 var beastSource = &pb.Source{
 	Type: pb.Source_BeastServer,
 }
-var basicOptions = Options{
-	SightingTimeout:         time.Second * 30,
-	OnGroundUpdateThreshold: 1,
-}
 
 func startTracker(database db.Database, c chan *pb.Message, opt Options) *Tracker {
 	tr, err := New(database, opt)
@@ -65,7 +61,10 @@ func TestTracker(t *testing.T) {
 		defer closer()
 		c := make(chan *pb.Message)
 		database := db.NewDatabase(dbConn, dialect)
-		tr := startTracker(database, c, basicOptions)
+		tr := startTracker(database, c, Options{
+			SightingTimeout:         time.Second * 30,
+			OnGroundUpdateThreshold: 1,
+		})
 
 		err := tr.Stop()
 		if err != nil {
@@ -74,13 +73,16 @@ func TestTracker(t *testing.T) {
 	})
 
 	t.Run("message", func(t *testing.T) {
-		opt := basicOptions
+
 		projCfg := config.Project{
 			Name: "testproj",
 		}
 		proj, err := InitProject(projCfg)
 		assert.NoError(t, err)
-		err = doTest(opt, proj, func(tr *Tracker) error {
+		err = doTest(Options{
+			SightingTimeout:         time.Second * 30,
+			OnGroundUpdateThreshold: 1,
+		}, proj, func(tr *Tracker) error {
 			p := pb.Message{Source: beastSource, Icao: "444444"}
 			now := time.Now()
 			s := tr.getSighting(p.Icao, now)
@@ -119,6 +121,81 @@ func TestTracker(t *testing.T) {
 			return nil
 		})
 		assert.NoError(t, err)
+	})
+}
+func TestTracker_AddProject(t *testing.T) {
+	t.Run("LocationUpdateInterval_Default0", func(t *testing.T) {
+		dbConn, dialect, _, closer := test.InitDBUp()
+		defer closer()
+		c := make(chan *pb.Message)
+		database := db.NewDatabase(dbConn, dialect)
+		tr := startTracker(database, c, Options{
+			SightingTimeout:         time.Second * 30,
+			OnGroundUpdateThreshold: 1,
+		})
+
+		cfg := config.Project{
+			Name: "myproj",
+		}
+		proj, err := InitProject(cfg)
+		assert.NoError(t, err)
+		err = tr.AddProject(proj)
+		assert.NoError(t, err)
+		assert.Equal(t, time.Duration(0), proj.LocationUpdateInterval)
+		err = tr.Stop()
+		if err != nil {
+			t.Errorf("error stopping tracker: %s", err)
+		}
+	})
+	t.Run("LocationUpdateInterval_DefaultSet15", func(t *testing.T) {
+		dbConn, dialect, _, closer := test.InitDBUp()
+		defer closer()
+		c := make(chan *pb.Message)
+		database := db.NewDatabase(dbConn, dialect)
+		tr := startTracker(database, c, Options{
+			SightingTimeout:        time.Second * 30,
+			LocationUpdateInterval: time.Second * 15,
+			OnGroundUpdateThreshold: 1,
+		})
+
+		cfg := config.Project{
+			Name: "myproj",
+		}
+		proj, err := InitProject(cfg)
+		assert.NoError(t, err)
+		err = tr.AddProject(proj)
+		assert.NoError(t, err)
+		assert.Equal(t, time.Second*15, proj.LocationUpdateInterval)
+		err = tr.Stop()
+		if err != nil {
+			t.Errorf("error stopping tracker: %s", err)
+		}
+	})
+	t.Run("LocationUpdateInterval_Project16", func(t *testing.T) {
+		dbConn, dialect, _, closer := test.InitDBUp()
+		defer closer()
+		c := make(chan *pb.Message)
+		database := db.NewDatabase(dbConn, dialect)
+		tr := startTracker(database, c, Options{
+			SightingTimeout:        time.Second * 30,
+			LocationUpdateInterval: time.Second * 15,
+			OnGroundUpdateThreshold: 1,
+		})
+
+		updateInterval := int64(16)
+		cfg := config.Project{
+			Name:                   "myproj",
+			LocationUpdateInterval: &updateInterval,
+		}
+		proj, err := InitProject(cfg)
+		assert.NoError(t, err)
+		err = tr.AddProject(proj)
+		assert.NoError(t, err)
+		assert.Equal(t, time.Second*16, proj.LocationUpdateInterval)
+		err = tr.Stop()
+		if err != nil {
+			t.Errorf("error stopping tracker: %s", err)
+		}
 	})
 }
 
