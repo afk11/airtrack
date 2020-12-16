@@ -1,6 +1,5 @@
 package tracker
 
-import "C"
 import (
 	"context"
 	"fmt"
@@ -553,16 +552,21 @@ func (m *AircraftMap) updateJSON(ctx context.Context) {
 			return
 		}
 
-		<-time.After(time.Second)
+		updateTime := <-time.After(time.Second)
+
+		// Update ac with duration since last msg, and duration since last position
 		m.acMu.RLock()
-		for _, ac := range m.ac {
-			ac.Lock()
-			ac.Seen = int64(time.Since(ac.lastMsgTime).Seconds())
-			ac.SeenPos = time.Since(ac.lastPosTime).Seconds()
-			ac.Unlock()
+		for i := range m.ac {
+			m.ac[i].Lock()
+			m.ac[i].Seen = int64(updateTime.Sub(m.ac[i].lastMsgTime).Seconds())
+			m.ac[i].SeenPos = updateTime.Sub(m.ac[i].lastPosTime).Seconds()
+			m.ac[i].Unlock()
 		}
 		m.acMu.RUnlock()
-		if firstRun || time.Since(lastHistoryUpdate) > m.historyInterval {
+
+		// If there are no history files, or historyInterval has passed since lastHistoryUpdate
+		// have each MapServices UpdateHistory for all projects
+		if firstRun || updateTime.Sub(lastHistoryUpdate) > m.historyInterval {
 			if firstRun {
 				firstRun = false
 			}
