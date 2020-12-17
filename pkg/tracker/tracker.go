@@ -1336,6 +1336,11 @@ func (t *Tracker) UpdateStateFromMessage(s *Sighting, msg *pb.Message, now time.
 
 	return nil
 }
+
+// getObservation searches a s for an for an observation by this project.
+// If an observation exists, it is returned. Otherwise, a new observation
+// will be created and associated with the s and project. The returned
+// ProjectObservation will have the write lock held.
 func (t *Tracker) getObservation(project *Project, s *Sighting, msgTime time.Time) (*ProjectObservation, bool) {
 	observation, ok := s.observedBy[project.Session.ID]
 	var sightingOpened bool
@@ -1382,7 +1387,7 @@ func (t *Tracker) ProcessMessage(project *Project, s *Sighting, now time.Time, m
 		}
 	}
 
-	// Initialize project sighting, if not already done
+	// Find or initialize project observation, if not already done
 	observation, sightingOpened := t.getObservation(project, s, now)
 	defer observation.mu.Unlock()
 
