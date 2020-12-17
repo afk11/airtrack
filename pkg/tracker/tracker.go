@@ -605,19 +605,19 @@ func (t *Tracker) startDatabaseTask(ctx context.Context) {
 // processDatabaseUpdates is called periodically to persist
 // recently received data to disk
 func (t *Tracker) processDatabaseUpdates() error {
-	t.projectMu.Lock()
-	defer t.projectMu.Unlock()
+	t.projectMu.RLock()
+	defer t.projectMu.RUnlock()
 	begin := time.Now()
 	updatedSightings := 0
 	var csUpdates []callsignLog
 	var squawkUpdates []squawkLog
 	var locationUpdates []locationLog
 	for _, proj := range t.projects {
-		proj.obsMu.Lock()
+		proj.obsMu.RLock()
 		for _, o := range proj.Observations {
 			createdSighting, csLogs, squawkLogs, locationLogs, err := t.updateSightingAndReturnLogs(o)
 			if err != nil {
-				proj.obsMu.Unlock()
+				proj.obsMu.RUnlock()
 				return err
 			}
 			if createdSighting {
@@ -627,7 +627,7 @@ func (t *Tracker) processDatabaseUpdates() error {
 			squawkUpdates = append(squawkUpdates, squawkLogs...)
 			locationUpdates = append(locationUpdates, locationLogs...)
 		}
-		proj.obsMu.Unlock()
+		proj.obsMu.RUnlock()
 	}
 
 	err := t.writeUpdates(csUpdates, squawkUpdates, locationUpdates)
