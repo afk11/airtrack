@@ -82,7 +82,7 @@ func (p *BeastProducer) producer(ctx context.Context) {
 			fmt.Sprintf("%s:%d", p.host, p.port), time.Second*5)
 		if err != nil {
 			select {
-			case <-time.After(time.Second * 30):
+			case <-time.After(time.Second * 10):
 				continue
 			case <-ctx.Done():
 				return
@@ -101,14 +101,12 @@ func (p *BeastProducer) producer(ctx context.Context) {
 			err = conn.SetReadDeadline(time.Now().Add(60 * time.Second))
 			if err != nil {
 				_ = conn.Close()
-				// Sleep for 30 seconds and attempt to reconnect, or quit
-				// if we received the quit signal.
 				select {
-				case <-time.After(time.Second * 30):
-					continue
+				default:
 				case <-ctx.Done():
 					return
 				}
+				break // not continue, want outer loop to rerun
 			}
 
 			m := 1024
@@ -117,14 +115,12 @@ func (p *BeastProducer) producer(ctx context.Context) {
 			_, err := conn.Read(recvBuf[:]) // recv data
 			if err != nil {
 				_ = conn.Close()
-				// Sleep for 30 seconds and attempt to reconnect, or quit
-				// if we received the quit signal.
 				select {
-				case <-time.After(time.Second * 30):
-					continue
+				default:
 				case <-ctx.Done():
 					return
 				}
+				break // not continue, we want outer loop to rerun
 			}
 
 			// append receivedData to connection buffer for leftovers from

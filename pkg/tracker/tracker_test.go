@@ -153,8 +153,8 @@ func TestTracker_AddProject(t *testing.T) {
 		c := make(chan *pb.Message)
 		database := db.NewDatabase(dbConn, dialect)
 		tr := startTracker(database, c, Options{
-			SightingTimeout:        time.Second * 30,
-			LocationUpdateInterval: time.Second * 15,
+			SightingTimeout:         time.Second * 30,
+			LocationUpdateInterval:  time.Second * 15,
 			OnGroundUpdateThreshold: 1,
 		})
 
@@ -177,8 +177,8 @@ func TestTracker_AddProject(t *testing.T) {
 		c := make(chan *pb.Message)
 		database := db.NewDatabase(dbConn, dialect)
 		tr := startTracker(database, c, Options{
-			SightingTimeout:        time.Second * 30,
-			LocationUpdateInterval: time.Second * 15,
+			SightingTimeout:         time.Second * 30,
+			LocationUpdateInterval:  time.Second * 15,
 			OnGroundUpdateThreshold: 1,
 		})
 
