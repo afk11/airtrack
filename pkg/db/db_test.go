@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"github.com/afk11/airtrack/pkg/test"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	assert "github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -244,16 +243,16 @@ func TestSighting(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, sighting.ID, sightingByID.ID)
 	// again
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		s, err := database.GetSightingByIDTx(tx, sighting.ID)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		s, err := tx.GetSightingByID(sighting.ID)
 		assert.NoError(t, err)
 		assert.NotNil(t, s)
 		assert.Equal(t, sighting.ID, s.ID)
 		return nil
 	}))
 	// again
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		s, err := database.GetLastSightingTx(tx, sess, a)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		s, err := tx.GetLastSighting(sess, a)
 		assert.NoError(t, err)
 		assert.NotNil(t, s)
 		assert.Equal(t, sighting.ID, s.ID)
@@ -263,17 +262,17 @@ func TestSighting(t *testing.T) {
 
 	now := time.Now().In(loc)
 	callsign := "UPS1234"
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err := database.UpdateSightingCallsignTx(tx, sighting, callsign)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err := tx.UpdateSightingCallsign(sighting, callsign)
 		assert.NoError(t, err)
 		return nil
 	}))
 	assert.NotNil(t, sighting.CallSign)
 	assert.Equal(t, callsign, *sighting.CallSign)
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err := database.CreateNewSightingCallSignTx(tx, sighting, callsign, now)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err := tx.CreateNewSightingCallSign(sighting, callsign, now)
 		assert.NoError(t, err)
-		cs, err := database.GetLastSightingCallSignTx(tx, sighting)
+		cs, err := tx.GetLastSightingCallSign(sighting)
 		assert.NoError(t, err)
 		assert.NotNil(t, cs)
 		assert.Equal(t, callsign, cs.CallSign)
@@ -283,17 +282,17 @@ func TestSighting(t *testing.T) {
 	}))
 
 	squawk := "7700"
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err := database.UpdateSightingSquawkTx(tx, sighting, squawk)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err := tx.UpdateSightingSquawk(sighting, squawk)
 		assert.NoError(t, err)
 		return nil
 	}))
 	assert.NotNil(t, sighting.Squawk)
 	assert.Equal(t, squawk, *sighting.Squawk)
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err := database.CreateNewSightingSquawkTx(tx, sighting, squawk, now)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err := tx.CreateNewSightingSquawk(sighting, squawk, now)
 		assert.NoError(t, err)
-		sk, err := database.GetLastSightingSquawkTx(tx, sighting)
+		sk, err := tx.GetLastSightingSquawk(sighting)
 		assert.NoError(t, err)
 		assert.NotNil(t, sk)
 		assert.Equal(t, squawk, sk.Squawk)
@@ -314,8 +313,8 @@ func TestSighting(t *testing.T) {
 	err = database.CloseSightingBatch([]*Sighting{sighting}, now.Add(time.Second*3))
 	assert.NoError(t, err)
 	assert.NotNil(t, sighting.ClosedAt)
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err = database.ReopenSightingTx(tx, sighting)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err = tx.ReopenSighting(sighting)
 		assert.NoError(t, err)
 		assert.Nil(t, sighting.ClosedAt)
 		return nil
@@ -379,8 +378,8 @@ func TestSightingLocation(t *testing.T) {
 	lat2 := 1.9899523
 	lon2 := 1.238889
 	alt2 := int64(10015)
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err = database.CreateSightingLocationTx(tx, sighting.ID, now, alt2, lat2, lon2)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err = tx.CreateSightingLocation(sighting.ID, now, alt2, lat2, lon2)
 		assert.NoError(t, err)
 		return nil
 	}))
@@ -442,8 +441,8 @@ func TestEmail(t *testing.T) {
 	assert.Nil(t, rows)
 
 	encoded := []byte(`{"to":"testuser@developer.local","subject":"[unittest] 42424242 (THIC4F): spotted in flight","body":"Project: unittest\u003cbr /\u003e\n\n42424242\n\n THIC4F\n\nspotted in flight.\n\u003cbr /\u003e\n\u003cbr /\u003e\n\u003cul\u003e\n    \u003cli\u003eTime: 03 Oct 20 18:40 IST\u003c/li\u003e\n    \u003cli\u003ePlace: \u003ca href=\"https://www.openstreetmap.org/#map=13/0/0\"\u003e0, 0\u003c/a\u003e @ 0 ft\u003c/li\u003e\n\u003c/ul\u003e\n","attachments":null}`)
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err = database.CreateEmailJobTx(tx, now, encoded)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err = tx.CreateEmailJob(now, encoded)
 		assert.NoError(t, err)
 		return nil
 	}))
@@ -454,8 +453,8 @@ func TestEmail(t *testing.T) {
 	assert.Equal(t, 1, len(rows))
 	assert.True(t, bytes.Equal(encoded, rows[0].Job))
 
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err := database.DeleteCompletedEmailTx(tx, rows[0])
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err := tx.DeleteCompletedEmail(rows[0])
 		assert.NoError(t, err)
 		return nil
 	}))
@@ -464,8 +463,8 @@ func TestEmail(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Nil(t, rows)
 
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err = database.CreateEmailJobTx(tx, now, encoded)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err = tx.CreateEmailJob(now, encoded)
 		assert.NoError(t, err)
 		return nil
 	}))
@@ -473,23 +472,23 @@ func TestEmail(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, rows)
 	later := time.Now().Add(time.Second * 10)
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err = database.RetryEmailAfterTx(tx, &rows[0], later)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err = tx.RetryEmailAfter(&rows[0], later)
 		assert.NoError(t, err)
 		assert.Equal(t, later, *rows[0].RetryAfter)
 		assert.Equal(t, int32(1), rows[0].Retries)
 		return nil
 	}))
 	later = later.Add(time.Second * 10)
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err = database.RetryEmailAfterTx(tx, &rows[0], later)
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err = tx.RetryEmailAfter(&rows[0], later)
 		assert.NoError(t, err)
 		assert.Equal(t, later, *rows[0].RetryAfter)
 		assert.Equal(t, int32(2), rows[0].Retries)
 		return nil
 	}))
-	assert.NoError(t, database.Transaction(func(tx *sqlx.Tx) error {
-		_, err = database.MarkEmailFailedTx(tx, &rows[0])
+	assert.NoError(t, database.Transaction(func(tx Queries) error {
+		_, err = tx.MarkEmailFailed(&rows[0])
 		assert.NoError(t, err)
 		assert.Equal(t, int32(EmailFailed), rows[0].Status)
 		return nil

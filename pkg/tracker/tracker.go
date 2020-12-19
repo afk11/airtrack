@@ -17,7 +17,6 @@ import (
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/common/types"
 	"github.com/google/uuid"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	log "github.com/sirupsen/logrus"
@@ -660,17 +659,17 @@ func (t *Tracker) updateSightingAndReturnLogs(o *ProjectObservation) (bool, []ca
 	var locationUpdates []locationLog
 	if hasNoSighting || hasCsLogs || hasSquawkLogs {
 		// Updates regarding the sighting record (also to gather build up inserts for batching)
-		err := t.database.Transaction(func(tx *sqlx.Tx) error {
+		err := t.database.Transaction(func(tx db.Queries) error {
 			var err error
 			if hasNoSighting {
-				o.sighting, _, err = t.initProjectSighting(tx, o.project, o.mem.a, o.firstSeen)
+				o.sighting, _, err = initProjectSighting(tx, o.project, o.mem.a, o.firstSeen)
 				if err != nil {
 					// Cleanup reserved sighting
 					return errors.Wrapf(err, "failed to init project sighting")
 				}
 			}
 			if hasCsLogs {
-				res, err := t.database.UpdateSightingCallsignTx(tx, o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
+				res, err := tx.UpdateSightingCallsign(o.sighting, o.csLogs[len(o.csLogs)-1].callsign)
 				if err != nil {
 					return errors.Wrap(err, "updating sighting callsign")
 				} else if err = db.CheckRowsUpdated(res, 1); err != nil {
@@ -684,7 +683,7 @@ func (t *Tracker) updateSightingAndReturnLogs(o *ProjectObservation) (bool, []ca
 				o.csLogs = nil
 			}
 			if hasSquawkLogs {
-				_, err := t.database.UpdateSightingSquawkTx(tx, o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
+				_, err := tx.UpdateSightingSquawk(o.sighting, o.squawkLogs[len(o.squawkLogs)-1].squawk)
 				// todo: add this back in once we have 'sighting restore' added.
 				// reopened sightings trigger update though row count will be zero
 				if err != nil {
@@ -727,11 +726,11 @@ func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLo
 
 	// Insert new callsigns, squawks, and location logs in batches
 	for i := 0; i < numCsUpdates; i += csBatch {
-		err := t.database.Transaction(func(tx *sqlx.Tx) error {
+		err := t.database.Transaction(func(tx db.Queries) error {
 			var err error
 			last := min(numCsUpdates, i+csBatch)
 			for j := i; j < last; j++ {
-				_, err = t.database.CreateNewSightingCallSignTx(tx, csUpdates[j].sighting, csUpdates[j].callsign, csUpdates[j].time)
+				_, err = tx.CreateNewSightingCallSign(csUpdates[j].sighting, csUpdates[j].callsign, csUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating callsign record")
 				}
@@ -743,11 +742,11 @@ func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLo
 		}
 	}
 	for i := 0; i < numSquawkUpdates; i += csBatch {
-		err := t.database.Transaction(func(tx *sqlx.Tx) error {
+		err := t.database.Transaction(func(tx db.Queries) error {
 			var err error
 			last := min(numSquawkUpdates, i+csBatch)
 			for j := i; j < last; j++ {
-				_, err = t.database.CreateNewSightingSquawkTx(tx, squawkUpdates[j].sighting, squawkUpdates[j].squawk, squawkUpdates[j].time)
+				_, err = tx.CreateNewSightingSquawk(squawkUpdates[j].sighting, squawkUpdates[j].squawk, squawkUpdates[j].time)
 				if err != nil {
 					return errors.Wrap(err, "creating squawk record")
 				}
@@ -759,10 +758,10 @@ func (t *Tracker) writeUpdates(csUpdates []callsignLog, squawkUpdates []squawkLo
 		}
 	}
 	for i := 0; i < numLocationUpdates; i += csBatch {
-		err := t.database.Transaction(func(tx *sqlx.Tx) error {
+		err := t.database.Transaction(func(tx db.Queries) error {
 			last := min(numLocationUpdates, i+csBatch)
 			for j := i; j < last; j++ {
-				_, err := t.database.CreateSightingLocationTx(tx, locationUpdates[j].sighting.ID, locationUpdates[j].time,
+				_, err := tx.CreateSightingLocation(locationUpdates[j].sighting.ID, locationUpdates[j].time,
 					locationUpdates[j].alt, locationUpdates[j].lat, locationUpdates[j].lon)
 				if err != nil {
 					return errors.Wrapf(err, "failed to insert sighting location")
@@ -1680,8 +1679,8 @@ func (t *Tracker) loadAircraft(icao string, seenTime time.Time) (*db.Aircraft, e
 }
 
 // initProjectSighting creates or reopens a sighting for the aircraft in the provided project
-func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft, firstSeenTime time.Time) (*db.Sighting, bool, error) {
-	s, err := t.database.GetLastSightingTx(tx, p.Session, ac)
+func initProjectSighting(tx db.Queries, p *Project, ac *db.Aircraft, firstSeenTime time.Time) (*db.Sighting, bool, error) {
+	s, err := tx.GetLastSighting(p.Session, ac)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, false, err
 	}
@@ -1695,7 +1694,7 @@ func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft, 
 		// todo: maybe other checks here, like, finished_on_ground or something to avoid rapid stops, so
 		// we break up legs of the journey
 		if timeSinceClosed < p.ReopenSightingsInterval {
-			res, err := t.database.ReopenSightingTx(tx, s)
+			res, err := tx.ReopenSighting(s)
 			if err != nil {
 				return nil, false, errors.Wrap(err, "reopening sighting")
 			} else if err = db.CheckRowsUpdated(res, 1); err != nil {
@@ -1708,11 +1707,11 @@ func (t *Tracker) initProjectSighting(tx *sqlx.Tx, p *Project, ac *db.Aircraft, 
 	}
 
 	// A new sighting is needed
-	_, err = t.database.CreateSightingTx(tx, p.Session, ac, firstSeenTime)
+	_, err = tx.CreateSighting(p.Session, ac, firstSeenTime)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "creating sighting record failed")
 	}
-	s, err = t.database.GetLastSightingTx(tx, p.Session, ac)
+	s, err = tx.GetLastSighting(p.Session, ac)
 	if err != nil {
 		return nil, false, errors.Wrapf(err, "load new sighting failed")
 	}

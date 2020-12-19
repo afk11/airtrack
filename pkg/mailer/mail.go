@@ -9,7 +9,6 @@ import (
 	"fmt"
 	"github.com/afk11/airtrack/pkg/db"
 	"github.com/afk11/mail"
-	"github.com/jmoiron/sqlx"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"io/ioutil"
@@ -185,9 +184,9 @@ func (m *Mailer) processMails() error {
 		}
 
 		if len(finishedEmails) > 0 {
-			err = m.database.Transaction(func(tx *sqlx.Tx) error {
+			err = m.database.Transaction(func(tx db.Queries) error {
 				for i := range finishedEmails {
-					_, err = m.database.DeleteCompletedEmailTx(tx, finishedEmails[i])
+					_, err = tx.DeleteCompletedEmail(finishedEmails[i])
 					if err != nil {
 						return errors.Wrapf(err, "deleting completed email %d", finishedEmails[i].ID)
 					}
@@ -200,15 +199,15 @@ func (m *Mailer) processMails() error {
 		}
 
 		if len(failedEmails) > 0 {
-			err = m.database.Transaction(func(tx *sqlx.Tx) error {
+			err = m.database.Transaction(func(tx db.Queries) error {
 				for i := range failedEmails {
 					if failedEmails[i].Retries == 4 {
-						_, err = m.database.MarkEmailFailedTx(tx, &failedEmails[i])
+						_, err = tx.MarkEmailFailed(&failedEmails[i])
 						if err != nil {
 							return errors.Wrapf(err, "marking email failed %d", failedEmails[i].ID)
 						}
 					} else {
-						_, err = m.database.RetryEmailAfterTx(tx, &failedEmails[i], time.Now().Add(time.Minute*2))
+						_, err = tx.RetryEmailAfter(&failedEmails[i], time.Now().Add(time.Minute*2))
 						if err != nil {
 							return errors.Wrapf(err, "updating email retry information %d", failedEmails[i].ID)
 						}
@@ -226,13 +225,13 @@ func (m *Mailer) processMails() error {
 
 // addMailsToDb encodes and persist queued jobs.
 func (m *Mailer) addMailsToDb(now time.Time, queued []EmailJob) error {
-	return m.database.Transaction(func(tx *sqlx.Tx) error {
+	return m.database.Transaction(func(tx db.Queries) error {
 		for idx := range queued {
 			encoded, err := encodeJob(&queued[idx])
 			if err != nil {
 				return err
 			}
-			_, err = m.database.CreateEmailJobTx(tx, now, encoded)
+			_, err = m.database.CreateEmailJob(now, encoded)
 			if err != nil {
 				return err
 			}
