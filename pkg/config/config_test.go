@@ -378,8 +378,15 @@ database:
 }
 
 func TestReadConfigs(t *testing.T) {
-	t.Run("empty config file", func(t *testing.T) {
+	t.Run("empty config filepath", func(t *testing.T) {
 		_, err := ReadConfigs("", nil)
-		assert.EqualError(t, err, "configuration file empty")
+		assert.EqualError(t, err, "reading main config file: empty configuration file path provided")
+	})
+}
+
+func TestReadProjectConfigs(t *testing.T) {
+	t.Run("empty filepath", func(t *testing.T) {
+		_, err := ReadProjectsConfigFromFile("")
+		assert.EqualError(t, err, "empty project file path provided")
 	})
 }

@@ -250,6 +250,9 @@ func (d *Database) DataSource(loc *time.Location) (string, error) {
 // a Config structure. An error will be returned if duplicated project
 // names are encountered.
 func ReadConfigFromFile(filepath string) (*Config, error) {
+	if filepath == "" {
+		return nil, errors.New("empty configuration file path provided")
+	}
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
@@ -282,6 +285,9 @@ func ReadConfig(r io.Reader) (*Config, error) {
 // a Config structure. An error will be returned if duplicated project
 // names are encountered.
 func ReadProjectsConfigFromFile(filepath string) (*ProjectsConfig, error) {
+	if filepath == "" {
+		return nil, errors.New("empty project file path provided")
+	}
 	f, err := os.Open(filepath)
 	if err != nil {
 		return nil, err
@@ -314,9 +320,6 @@ func ReadProjectsConfig(r io.Reader) (*ProjectsConfig, error) {
 // any extra project only files, and return the initialized configuration.
 // An error will be returned if duplicated project names are encountered.
 func ReadConfigs(configFile string, projectsFiles []string) (*Config, error) {
-	if configFile == "" {
-		return nil, errors.New("configuration file empty")
-	}
 	cfg, err := ReadConfigFromFile(configFile)
 	if err != nil {
 		return nil, errors.Wrap(err, "reading main config file")
