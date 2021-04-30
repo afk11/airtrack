@@ -219,7 +219,7 @@ GEM
     rb-fsevent (0.10.4)
     rb-inotify (0.10.1)
       ffi (~> 1.0)
-    rexml (3.2.4)
+    rexml (3.2.5)
     rouge (3.19.0)
     ruby-enum (0.8.0)
       i18n
@@ -253,7 +253,6 @@ PLATFORMS
 
 DEPENDENCIES
   github-pages (~> 207)
-  jekyll-theme-architect (~> 0.1.1)
 
 BUNDLED WITH
    2.1.4
